@@ -322,11 +322,18 @@ function FontField({
 
 const nodeTypes = { geo: GeoNodeView };
 
+export interface EditorApi {
+  /** imperatively set a node param (used by the 3D gizmo to write tx/ty/tz) */
+  setParam: (nodeId: string, name: string, value: unknown) => void;
+}
+
 export interface NodeEditorProps {
   initialNodes: GeoNode[];
   initialEdges: Edge[];
   initialOutputId: string;
   onChange: (graph: Graph, outputId: string) => void;
+  /** hands the parent an imperative handle once mounted */
+  onReady?: (api: EditorApi) => void;
 }
 
 let uid = 0;
@@ -378,6 +385,7 @@ export default function NodeEditor({
   initialEdges,
   initialOutputId,
   onChange,
+  onReady,
 }: NodeEditorProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<GeoNode>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
@@ -486,6 +494,10 @@ export default function NodeEditor({
   );
 
   const setOutput = useCallback((id: string) => setOutputId(id), []);
+
+  useEffect(() => {
+    onReady?.({ setParam });
+  }, [onReady, setParam]);
 
   const onConnect = useCallback(
     (c: Connection) => {

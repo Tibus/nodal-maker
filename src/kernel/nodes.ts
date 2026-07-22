@@ -165,6 +165,16 @@ const REGISTRY: Record<string, NodeImpl> = {
     return { kind: "solid", solid };
   },
 
+  /** Translate a solid. tx/ty/tz are editable in 3D via the viewport gizmo. */
+  transform: (inputs, params) => {
+    const solid = expectSolid(inputs.in, "transform");
+    const tx = Number(params.tx ?? 0);
+    const ty = Number(params.ty ?? 0);
+    const tz = Number(params.tz ?? 0);
+    if (tx === 0 && ty === 0 && tz === 0) return { kind: "solid", solid };
+    return { kind: "solid", solid: solid.translate(tx, ty, tz) as Shape3D };
+  },
+
   /**
    * THE SPIKE — "extrude on the result of an extrude, taking the cap".
    *

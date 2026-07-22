@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import type { Edge, Node } from "@xyflow/react";
 import { Viewport } from "./viewport";
-import NodeEditor from "./NodeEditor";
+import NodeEditor, { type EditorApi } from "./NodeEditor";
 import { kernel, type Params, type MeshImportParams, type Graph } from "./kernel/client";
 import type { BuildResult } from "./kernel/model";
 import { DEFAULT_PARAMS } from "./kernel/model";
@@ -50,6 +50,7 @@ export default function App() {
   const [meshCut, setMeshCut] = useState(false);
   const [mode, setMode] = useState<Mode>("form");
   const graphTimer = useRef<number | undefined>(undefined);
+  const editorApi = useRef<EditorApi | null>(null);
 
   useEffect(() => {
     if (mountRef.current && !viewportRef.current) {
@@ -94,6 +95,25 @@ export default function App() {
         setStatus(
           `graph · ${res.mesh.stats.faceCount} regions · ${res.mesh.stats.triangleCount} triangles`,
         );
+
+        // if the displayed node is a Transform, offer a 3D translation gizmo
+        const out = graph.find((n) => n.id === outputId);
+        if (out?.type === "transform") {
+          const t: [number, number, number] = [
+            Number(out.params?.tx ?? 0),
+            Number(out.params?.ty ?? 0),
+            Number(out.params?.tz ?? 0),
+          ];
+          viewportRef.current?.showTranslateGizmo(t, ([nx, ny, nz]) => {
+            const api = editorApi.current;
+            const r = (v: number) => Math.round(v * 2) / 2; // snap to the 0.5 step
+            api?.setParam(outputId, "tx", r(nx));
+            api?.setParam(outputId, "ty", r(ny));
+            api?.setParam(outputId, "tz", r(nz));
+          });
+        } else {
+          viewportRef.current?.hideGizmo();
+        }
       } catch (e) {
         setStatus("error: " + (e instanceof Error ? e.message : String(e)));
       } finally {
@@ -101,6 +121,11 @@ export default function App() {
       }
     }, 250);
   }, []);
+
+  // the gizmo only belongs to graph mode
+  useEffect(() => {
+    if (mode !== "graph") viewportRef.current?.hideGizmo();
+  }, [mode]);
 
   // mesh-domain rebuild: an STL is loaded → import + repair (+ optional cut)
   const meshOpts = useCallback(
@@ -180,6 +205,9 @@ export default function App() {
           initialEdges={SEED_EDGES}
           initialOutputId="boss"
           onChange={onGraphChange}
+          onReady={(api) => {
+            editorApi.current = api;
+          }}
         />
       ) : (
       <div className="panel">

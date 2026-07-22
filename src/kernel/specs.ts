@@ -100,6 +100,17 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     output: "solid",
     params: [{ name: "height", kind: "number", default: 10, min: 1, max: 100, step: 1 }],
   },
+  transform: {
+    type: "transform",
+    label: "Transform",
+    inputs: [{ name: "in", type: "solid" }],
+    output: "solid",
+    params: [
+      { name: "tx", kind: "number", label: "move X", default: 0, min: -100, max: 100, step: 0.5 },
+      { name: "ty", kind: "number", label: "move Y", default: 0, min: -100, max: 100, step: 0.5 },
+      { name: "tz", kind: "number", label: "move Z", default: 0, min: -100, max: 100, step: 0.5 },
+    ],
+  },
   bossOnCap: {
     type: "bossOnCap",
     label: "Boss on cap",

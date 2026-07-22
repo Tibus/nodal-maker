@@ -135,6 +135,13 @@ l'impression 3D, que des utilisateurs customisent en changeant des paramètres
   (`queryLocalFonts`, Chromium, permission + onglet visible requis) + repli upload
   `.ttf/.otf` — FAIT (`FontField` dans NodeEditor). Erreur gérée proprement si
   l'API est absente ou l'accès refusé.
+- ✅ **Nœud `Transform` (translation) + gizmo 3D** — FAIT : nœud solid→solid
+  (`tx/ty/tz`, ports optionnels nombre) ; quand il est le nœud affiché, un gizmo
+  Three.js `TransformControls` apparaît sur l'objet et écrit `tx/ty/tz` en direct
+  (pont `NodeEditor.onReady` → `App` → `viewport.showTranslateGizmo`). Le viewport
+  ne recentre plus le mesh (coords réelles) et ne re-cadre qu'au 1er rendu.
+  Vérifié navigateur : drag → objet déplacé + param move Y = 30,5.
+  - **Suite** : rotation/échelle (gizmo modes rotate/scale), transform sur mesh.
 - Éditeur : auto-layout, groupes de nœuds, copier/coller.
 
 ### Spike n°2 — notes techniques (Manifold)
