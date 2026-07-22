@@ -212,6 +212,31 @@ const REGISTRY: Record<string, NodeImpl> = {
     return { kind: "solid", solid };
   },
 
+  /** Round all edges of a solid (congé). radius 0 = passthrough. */
+  fillet: (inputs, params) => {
+    const solid = expectSolid(inputs.in, "fillet");
+    const r = Number(params.radius ?? 0);
+    return { kind: "solid", solid: r > 0 ? (solid.fillet(r) as Shape3D) : solid };
+  },
+  /** Chamfer (bevel) all edges of a solid. distance 0 = passthrough. */
+  bevel: (inputs, params) => {
+    const solid = expectSolid(inputs.in, "bevel");
+    const d = Number(params.distance ?? 0);
+    return { kind: "solid", solid: d > 0 ? (solid.chamfer(d) as Shape3D) : solid };
+  },
+  /** Round the corners of a 2D profile (great for laser-cut parts). */
+  fillet2d: (inputs, params) => {
+    const dr = expectSketch(inputs.in, "fillet2d");
+    const r = Number(params.radius ?? 0);
+    return { kind: "sketch2d", drawing: r > 0 ? dr.fillet(r) : dr };
+  },
+  /** Chamfer the corners of a 2D profile. */
+  bevel2d: (inputs, params) => {
+    const dr = expectSketch(inputs.in, "bevel2d");
+    const d = Number(params.distance ?? 0);
+    return { kind: "sketch2d", drawing: d > 0 ? dr.chamfer(d) : dr };
+  },
+
   /** Translate a solid. tx/ty/tz are editable in 3D via the viewport gizmo. */
   transform: (inputs, params) => {
     const solid = expectSolid(inputs.in, "transform");
