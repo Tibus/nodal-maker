@@ -16,8 +16,10 @@
 import {
   type Drawing,
   type Shape3D,
+  draw,
   drawRectangle,
   drawCircle,
+  drawEllipse,
   drawPolysides,
   makeBaseBox,
   makeCylinder,
@@ -203,6 +205,75 @@ const REGISTRY: Record<string, NodeImpl> = {
     kind: "sketch2d",
     drawing: drawPolysides(Number(params.radius ?? 20), Math.max(3, Math.round(Number(params.sides ?? 6)))),
   }),
+  ellipse: (_inputs, params) => ({
+    kind: "sketch2d",
+    drawing: drawEllipse(Number(params.rx ?? 30), Number(params.ry ?? 18)),
+  }),
+  star: (_inputs, params) => {
+    const outer = Number(params.outer ?? 30);
+    const inner = Number(params.inner ?? 14);
+    const n = Math.max(3, Math.round(Number(params.points ?? 5)));
+    const pts: [number, number][] = [];
+    for (let i = 0; i < n * 2; i++) {
+      const r = i % 2 === 0 ? outer : inner;
+      const a = (Math.PI * i) / n - Math.PI / 2;
+      pts.push([r * Math.cos(a), r * Math.sin(a)]);
+    }
+    let pen = draw(pts[0]);
+    for (let i = 1; i < pts.length; i++) pen = pen.lineTo(pts[i]);
+    return { kind: "sketch2d", drawing: pen.close() };
+  },
+  slot: (_inputs, params) => {
+    const len = Number(params.length ?? 40);
+    const w = Number(params.width ?? 12);
+    return { kind: "sketch2d", drawing: drawRectangle(len, w, w / 2) };
+  },
+  boolean2d: (inputs, params) => {
+    const a = expectSketch(inputs.a, "boolean2d");
+    const b = expectSketch(inputs.b, "boolean2d");
+    const op = String(params.op ?? "union");
+    const out = op === "difference" ? a.cut(b) : op === "intersection" ? a.intersect(b) : a.fuse(b);
+    return { kind: "sketch2d", drawing: out };
+  },
+  mirror2d: (inputs, params) => {
+    const dr = expectSketch(inputs.in, "mirror2d");
+    // axis "X" → flip across the X axis (direction [0,1]); "Y" → across Y ([1,0])
+    const dir: [number, number] = String(params.axis ?? "X") === "X" ? [0, 1] : [1, 0];
+    return { kind: "sketch2d", drawing: dr.mirror(dir, [0, 0], "plane") };
+  },
+  transform2d: (inputs, params) => {
+    const dr = expectSketch(inputs.in, "transform2d");
+    let out = dr;
+    const sc = Number(params.scale ?? 1);
+    if (sc !== 1) out = out.scale(sc);
+    const rot = Number(params.rotate ?? 0);
+    if (rot !== 0) out = out.rotate(rot);
+    const tx = Number(params.tx ?? 0);
+    const ty = Number(params.ty ?? 0);
+    if (tx !== 0 || ty !== 0) out = out.translate(tx, ty);
+    return { kind: "sketch2d", drawing: out };
+  },
+  arrayLinear2d: (inputs, params) => {
+    const dr = expectSketch(inputs.in, "arrayLinear2d");
+    const count = Math.max(1, Math.round(Number(params.count ?? 3)));
+    const dx = Number(params.dx ?? 25);
+    const dy = Number(params.dy ?? 0);
+    let out = dr;
+    for (let i = 1; i < count; i++) out = out.fuse(dr.translate(dx * i, dy * i));
+    return { kind: "sketch2d", drawing: out };
+  },
+  arrayRadial2d: (inputs, params) => {
+    const dr = expectSketch(inputs.in, "arrayRadial2d");
+    const count = Math.max(1, Math.round(Number(params.count ?? 6)));
+    const radius = Number(params.radius ?? 40);
+    const total = Number(params.angle ?? 360);
+    const base = radius !== 0 ? dr.translate(radius, 0) : dr;
+    const full = Math.abs(total) >= 360;
+    const denom = full ? count : Math.max(1, count - 1);
+    let out = base;
+    for (let i = 1; i < count; i++) out = out.fuse(base.rotate((total / denom) * i));
+    return { kind: "sketch2d", drawing: out };
+  },
 
   /* --- primitives 3D (sources) --- */
   box: (_inputs, params) => ({

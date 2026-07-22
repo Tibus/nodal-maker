@@ -159,6 +159,88 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
       { name: "sides", kind: "number", default: 6, min: 3, max: 24, step: 1 },
     ],
   },
+  ellipse: {
+    type: "ellipse",
+    label: "Ellipse 2D",
+    inputs: [],
+    output: "sketch2d",
+    params: [
+      { name: "rx", kind: "number", default: 30, min: 0.5, max: 300, step: 0.5 },
+      { name: "ry", kind: "number", default: 18, min: 0.5, max: 300, step: 0.5 },
+    ],
+  },
+  star: {
+    type: "star",
+    label: "Star 2D",
+    inputs: [],
+    output: "sketch2d",
+    params: [
+      { name: "outer", kind: "number", default: 30, min: 1, max: 300, step: 0.5 },
+      { name: "inner", kind: "number", default: 14, min: 0.5, max: 300, step: 0.5 },
+      { name: "points", kind: "number", default: 5, min: 3, max: 24, step: 1 },
+    ],
+  },
+  slot: {
+    type: "slot",
+    label: "Slot 2D",
+    inputs: [],
+    output: "sketch2d",
+    params: [
+      { name: "length", kind: "number", default: 40, min: 1, max: 300, step: 1 },
+      { name: "width", kind: "number", default: 12, min: 1, max: 300, step: 0.5 },
+    ],
+  },
+  boolean2d: {
+    type: "boolean2d",
+    label: "Boolean 2D",
+    inputs: [
+      { name: "a", type: "sketch2d" },
+      { name: "b", type: "sketch2d" },
+    ],
+    output: "sketch2d",
+    params: [{ name: "op", kind: "select", default: "union", options: ["union", "difference", "intersection"] }],
+  },
+  mirror2d: {
+    type: "mirror2d",
+    label: "Mirror 2D",
+    inputs: [{ name: "in", type: "sketch2d" }],
+    output: "sketch2d",
+    params: [{ name: "axis", kind: "select", default: "X", options: ["X", "Y"] }],
+  },
+  transform2d: {
+    type: "transform2d",
+    label: "Transform 2D",
+    inputs: [{ name: "in", type: "sketch2d" }],
+    output: "sketch2d",
+    params: [
+      { name: "tx", kind: "number", default: 0, min: -300, max: 300, step: 0.5 },
+      { name: "ty", kind: "number", default: 0, min: -300, max: 300, step: 0.5 },
+      { name: "rotate", kind: "number", label: "rotate°", default: 0, min: -360, max: 360, step: 1 },
+      { name: "scale", kind: "number", default: 1, min: 0.05, max: 20, step: 0.05 },
+    ],
+  },
+  arrayLinear2d: {
+    type: "arrayLinear2d",
+    label: "Array Linear 2D",
+    inputs: [{ name: "in", type: "sketch2d" }],
+    output: "sketch2d",
+    params: [
+      { name: "count", kind: "number", default: 3, min: 1, max: 200, step: 1 },
+      { name: "dx", kind: "number", default: 25, min: -300, max: 300, step: 0.5 },
+      { name: "dy", kind: "number", default: 0, min: -300, max: 300, step: 0.5 },
+    ],
+  },
+  arrayRadial2d: {
+    type: "arrayRadial2d",
+    label: "Array Radial 2D",
+    inputs: [{ name: "in", type: "sketch2d" }],
+    output: "sketch2d",
+    params: [
+      { name: "count", kind: "number", default: 6, min: 1, max: 200, step: 1 },
+      { name: "radius", kind: "number", default: 40, min: 0, max: 300, step: 1 },
+      { name: "angle", kind: "number", label: "total°", default: 360, min: -360, max: 360, step: 1 },
+    ],
+  },
   box: {
     type: "box",
     label: "Box 3D",
