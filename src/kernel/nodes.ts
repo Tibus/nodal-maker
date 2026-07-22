@@ -288,6 +288,73 @@ const REGISTRY: Record<string, NodeImpl> = {
     kind: "solid",
     solid: makeSphere(Number(params.radius ?? 20)) as Shape3D,
   }),
+  cone: (_inputs, params) => {
+    const r = Number(params.radius ?? 15);
+    const h = Number(params.height ?? 30);
+    const profile = draw([0, 0]).lineTo([r, 0]).lineTo([0, h]).close();
+    return { kind: "solid", solid: profile.sketchOnPlane("XZ").revolve() as Shape3D };
+  },
+  torus: (_inputs, params) => {
+    const major = Number(params.radius ?? 25);
+    const tube = Number(params.tube ?? 7);
+    const profile = drawCircle(tube).translate(major, 0);
+    return { kind: "solid", solid: profile.sketchOnPlane("XZ").revolve() as Shape3D };
+  },
+  revolve: (inputs, params) => {
+    const dr = expectSketch(inputs.in, "revolve");
+    const angle = Number(params.angle ?? 360);
+    const solid = dr.sketchOnPlane("XZ").revolve([0, 0, 1], { angle }) as Shape3D;
+    return { kind: "solid", solid };
+  },
+
+  /* --- ops 3D --- */
+  boolean3d: (inputs, params) => {
+    const a = expectSolid(inputs.a, "boolean3d");
+    const b = expectSolid(inputs.b, "boolean3d");
+    const op = String(params.op ?? "union");
+    const out = op === "difference" ? a.cut(b) : op === "intersection" ? a.intersect(b) : a.fuse(b);
+    return { kind: "solid", solid: out as Shape3D };
+  },
+  mirror3d: (inputs, params) => {
+    const solid = expectSolid(inputs.in, "mirror3d");
+    const plane = String(params.plane ?? "YZ") as "XY" | "XZ" | "YZ";
+    return { kind: "solid", solid: solid.clone().mirror(plane) as Shape3D };
+  },
+  rotate3d: (inputs, params) => {
+    const solid = expectSolid(inputs.in, "rotate3d");
+    const angle = Number(params.angle ?? 0);
+    const axis = String(params.axis ?? "Z");
+    const dir: [number, number, number] = axis === "X" ? [1, 0, 0] : axis === "Y" ? [0, 1, 0] : [0, 0, 1];
+    return { kind: "solid", solid: solid.clone().rotate(angle, [0, 0, 0], dir) as Shape3D };
+  },
+  scale3d: (inputs, params) => {
+    const solid = expectSolid(inputs.in, "scale3d");
+    const f = Number(params.factor ?? 1);
+    return { kind: "solid", solid: solid.clone().scale(f) as Shape3D };
+  },
+  arrayLinear3d: (inputs, params) => {
+    const solid = expectSolid(inputs.in, "arrayLinear3d");
+    const count = Math.max(1, Math.round(Number(params.count ?? 3)));
+    const dx = Number(params.dx ?? 40);
+    const dy = Number(params.dy ?? 0);
+    const dz = Number(params.dz ?? 0);
+    let out: Shape3D = solid;
+    for (let i = 1; i < count; i++) {
+      out = out.fuse(solid.clone().translate(dx * i, dy * i, dz * i) as Shape3D) as Shape3D;
+    }
+    return { kind: "solid", solid: out };
+  },
+  arrayRadial3d: (inputs, params) => {
+    const solid = expectSolid(inputs.in, "arrayRadial3d");
+    const count = Math.max(1, Math.round(Number(params.count ?? 6)));
+    const total = Number(params.angle ?? 360);
+    const denom = Math.abs(total) >= 360 ? count : Math.max(1, count - 1);
+    let out: Shape3D = solid;
+    for (let i = 1; i < count; i++) {
+      out = out.fuse(solid.clone().rotate((total / denom) * i, [0, 0, 0], [0, 0, 1]) as Shape3D) as Shape3D;
+    }
+    return { kind: "solid", solid: out };
+  },
 
   /** Union several 2D profiles into one (overlaps resolved). */
   group: (inputs) => {
