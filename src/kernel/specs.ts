@@ -68,6 +68,62 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     output: "text",
     params: [{ name: "value", kind: "text", label: "value", default: "" }],
   },
+  math: {
+    type: "math",
+    label: "Math",
+    inputs: [],
+    output: "number",
+    params: [
+      { name: "a", kind: "number", default: 0, min: -1000, max: 1000, step: 0.5 },
+      { name: "b", kind: "number", default: 0, min: -1000, max: 1000, step: 0.5 },
+      { name: "op", kind: "select", default: "add", options: ["add", "subtract", "multiply", "divide", "power", "modulo", "min", "max"] },
+    ],
+  },
+  mathUnary: {
+    type: "mathUnary",
+    label: "Math (unary)",
+    inputs: [],
+    output: "number",
+    params: [
+      { name: "x", kind: "number", default: 0, min: -1000, max: 1000, step: 0.5 },
+      { name: "op", kind: "select", default: "abs", options: ["negate", "abs", "sqrt", "sin", "cos", "tan", "round", "floor", "ceil"] },
+    ],
+  },
+  clamp: {
+    type: "clamp",
+    label: "Clamp",
+    inputs: [],
+    output: "number",
+    params: [
+      { name: "value", kind: "number", default: 0, min: -1000, max: 1000, step: 0.5 },
+      { name: "min", kind: "number", default: 0, min: -1000, max: 1000, step: 0.5 },
+      { name: "max", kind: "number", default: 1, min: -1000, max: 1000, step: 0.5 },
+    ],
+  },
+  remap: {
+    type: "remap",
+    label: "Remap",
+    inputs: [],
+    output: "number",
+    params: [
+      { name: "value", kind: "number", default: 0, min: -1000, max: 1000, step: 0.1 },
+      { name: "inMin", kind: "number", default: 0, min: -1000, max: 1000, step: 0.1 },
+      { name: "inMax", kind: "number", default: 1, min: -1000, max: 1000, step: 0.1 },
+      { name: "outMin", kind: "number", default: 0, min: -1000, max: 1000, step: 0.1 },
+      { name: "outMax", kind: "number", default: 10, min: -1000, max: 1000, step: 0.1 },
+    ],
+  },
+  random: {
+    type: "random",
+    label: "Random",
+    inputs: [],
+    output: "number",
+    params: [
+      { name: "seed", kind: "number", default: 1, min: 0, max: 99999, step: 1 },
+      { name: "min", kind: "number", default: 0, min: -1000, max: 1000, step: 0.5 },
+      { name: "max", kind: "number", default: 1, min: -1000, max: 1000, step: 0.5 },
+    ],
+  },
   svgInput: {
     type: "svgInput",
     label: "SVG input",
