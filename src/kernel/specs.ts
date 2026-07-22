@@ -7,7 +7,7 @@
  * `GraphValue["kind"]` there.
  */
 
-export type SocketType = "sketch2d" | "solid" | "mesh" | "number" | "text";
+export type SocketType = "sketch2d" | "solid" | "mesh" | "number" | "text" | "selection";
 
 export interface PortSpec {
   name: string;
@@ -40,6 +40,7 @@ export const SOCKET_COLORS: Record<SocketType, string> = {
   mesh: "#56b6c2", // cyan   — triangle meshes
   number: "#98c379", // green  — scalar numbers
   text: "#e5c07b", // yellow — strings
+  selection: "#d19a66", // amber — face/edge selections (criteria)
 };
 
 /**
@@ -391,19 +392,55 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     output: "solid",
     params: [{ name: "height", kind: "number", default: 10, min: 1, max: 100, step: 1 }],
   },
+  edgeSelect: {
+    type: "edgeSelect",
+    label: "Edge Select",
+    inputs: [],
+    output: "selection",
+    params: [
+      { name: "where", kind: "select", default: "vertical", options: ["all", "vertical", "horizontal-x", "horizontal-y", "atZ"] },
+      { name: "offset", kind: "number", label: "atZ offset", default: 0, min: -300, max: 300, step: 0.5 },
+    ],
+  },
+  faceSelect: {
+    type: "faceSelect",
+    label: "Face Select",
+    inputs: [],
+    output: "selection",
+    params: [
+      { name: "where", kind: "select", default: "top", options: ["all", "top", "bottom", "horizontal", "vertical-x", "vertical-y", "planar", "cylindrical"] },
+      { name: "offset", kind: "number", label: "top/bottom Z", default: 0, min: -300, max: 300, step: 0.5 },
+    ],
+  },
   fillet: {
     type: "fillet",
     label: "Fillet",
-    inputs: [{ name: "in", type: "solid" }],
+    inputs: [
+      { name: "in", type: "solid" },
+      { name: "sel", type: "selection" },
+    ],
     output: "solid",
     params: [{ name: "radius", kind: "number", default: 2, min: 0, max: 50, step: 0.5 }],
   },
   bevel: {
     type: "bevel",
     label: "Bevel",
-    inputs: [{ name: "in", type: "solid" }],
+    inputs: [
+      { name: "in", type: "solid" },
+      { name: "sel", type: "selection" },
+    ],
     output: "solid",
     params: [{ name: "distance", kind: "number", default: 2, min: 0, max: 50, step: 0.5 }],
+  },
+  shell: {
+    type: "shell",
+    label: "Shell / Hollow",
+    inputs: [
+      { name: "in", type: "solid" },
+      { name: "faces", type: "selection" },
+    ],
+    output: "solid",
+    params: [{ name: "thickness", kind: "number", default: 2, min: 0.2, max: 50, step: 0.2 }],
   },
   fillet2d: {
     type: "fillet2d",

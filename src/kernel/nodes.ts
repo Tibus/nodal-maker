@@ -16,6 +16,8 @@
 import {
   type Drawing,
   type Shape3D,
+  type EdgeFinder,
+  type FaceFinder,
   draw,
   drawRectangle,
   drawCircle,
@@ -50,7 +52,10 @@ export type GraphValue =
   | { kind: "solid"; solid: Shape3D }
   | { kind: "mesh"; mesh: MeshData }
   | { kind: "number"; value: number }
-  | { kind: "text"; value: string };
+  | { kind: "text"; value: string }
+  // a criteria-based face/edge selection — resolved against whatever geometry
+  // the fillet/bevel/shell receives, so it survives regeneration.
+  | { kind: "selection"; target: "edge" | "face"; apply: (finder: unknown) => unknown };
 
 /* ------------------------------------------------------------------ */
 /* Graph description                                                   */
@@ -414,17 +419,69 @@ const REGISTRY: Record<string, NodeImpl> = {
     return { kind: "solid", solid };
   },
 
-  /** Round all edges of a solid (congé). radius 0 = passthrough. */
+  /* --- criteria-based selectors (survive regeneration) --- */
+  edgeSelect: (_inputs, params) => {
+    const where = String(params.where ?? "all");
+    const offset = Number(params.offset ?? 0);
+    const apply = (e: EdgeFinder): EdgeFinder => {
+      switch (where) {
+        case "vertical": return e.inDirection([0, 0, 1]);
+        case "horizontal-x": return e.inDirection([1, 0, 0]);
+        case "horizontal-y": return e.inDirection([0, 1, 0]);
+        case "atZ": return e.inPlane("XY", offset);
+        default: return e;
+      }
+    };
+    return { kind: "selection", target: "edge", apply: apply as (f: unknown) => unknown };
+  },
+  faceSelect: (_inputs, params) => {
+    const where = String(params.where ?? "all");
+    const offset = Number(params.offset ?? 0);
+    const apply = (f: FaceFinder): FaceFinder => {
+      switch (where) {
+        case "top":
+        case "bottom": return f.inPlane("XY", offset);
+        case "horizontal": return f.parallelTo("XY");
+        case "vertical-x": return f.parallelTo("YZ");
+        case "vertical-y": return f.parallelTo("XZ");
+        case "planar": return f.ofSurfaceType("PLANE");
+        case "cylindrical": return f.ofSurfaceType("CYLINDRE");
+        default: return f;
+      }
+    };
+    return { kind: "selection", target: "face", apply: apply as (f: unknown) => unknown };
+  },
+
+  /** Round edges of a solid (congé). Optional `sel` targets specific edges. */
   fillet: (inputs, params) => {
     const solid = expectSolid(inputs.in, "fillet");
     const r = Number(params.radius ?? 0);
-    return { kind: "solid", solid: r > 0 ? (solid.fillet(r) as Shape3D) : solid };
+    if (r <= 0) return { kind: "solid", solid };
+    const sel = inputs.sel;
+    if (sel && sel.kind === "selection" && sel.target === "edge") {
+      return { kind: "solid", solid: solid.fillet(r, (e) => sel.apply(e) as EdgeFinder) as Shape3D };
+    }
+    return { kind: "solid", solid: solid.fillet(r) as Shape3D };
   },
-  /** Chamfer (bevel) all edges of a solid. distance 0 = passthrough. */
+  /** Chamfer (bevel) edges of a solid. Optional `sel` targets specific edges. */
   bevel: (inputs, params) => {
     const solid = expectSolid(inputs.in, "bevel");
     const d = Number(params.distance ?? 0);
-    return { kind: "solid", solid: d > 0 ? (solid.chamfer(d) as Shape3D) : solid };
+    if (d <= 0) return { kind: "solid", solid };
+    const sel = inputs.sel;
+    if (sel && sel.kind === "selection" && sel.target === "edge") {
+      return { kind: "solid", solid: solid.chamfer(d, (e) => sel.apply(e) as EdgeFinder) as Shape3D };
+    }
+    return { kind: "solid", solid: solid.chamfer(d) as Shape3D };
+  },
+  /** Hollow a solid, opening the selected face(s). Requires a Face Select. */
+  shell: (inputs, params) => {
+    const solid = expectSolid(inputs.in, "shell");
+    const t = Number(params.thickness ?? 2);
+    const sel = inputs.faces;
+    if (!sel || sel.kind !== "selection" || sel.target !== "face")
+      throw new Error("[shell] connect a Face Select (which face(s) to open)");
+    return { kind: "solid", solid: solid.shell(t, (f) => sel.apply(f) as FaceFinder) as Shape3D };
   },
   /** Round the corners of a 2D profile (great for laser-cut parts). */
   fillet2d: (inputs, params) => {
