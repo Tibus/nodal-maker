@@ -389,9 +389,20 @@ export function evalGraphCached(
       cache.entries.delete(k);
     }
   }
+  // hard LRU bound as a backstop against pathological graphs: if we're still
+  // over budget, drop the oldest entries (smallest run) first.
+  if (cache.entries.size > CACHE_MAX_ENTRIES) {
+    const byAge = [...cache.entries.entries()].sort((a, b) => a[1].run - b[1].run);
+    for (let i = 0; i < byAge.length && cache.entries.size > CACHE_MAX_ENTRIES; i++) {
+      disposeValue(byAge[i][1].value);
+      cache.entries.delete(byAge[i][0]);
+    }
+  }
 
   return { outputs, hits, misses };
 }
+
+const CACHE_MAX_ENTRIES = 256;
 
 /* ------------------------------------------------------------------ */
 /* Meshing + face segmentation/tagging                                 */

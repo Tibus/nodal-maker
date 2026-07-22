@@ -60,6 +60,17 @@ function handleType(nodeType: string, handle: string): SocketType | undefined {
   return param ? (paramPortType(param) ?? undefined) : undefined;
 }
 
+/**
+ * Can this source output feed that target input? Same type, or the one implicit
+ * coercion we support: a B-rep solid into a mesh port (auto-tessellated).
+ */
+function isCompatible(srcType: string, tgtType: string, tgtHandle: string): boolean {
+  const out = NODE_SPECS[srcType]?.output;
+  const inp = handleType(tgtType, tgtHandle);
+  if (!out || !inp) return false;
+  return out === inp || (out === "solid" && inp === "mesh");
+}
+
 /* ------------------------------------------------------------------ */
 /* Custom node                                                         */
 /* ------------------------------------------------------------------ */
@@ -280,6 +291,20 @@ export default function NodeEditor({
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
   const [outputId, setOutputId] = useState(initialOutputId);
 
+  // undo/redo: snapshots of {nodes, edges, outputId}. `applying` suppresses
+  // history recording while we replay a snapshot; `prevSnap` always mirrors the
+  // latest committed state (positions included) so undo doesn't lose node moves.
+  type Snapshot = { nodes: GeoNode[]; edges: Edge[]; outputId: string };
+  const undoStack = useRef<Snapshot[]>([]);
+  const redoStack = useRef<Snapshot[]>([]);
+  const applying = useRef(false);
+  const prevSnap = useRef<Snapshot>({
+    nodes: initialNodes,
+    edges: initialEdges,
+    outputId: initialOutputId,
+  });
+  const [histLen, setHistLen] = useState({ undo: 0, redo: 0 });
+
   // Single source of emission: whenever the graph's *topology or params* change
   // (drags don't count), emit a fresh graph. This makes add / delete / connect /
   // param-edit all flow through one path, and deletion works for free.
@@ -295,10 +320,65 @@ export default function NodeEditor({
     const graph = toGraph(nodes, edges);
     const sig = graphSignature(graph, validOut);
     if (sig !== lastSig.current) {
+      const isFirst = lastSig.current === "";
+      if (!applying.current && !isFirst) {
+        undoStack.current.push(prevSnap.current);
+        if (undoStack.current.length > 100) undoStack.current.shift();
+        redoStack.current = [];
+        setHistLen({ undo: undoStack.current.length, redo: 0 });
+      }
+      applying.current = false;
       lastSig.current = sig;
       onChange(graph, validOut);
     }
+    prevSnap.current = { nodes, edges, outputId: validOut };
   }, [nodes, edges, outputId, onChange]);
+
+  const undo = useCallback(() => {
+    const snap = undoStack.current.pop();
+    if (!snap) return;
+    redoStack.current.push(prevSnap.current);
+    applying.current = true;
+    setNodes(snap.nodes);
+    setEdges(snap.edges);
+    setOutputId(snap.outputId);
+    setHistLen({ undo: undoStack.current.length, redo: redoStack.current.length });
+  }, [setNodes, setEdges]);
+
+  const redo = useCallback(() => {
+    const snap = redoStack.current.pop();
+    if (!snap) return;
+    undoStack.current.push(prevSnap.current);
+    applying.current = true;
+    setNodes(snap.nodes);
+    setEdges(snap.edges);
+    setOutputId(snap.outputId);
+    setHistLen({ undo: undoStack.current.length, redo: redoStack.current.length });
+  }, [setNodes, setEdges]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return; // let fields keep their own undo
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [undo, redo]);
+
+  const isValidConnection = useCallback(
+    (c: Connection | Edge) => {
+      if (!c.source || !c.target || !c.targetHandle || c.source === c.target) return false;
+      const src = nodes.find((n) => n.id === c.source);
+      const tgt = nodes.find((n) => n.id === c.target);
+      return !!src && !!tgt && isCompatible(src.data.nodeType, tgt.data.nodeType, c.targetHandle);
+    },
+    [nodes],
+  );
 
   const setParam = useCallback(
     (id: string, name: string, value: unknown) => {
@@ -457,12 +537,14 @@ export default function NodeEditor({
             + {s.label}
           </button>
         ))}
+        <button className="palette__btn" onClick={undo} disabled={histLen.undo === 0} title="⌘Z">↶ Undo</button>
+        <button className="palette__btn" onClick={redo} disabled={histLen.redo === 0} title="⇧⌘Z">↷ Redo</button>
         <button className="palette__btn" onClick={saveGraph}>💾 Save</button>
         <label className="palette__btn">
           📂 Load
           <input type="file" accept=".json,application/json" hidden onChange={loadGraph} />
         </label>
-        <span className="palette__hint">click a node to display it · ⌫ deletes selection</span>
+        <span className="palette__hint">click a node to display it · ⌫ deletes · ⌘Z undo</span>
       </div>
       <Ctx.Provider value={ctx}>
         <ReactFlow
@@ -471,6 +553,7 @@ export default function NodeEditor({
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          isValidConnection={isValidConnection}
           nodeTypes={nodeTypes}
           deleteKeyCode={["Backspace", "Delete"]}
           fitView

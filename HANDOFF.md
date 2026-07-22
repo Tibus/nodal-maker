@@ -127,11 +127,12 @@ l'impression 3D, que des utilisateurs customisent en changeant des paramètres
 
 ### Reste à faire (nouveau backlog)
 
-- Cache : borne de taille (LRU) en plus de la fenêtre 2 runs.
+- ✅ Cache : borne LRU (256 entrées) en plus de la fenêtre 2 runs — FAIT.
+- ✅ Éditeur : **undo/redo** (⌘Z / ⇧⌘Z + boutons, historique 100) et
+  **validation des connexions** (`isValidConnection` → React Flow refuse le drop
+  incompatible ; plus de rejet silencieux) — FAIT.
 - Nœud texte : polices bundlées (aujourd'hui upload obligatoire).
-- Éditeur : auto-layout, groupes, undo/redo, validation visuelle des connexions
-  incompatibles (rejet silencieux actuellement).
-- `.gitignore` : `.idea/`, `tsconfig.tsbuildinfo`.
+- Éditeur : auto-layout, groupes de nœuds, copier/coller.
 
 ### Spike n°2 — notes techniques (Manifold)
 
