@@ -32,7 +32,9 @@ import { parseBinarySTL } from "./stl";
 export type GraphValue =
   | { kind: "sketch2d"; drawing: Drawing }
   | { kind: "solid"; solid: Shape3D }
-  | { kind: "mesh"; mesh: MeshData };
+  | { kind: "mesh"; mesh: MeshData }
+  | { kind: "number"; value: number }
+  | { kind: "text"; value: string };
 
 /* ------------------------------------------------------------------ */
 /* Graph description                                                   */
@@ -55,8 +57,37 @@ type NodeImpl = (
 
 // Node metadata (ports, params, socket colours) lives dependency-free in
 // `specs.ts` so the editor can import it without pulling in the WASM kernels.
+import { NODE_SPECS, paramPortType } from "./specs";
 export type { SocketType, PortSpec, ParamSpec, NodeSpec } from "./specs";
 export { NODE_SPECS, SOCKET_COLORS } from "./specs";
+
+/**
+ * Split a node's evaluated inputs into structural inputs (sketch/solid/mesh
+ * ports) and scalar param overrides (number/text ports). A param whose port is
+ * wired takes the upstream value; otherwise the node keeps its inline default.
+ */
+function resolveInputs(
+  nodeType: string,
+  rawInputs: Record<string, GraphValue>,
+  params: Record<string, unknown>,
+): { inputs: Record<string, GraphValue>; params: Record<string, unknown> } {
+  const spec = NODE_SPECS[nodeType];
+  if (!spec) return { inputs: rawInputs, params };
+  const paramPorts = new Map(
+    spec.params.map((p) => [p.name, paramPortType(p)] as const).filter(([, t]) => t !== null),
+  );
+  const inputs: Record<string, GraphValue> = {};
+  const merged: Record<string, unknown> = { ...params };
+  for (const [port, v] of Object.entries(rawInputs)) {
+    if (paramPorts.has(port)) {
+      if (v.kind === "number" || v.kind === "text") merged[port] = v.value;
+      else throw new Error(`[${nodeType}] param port "${port}" expects a ${paramPorts.get(port)}, got ${v.kind}`);
+    } else {
+      inputs[port] = v;
+    }
+  }
+  return { inputs, params: merged };
+}
 
 /* ------------------------------------------------------------------ */
 /* Node registry                                                       */
@@ -87,6 +118,10 @@ function solidToMeshData(solid: Shape3D): MeshData {
 }
 
 const REGISTRY: Record<string, NodeImpl> = {
+  /** Scalar source nodes — feed the optional param ports of other nodes. */
+  numberValue: (_inputs, params) => ({ kind: "number", value: Number(params.value ?? 0) }),
+  textValue: (_inputs, params) => ({ kind: "text", value: String(params.value ?? "") }),
+
   /** SVG input: parse an SVG path `d` string into a 2D drawing. */
   svgInput: (_inputs, params) => {
     const d = String(params.d ?? "");
@@ -210,13 +245,14 @@ export function evalGraph(graph: Graph): { outputs: Record<string, GraphValue>; 
     if (!node) throw new Error(`unknown node ${id}`);
     visiting.add(id);
 
-    const inputs: Record<string, GraphValue> = {};
+    const rawInputs: Record<string, GraphValue> = {};
     for (const [port, srcId] of Object.entries(node.inputs ?? {})) {
-      inputs[port] = evalNode(srcId);
+      rawInputs[port] = evalNode(srcId);
     }
     const impl = REGISTRY[node.type];
     if (!impl) throw new Error(`no implementation for node type "${node.type}"`);
-    const out = impl(inputs, node.params ?? {});
+    const { inputs, params } = resolveInputs(node.type, rawInputs, node.params ?? {});
+    const out = impl(inputs, params);
 
     visiting.delete(id);
     cache.set(id, out);
@@ -326,13 +362,14 @@ export function evalGraphCached(
       value = hit.value;
       hits++;
     } else {
-      const inputs: Record<string, GraphValue> = {};
+      const rawInputs: Record<string, GraphValue> = {};
       for (const [port, srcId] of Object.entries(node.inputs ?? {})) {
-        inputs[port] = evalNode(srcId);
+        rawInputs[port] = evalNode(srcId);
       }
       const impl = REGISTRY[node.type];
       if (!impl) throw new Error(`no implementation for node type "${node.type}"`);
-      value = impl(inputs, node.params ?? {});
+      const { inputs, params } = resolveInputs(node.type, rawInputs, node.params ?? {});
+      value = impl(inputs, params);
       cache.entries.set(key, { value, run: cache.run });
       misses++;
     }

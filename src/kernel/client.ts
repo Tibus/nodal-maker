@@ -10,4 +10,4 @@ export type { Params, MeshImportParams } from "./model";
 export type { MeshPayload, FaceTag, Graph, NodeDescriptor } from "./nodes";
 // metadata comes from the dependency-free specs module (no WASM in the UI bundle)
 export type { NodeSpec, ParamSpec, PortSpec, SocketType } from "./specs";
-export { NODE_SPECS, SOCKET_COLORS } from "./specs";
+export { NODE_SPECS, SOCKET_COLORS, paramPortType } from "./specs";

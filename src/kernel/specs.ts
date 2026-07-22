@@ -7,7 +7,7 @@
  * `GraphValue["kind"]` there.
  */
 
-export type SocketType = "sketch2d" | "solid" | "mesh";
+export type SocketType = "sketch2d" | "solid" | "mesh" | "number" | "text";
 
 export interface PortSpec {
   name: string;
@@ -38,9 +38,36 @@ export const SOCKET_COLORS: Record<SocketType, string> = {
   sketch2d: "#c678dd", // purple — 2D profiles
   solid: "#ff8c42", // orange — B-rep solids
   mesh: "#56b6c2", // cyan   — triangle meshes
+  number: "#98c379", // green  — scalar numbers
+  text: "#e5c07b", // yellow — strings
 };
 
+/**
+ * The socket type a param exposes as an OPTIONAL input port, or null if the
+ * param is inline-only (files, enums). Numbers and text can be driven by an
+ * upstream value node instead of their inline default.
+ */
+export function paramPortType(p: ParamSpec): SocketType | null {
+  if (p.kind === "number") return "number";
+  if (p.kind === "text") return "text";
+  return null;
+}
+
 export const NODE_SPECS: Record<string, NodeSpec> = {
+  numberValue: {
+    type: "numberValue",
+    label: "Number",
+    inputs: [],
+    output: "number",
+    params: [{ name: "value", kind: "number", label: "value", default: 10, min: -1000, max: 1000, step: 0.5 }],
+  },
+  textValue: {
+    type: "textValue",
+    label: "Text",
+    inputs: [],
+    output: "text",
+    params: [{ name: "value", kind: "text", label: "value", default: "" }],
+  },
   svgInput: {
     type: "svgInput",
     label: "SVG input",

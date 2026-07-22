@@ -29,9 +29,11 @@ import "@xyflow/react/dist/style.css";
 import {
   NODE_SPECS,
   SOCKET_COLORS,
+  paramPortType,
   type Graph,
   type NodeDescriptor,
   type ParamSpec,
+  type SocketType,
 } from "./kernel/client";
 
 type GeoData = {
@@ -44,8 +46,19 @@ interface EditorCtx {
   outputId: string;
   setOutput: (id: string) => void;
   setParam: (id: string, name: string, value: unknown) => void;
+  isLinked: (nodeId: string, port: string) => boolean;
 }
 const Ctx = createContext<EditorCtx | null>(null);
+
+/** The socket type accepted by a node's input handle (structural or param). */
+function handleType(nodeType: string, handle: string): SocketType | undefined {
+  const spec = NODE_SPECS[nodeType];
+  if (!spec) return undefined;
+  const structural = spec.inputs.find((p) => p.name === handle);
+  if (structural) return structural.type;
+  const param = spec.params.find((p) => p.name === handle);
+  return param ? (paramPortType(param) ?? undefined) : undefined;
+}
 
 /* ------------------------------------------------------------------ */
 /* Custom node                                                         */
@@ -58,42 +71,67 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
 
   return (
     <div className={`gnode${isOutput ? " gnode--out" : ""}`} onClick={() => ctx.setOutput(id)}>
-      {spec.inputs.map((p, i) => (
-        <Handle
-          key={p.name}
-          id={p.name}
-          type="target"
-          position={Position.Left}
-          style={{ top: 34 + i * 20, background: SOCKET_COLORS[p.type] }}
-          title={`${p.name}: ${p.type}`}
-        />
-      ))}
-
       <div className="gnode__title">
         {spec.label}
         {isOutput && <span className="gnode__badge">● view</span>}
       </div>
 
       <div className="gnode__body" onClick={(e) => e.stopPropagation()}>
-        {spec.params.map((ps) => (
-          <ParamField
-            key={ps.name}
-            spec={ps}
-            value={data.params[ps.name]}
-            onChange={(v) => ctx.setParam(id, ps.name, v)}
-          />
-        ))}
+        {/* structural inputs — required, filled ports */}
         {spec.inputs.map((p) => (
-          <div key={p.name} className="gnode__port" style={{ color: SOCKET_COLORS[p.type] }}>
-            ◀ {p.name}
+          <div className="gnode__row" key={`in-${p.name}`}>
+            <Handle
+              id={p.name}
+              type="target"
+              position={Position.Left}
+              className="rf-port rf-port--req"
+              style={{ background: SOCKET_COLORS[p.type] }}
+              title={`${p.name}: ${p.type} (required)`}
+            />
+            <span className="gnode__portlabel" style={{ color: SOCKET_COLORS[p.type] }}>
+              {p.name}
+            </span>
           </div>
         ))}
+
+        {/* params — those that are portable get an OPTIONAL, hollow port */}
+        {spec.params.map((ps) => {
+          const pt = paramPortType(ps);
+          const linked = pt !== null && ctx.isLinked(id, ps.name);
+          return (
+            <div className={`gnode__row${pt ? " gnode__row--param" : ""}`} key={`p-${ps.name}`}>
+              {pt && (
+                <Handle
+                  id={ps.name}
+                  type="target"
+                  position={Position.Left}
+                  className="rf-port rf-port--opt"
+                  style={{ borderColor: SOCKET_COLORS[pt] }}
+                  title={`${ps.name}: ${pt} (optional — has a default)`}
+                />
+              )}
+              {linked ? (
+                <div className="pf pf--linked">
+                  <span>{ps.label ?? ps.name}</span>
+                  <em style={{ color: SOCKET_COLORS[pt!] }}>◀ linked</em>
+                </div>
+              ) : (
+                <ParamField
+                  spec={ps}
+                  value={data.params[ps.name]}
+                  onChange={(v) => ctx.setParam(id, ps.name, v)}
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <Handle
         id="out"
         type="source"
         position={Position.Right}
+        className="rf-port rf-port--req"
         style={{ background: SOCKET_COLORS[spec.output] }}
         title={`out: ${spec.output}`}
       />
@@ -283,9 +321,7 @@ export default function NodeEditor({
       const tgt = nodes.find((n) => n.id === c.target);
       if (!src || !tgt || !c.targetHandle) return;
       const outType = NODE_SPECS[src.data.nodeType].output;
-      const inType = NODE_SPECS[tgt.data.nodeType].inputs.find(
-        (p) => p.name === c.targetHandle,
-      )?.type;
+      const inType = handleType(tgt.data.nodeType, c.targetHandle);
       if (!inType) return;
 
       // one input port takes at most one wire — drop any existing edge into it
@@ -396,9 +432,21 @@ export default function NodeEditor({
     [setNodes, setEdges],
   );
 
+  // which (node, port) targets currently have an incoming wire
+  const linkedSet = useMemo(() => {
+    const s = new Set<string>();
+    for (const e of edges) if (e.targetHandle) s.add(`${e.target} ${e.targetHandle}`);
+    return s;
+  }, [edges]);
+
   const ctx = useMemo<EditorCtx>(
-    () => ({ outputId, setOutput, setParam }),
-    [outputId, setOutput, setParam],
+    () => ({
+      outputId,
+      setOutput,
+      setParam,
+      isLinked: (nodeId, port) => linkedSet.has(`${nodeId} ${port}`),
+    }),
+    [outputId, setOutput, setParam, linkedSet],
   );
 
   return (
