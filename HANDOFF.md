@@ -141,7 +141,21 @@ l'impression 3D, que des utilisateurs customisent en changeant des paramètres
   (pont `NodeEditor.onReady` → `App` → `viewport.showTranslateGizmo`). Le viewport
   ne recentre plus le mesh (coords réelles) et ne re-cadre qu'au 1er rendu.
   Vérifié navigateur : drag → objet déplacé + param move Y = 30,5.
-  - **Suite** : rotation/échelle (gizmo modes rotate/scale), transform sur mesh.
+  - **Suite** : rotation/échelle (gizmo modes rotate/scale, mode 2D/3D), transform mesh.
+- ✅ **Primitives** — FAIT : 2D `rect`/`circle`/`polygon`, 3D `box`/`cylinder`/`sphere`
+  (sources, pour laser/Cricut et profils).
+- ✅ **Nœud `Group 2D` (= « weld » de Cuttle)** — FAIT : union de 2 à 4 profils
+  (replicad `.fuse`, overlaps résolus) → offset ensuite le tout.
+- ✅ **Export SVG** — FAIT : bouton d'export bascule STL↔SVG selon le type de
+  sortie ; profils 2D affichés en plaque fine (aperçu). **Non facetté** : passe
+  par `Drawing.toSVG()` (courbes arcs/béziers préservées). Vérifié headless.
+- **Suite (demandé)** :
+  - **Rotate/Scale** avec mode 2D/3D + gizmo.
+  - **FaceSelect + Fillet** (sélecteur topologique → congé d'arêtes).
+  - **Score vs Cut** (Cuttle) : taguer des chemins « rainage » vs « découpe »
+    et exporter un SVG multi-calques/couleurs.
+  - Offset via **Clipper2** (CrossSection) en option — plus robuste sur
+    auto-intersections MAIS **facette** (à réserver quand OCCT échoue).
 - Éditeur : auto-layout, groupes de nœuds, copier/coller.
 
 ### Spike n°2 — notes techniques (Manifold)

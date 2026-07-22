@@ -26,8 +26,8 @@ const SEED_EDGES: Edge[] = [
   { id: "e4", source: "off", sourceHandle: "out", target: "boss", targetHandle: "profile", style: { stroke: "#c678dd" } },
 ];
 
-function downloadBytes(bytes: Uint8Array, name: string) {
-  const blob = new Blob([bytes as unknown as BlobPart], { type: "model/stl" });
+function download(data: BlobPart, name: string, type: string) {
+  const blob = new Blob([data], { type });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -35,6 +35,8 @@ function downloadBytes(bytes: Uint8Array, name: string) {
   a.click();
   URL.revokeObjectURL(url);
 }
+const downloadBytes = (bytes: Uint8Array, name: string) =>
+  download(bytes as unknown as BlobPart, name, "model/stl");
 
 export default function App() {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -207,6 +209,22 @@ export default function App() {
           onChange={onGraphChange}
           onReady={(api) => {
             editorApi.current = api;
+          }}
+          onExportSTL={async (graph, outputId) => {
+            try {
+              const bytes = await kernel.exportGraphSTL(graph, outputId);
+              downloadBytes(bytes as Uint8Array, "maker-graph.stl");
+            } catch (e) {
+              setStatus("export error: " + (e instanceof Error ? e.message : String(e)));
+            }
+          }}
+          onExportSVG={async (graph, outputId) => {
+            try {
+              const svg = await kernel.exportGraphSVG(graph, outputId);
+              download(svg, "maker-graph.svg", "image/svg+xml");
+            } catch (e) {
+              setStatus("export error: " + (e instanceof Error ? e.message : String(e)));
+            }
           }}
         />
       ) : (

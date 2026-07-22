@@ -334,6 +334,8 @@ export interface NodeEditorProps {
   onChange: (graph: Graph, outputId: string) => void;
   /** hands the parent an imperative handle once mounted */
   onReady?: (api: EditorApi) => void;
+  onExportSTL?: (graph: Graph, outputId: string) => void;
+  onExportSVG?: (graph: Graph, outputId: string) => void;
 }
 
 let uid = 0;
@@ -386,6 +388,8 @@ export default function NodeEditor({
   initialOutputId,
   onChange,
   onReady,
+  onExportSTL,
+  onExportSVG,
 }: NodeEditorProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<GeoNode>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
@@ -643,6 +647,21 @@ export default function NodeEditor({
         ))}
         <button className="palette__btn" onClick={undo} disabled={histLen.undo === 0} title="⌘Z">↶ Undo</button>
         <button className="palette__btn" onClick={redo} disabled={histLen.redo === 0} title="⇧⌘Z">↷ Redo</button>
+        {(() => {
+          const outType = NODE_SPECS[nodes.find((n) => n.id === outputId)?.data.nodeType ?? ""]?.output;
+          const svg = outType === "sketch2d";
+          return (
+            <button
+              className="palette__btn"
+              onClick={() =>
+                (svg ? onExportSVG : onExportSTL)?.(toGraph(nodes, edges), outputId)
+              }
+              title={svg ? "export the 2D profile (curves preserved)" : "export the 3D model"}
+            >
+              ⬇ {svg ? "SVG" : "STL"}
+            </button>
+          );
+        })()}
         <button className="palette__btn" onClick={saveGraph}>💾 Save</button>
         <label className="palette__btn">
           📂 Load

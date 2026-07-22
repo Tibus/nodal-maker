@@ -13,7 +13,16 @@
  * test) is responsible for initialising OCCT first. That keeps the graph
  * logic runnable in both environments.
  */
-import { type Drawing, type Shape3D } from "replicad";
+import {
+  type Drawing,
+  type Shape3D,
+  drawRectangle,
+  drawCircle,
+  drawPolysides,
+  makeBaseBox,
+  makeCylinder,
+  makeSphere,
+} from "replicad";
 import * as opentype from "opentype.js";
 import { svgPathToDrawing } from "./svgPath";
 import {
@@ -121,6 +130,44 @@ const REGISTRY: Record<string, NodeImpl> = {
   /** Scalar source nodes — feed the optional param ports of other nodes. */
   numberValue: (_inputs, params) => ({ kind: "number", value: Number(params.value ?? 0) }),
   textValue: (_inputs, params) => ({ kind: "text", value: String(params.value ?? "") }),
+
+  /* --- primitives 2D (sources) — for laser / Cricut and profiles --- */
+  rect: (_inputs, params) => ({
+    kind: "sketch2d",
+    drawing: drawRectangle(Number(params.width ?? 40), Number(params.height ?? 30), Number(params.radius ?? 0)),
+  }),
+  circle: (_inputs, params) => ({
+    kind: "sketch2d",
+    drawing: drawCircle(Number(params.radius ?? 20)),
+  }),
+  polygon: (_inputs, params) => ({
+    kind: "sketch2d",
+    drawing: drawPolysides(Number(params.radius ?? 20), Math.max(3, Math.round(Number(params.sides ?? 6)))),
+  }),
+
+  /* --- primitives 3D (sources) --- */
+  box: (_inputs, params) => ({
+    kind: "solid",
+    solid: makeBaseBox(Number(params.x ?? 30), Number(params.y ?? 30), Number(params.z ?? 30)) as Shape3D,
+  }),
+  cylinder: (_inputs, params) => ({
+    kind: "solid",
+    solid: makeCylinder(Number(params.radius ?? 15), Number(params.height ?? 30)) as Shape3D,
+  }),
+  sphere: (_inputs, params) => ({
+    kind: "solid",
+    solid: makeSphere(Number(params.radius ?? 20)) as Shape3D,
+  }),
+
+  /** Union several 2D profiles into one (overlaps resolved). */
+  group: (inputs) => {
+    const drs = ["a", "b", "c", "d"]
+      .map((k) => inputs[k])
+      .filter((v): v is Extract<GraphValue, { kind: "sketch2d" }> => !!v && v.kind === "sketch2d")
+      .map((v) => v.drawing);
+    if (!drs.length) throw new Error("[group] connect at least one 2D profile");
+    return { kind: "sketch2d", drawing: drs.reduce((acc, d) => acc.fuse(d)) };
+  },
 
   /** SVG input: parse an SVG path `d` string into a 2D drawing. */
   svgInput: (_inputs, params) => {

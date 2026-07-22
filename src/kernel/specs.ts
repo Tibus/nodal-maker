@@ -75,6 +75,62 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     output: "sketch2d",
     params: [{ name: "d", kind: "text", label: "path d", default: "" }],
   },
+  rect: {
+    type: "rect",
+    label: "Rectangle 2D",
+    inputs: [],
+    output: "sketch2d",
+    params: [
+      { name: "width", kind: "number", default: 40, min: 1, max: 300, step: 1 },
+      { name: "height", kind: "number", default: 30, min: 1, max: 300, step: 1 },
+      { name: "radius", kind: "number", label: "corner r", default: 0, min: 0, max: 100, step: 0.5 },
+    ],
+  },
+  circle: {
+    type: "circle",
+    label: "Circle 2D",
+    inputs: [],
+    output: "sketch2d",
+    params: [{ name: "radius", kind: "number", default: 20, min: 0.5, max: 300, step: 0.5 }],
+  },
+  polygon: {
+    type: "polygon",
+    label: "Polygon 2D",
+    inputs: [],
+    output: "sketch2d",
+    params: [
+      { name: "radius", kind: "number", default: 20, min: 0.5, max: 300, step: 0.5 },
+      { name: "sides", kind: "number", default: 6, min: 3, max: 24, step: 1 },
+    ],
+  },
+  box: {
+    type: "box",
+    label: "Box 3D",
+    inputs: [],
+    output: "solid",
+    params: [
+      { name: "x", kind: "number", default: 30, min: 1, max: 300, step: 1 },
+      { name: "y", kind: "number", default: 30, min: 1, max: 300, step: 1 },
+      { name: "z", kind: "number", default: 30, min: 1, max: 300, step: 1 },
+    ],
+  },
+  cylinder: {
+    type: "cylinder",
+    label: "Cylinder 3D",
+    inputs: [],
+    output: "solid",
+    params: [
+      { name: "radius", kind: "number", default: 15, min: 0.5, max: 200, step: 0.5 },
+      { name: "height", kind: "number", default: 30, min: 1, max: 300, step: 1 },
+    ],
+  },
+  sphere: {
+    type: "sphere",
+    label: "Sphere 3D",
+    inputs: [],
+    output: "solid",
+    params: [{ name: "radius", kind: "number", default: 20, min: 0.5, max: 200, step: 0.5 }],
+  },
   textToSvg: {
     type: "textToSvg",
     label: "Text → SVG",
@@ -92,6 +148,20 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     inputs: [{ name: "in", type: "sketch2d" }],
     output: "sketch2d",
     params: [{ name: "distance", kind: "number", default: 0, min: -20, max: 20, step: 0.5 }],
+  },
+  group: {
+    type: "group",
+    label: "Group 2D",
+    // up to four profiles unioned into one — connect as many as you need,
+    // then Offset the group so overlaps are resolved as a single outline.
+    inputs: [
+      { name: "a", type: "sketch2d" },
+      { name: "b", type: "sketch2d" },
+      { name: "c", type: "sketch2d" },
+      { name: "d", type: "sketch2d" },
+    ],
+    output: "sketch2d",
+    params: [],
   },
   extrude: {
     type: "extrude",

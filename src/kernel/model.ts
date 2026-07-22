@@ -75,6 +75,8 @@ export interface BuildResult {
   /** informational: which raw B-rep face id resolved as the top cap this build */
   topCapFaceId: number | null;
   topCapZ: number;
+  /** what the displayed node actually produced (drives export UI) */
+  outputKind?: "solid" | "mesh" | "sketch2d";
 }
 
 export function build(p: Params): BuildResult {
@@ -169,12 +171,27 @@ export function evalToPayload(graph: Graph, outputId: string, cache?: EvalCache)
     } catch {
       /* not every solid has a resolvable top cap — fine */
     }
-    return { mesh: meshAndTag(v.solid), topCapFaceId, topCapZ };
+    return { mesh: meshAndTag(v.solid), topCapFaceId, topCapZ, outputKind: "solid" };
   }
   if (v.kind === "mesh") {
-    return { mesh: meshToPayload(v.mesh), topCapFaceId: null, topCapZ: 0 };
+    return { mesh: meshToPayload(v.mesh), topCapFaceId: null, topCapZ: 0, outputKind: "mesh" };
   }
-  throw new Error(`output node "${outputId}" is a ${v.kind}; only solid/mesh can be rendered`);
+  if (v.kind === "sketch2d") {
+    // preview a 2D profile as a thin plate so it's visible in the viewport;
+    // the true (non-faceted) geometry is what `exportGraphSVG` emits.
+    const plate = v.drawing.sketchOnPlane("XY").extrude(0.5) as Shape3D;
+    return { mesh: meshAndTag(plate), topCapFaceId: null, topCapZ: 0, outputKind: "sketch2d" };
+  }
+  throw new Error(`output node "${outputId}" is a ${v.kind}; connect it to geometry to preview`);
+}
+
+/** Export the displayed node as SVG (2D profiles only). Curves are preserved. */
+export function exportGraphSVG(graph: Graph, outputId: string): string {
+  const v: GraphValue | undefined = evalGraph(graph).outputs[outputId];
+  if (!v) throw new Error(`unknown output node "${outputId}"`);
+  if (v.kind !== "sketch2d")
+    throw new Error(`node "${outputId}" is a ${v.kind}; only 2D profiles export to SVG`);
+  return v.drawing.toSVG(1);
 }
 
 export async function exportGraphSTL(

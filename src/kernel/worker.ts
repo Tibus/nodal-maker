@@ -23,6 +23,7 @@ import {
   exportMeshSTL,
   evalToPayload,
   exportGraphSTL,
+  exportGraphSVG,
   type Params,
   type MeshImportParams,
 } from "./model";
@@ -71,6 +72,10 @@ const api = {
   async exportGraphSTL(graph: Graph, outputId: string) {
     await ensureKernels();
     return exportGraphSTL(graph, outputId, graphCache);
+  },
+  async exportGraphSVG(graph: Graph, outputId: string) {
+    await ensureKernels();
+    return exportGraphSVG(graph, outputId);
   },
 };
 
