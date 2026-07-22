@@ -158,6 +158,24 @@ l'impression 3D, que des utilisateurs customisent en changeant des paramètres
     auto-intersections MAIS **facette** (à réserver quand OCCT échoue).
 - Éditeur : auto-layout, groupes de nœuds, copier/coller.
 
+### Session nocturne — grande vague de nœuds (7 lots, tous vérifiés headless)
+
+- **Lot 1 Valeurs/logique** : math, mathUnary, clamp, remap, random (seedé).
+- **Lot 2 2D** : ellipse, star, slot, boolean2d, mirror2d, transform2d,
+  arrayLinear2d, arrayRadial2d (+ rect/circle/polygon déjà là).
+- **Lot 3 3D** : cone, torus, revolve, boolean3d, mirror3d, rotate3d, scale3d,
+  arrayLinear3d, arrayRadial3d.
+- **Lot 4 Mesh** : transformMesh, convexHull, minkowski, decimate, subdivide.
+- **Lot 5 Sélecteurs** : type socket `selection`, edgeSelect/faceSelect par
+  critères (survivent régen), fillet/bevel ciblés, **shell/hollow**.
+- **Lot 6 Export** : STEP (blobSTEP) + **Score/Cut** (SVG rouge=cut/bleu=score).
+- **Lot 7 Scènes** : `SCENES.md` (format = save/load JSON, STL base64),
+  `npm run scenes` génère+vérifie `examples/*.json` (hollow-tray, bolt-flange,
+  name-plate, living-hinge, coaster). Chargeables via 📂 Load — vérifié navigateur.
+- ~55 types de nœuds au total. `npm run scenes` régénère les exemples.
+- **Restant (🔴 non fait)** : loft, sweep hélicoïdal, emboss/engrave 3D, voronoi,
+  nesting sur plaque, tabbed-box auto ; gizmo rotate/scale (nœuds OK, pas le gizmo).
+
 ### Spike n°2 — notes techniques (Manifold)
 
 - Package **`manifold-3d`** 3.5.1 (ESM pur). Init : `Module({locateFile})` puis
