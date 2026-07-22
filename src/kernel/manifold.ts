@@ -164,6 +164,82 @@ export function repairMesh(md: MeshData): RepairResult {
 }
 
 /* ------------------------------------------------------------------ */
+/* Extra mesh operations (all via Manifold)                            */
+/* ------------------------------------------------------------------ */
+
+export interface MeshTransform {
+  tx?: number; ty?: number; tz?: number;
+  rx?: number; ry?: number; rz?: number; // degrees
+  scale?: number;
+}
+
+/** Translate / rotate (deg, per axis) / uniform-scale a mesh. */
+export function transformMesh(md: MeshData, t: MeshTransform): MeshData {
+  const man = meshDataToManifold(md);
+  const handles = [man];
+  let cur = man;
+  const s = t.scale ?? 1;
+  if (s !== 1) { cur = cur.scale(s); handles.push(cur); }
+  if ((t.rx ?? 0) || (t.ry ?? 0) || (t.rz ?? 0)) { cur = cur.rotate([t.rx ?? 0, t.ry ?? 0, t.rz ?? 0]); handles.push(cur); }
+  if ((t.tx ?? 0) || (t.ty ?? 0) || (t.tz ?? 0)) { cur = cur.translate([t.tx ?? 0, t.ty ?? 0, t.tz ?? 0]); handles.push(cur); }
+  try {
+    return manifoldToMeshData(cur);
+  } finally {
+    handles.forEach((h) => h.delete());
+  }
+}
+
+/** Convex hull of a mesh. */
+export function hullMesh(md: MeshData): MeshData {
+  const man = meshDataToManifold(md);
+  const res = man.hull();
+  try {
+    return manifoldToMeshData(res);
+  } finally {
+    man.delete();
+    res.delete();
+  }
+}
+
+/** Minkowski sum a ⊕ b — e.g. round `a` by a small sphere `b`. */
+export function minkowskiMesh(a: MeshData, b: MeshData): MeshData {
+  const ma = meshDataToManifold(a);
+  const mb = meshDataToManifold(b);
+  const res = ma.minkowskiSum(mb);
+  try {
+    return manifoldToMeshData(res);
+  } finally {
+    ma.delete();
+    mb.delete();
+    res.delete();
+  }
+}
+
+/** Decimate/simplify a mesh within a geometric tolerance. */
+export function simplifyMesh(md: MeshData, tolerance: number): MeshData {
+  const man = meshDataToManifold(md);
+  const res = man.simplify(tolerance);
+  try {
+    return manifoldToMeshData(res);
+  } finally {
+    man.delete();
+    res.delete();
+  }
+}
+
+/** Subdivide each triangle `n` extra times (refine). */
+export function refineMesh(md: MeshData, n: number): MeshData {
+  const man = meshDataToManifold(md);
+  const res = man.refine(Math.max(1, Math.round(n)));
+  try {
+    return manifoldToMeshData(res);
+  } finally {
+    man.delete();
+    res.delete();
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* Coplanar segmentation (mesh-domain face flagging)                   */
 /* ------------------------------------------------------------------ */
 

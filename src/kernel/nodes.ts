@@ -31,6 +31,11 @@ import {
   booleanMesh,
   repairMesh,
   segmentMesh,
+  transformMesh,
+  hullMesh,
+  minkowskiMesh,
+  simplifyMesh,
+  refineMesh,
   type BooleanOp,
   type MeshData,
 } from "./manifold";
@@ -504,6 +509,30 @@ const REGISTRY: Record<string, NodeImpl> = {
     const op = (params.op ?? "union") as BooleanOp;
     return { kind: "mesh", mesh: booleanMesh(a, b, op) };
   },
+  transformMesh: (inputs, params) => {
+    const mesh = expectMesh(inputs.in, "transformMesh");
+    return {
+      kind: "mesh",
+      mesh: transformMesh(mesh, {
+        tx: Number(params.tx ?? 0), ty: Number(params.ty ?? 0), tz: Number(params.tz ?? 0),
+        rx: Number(params.rx ?? 0), ry: Number(params.ry ?? 0), rz: Number(params.rz ?? 0),
+        scale: Number(params.scale ?? 1),
+      }),
+    };
+  },
+  convexHull: (inputs) => ({ kind: "mesh", mesh: hullMesh(expectMesh(inputs.in, "convexHull")) }),
+  minkowski: (inputs) => ({
+    kind: "mesh",
+    mesh: minkowskiMesh(expectMesh(inputs.a, "minkowski"), expectMesh(inputs.b, "minkowski")),
+  }),
+  decimate: (inputs, params) => ({
+    kind: "mesh",
+    mesh: simplifyMesh(expectMesh(inputs.in, "decimate"), Number(params.tolerance ?? 0.1)),
+  }),
+  subdivide: (inputs, params) => ({
+    kind: "mesh",
+    mesh: refineMesh(expectMesh(inputs.in, "subdivide"), Number(params.n ?? 2)),
+  }),
 };
 
 /* ------------------------------------------------------------------ */
