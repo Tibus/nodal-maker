@@ -110,6 +110,12 @@ l'impression 3D, que des utilisateurs customisent en changeant des paramètres
    - ✅ **Suppression nœud/arête + sérialisation FAIT** : émission par signature
      (topologie/params, ignore les déplacements) → la suppression marche via ⌫ ;
      boutons 💾 Save / 📂 Load (JSON, ArrayBuffers en base64).
+   - ✅ **Params scalaires = ports d'entrée optionnels FAIT** : tout param nombre/
+     texte est aussi un **port optionnel** (anneau creux vs port structurel plein).
+     Non câblé → valeur par défaut éditable inline ; câblé → valeur du nœud amont
+     (`◀ linked`). Nœuds sources **Number** / **Text**. Résolu par `resolveInputs`
+     dans nodes.ts (route les ports param vers `params`). Types de socket
+     `number`/`text` ajoutés. Vérifié navigateur (Number 40 → hauteur d'extrude).
 3. ~~**Nœud `texte → SVG`** via **opentype.js**~~ ✅ **FAIT** : nœud `textToSvg`
    (params text + size + font uploadée .ttf/.otf) → `opentype.getPath` → path `d`
    → `svgPathToDrawing`. Vérifié navigateur : « A » extrudé avec son contre-poinçon.
