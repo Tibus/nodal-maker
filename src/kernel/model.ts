@@ -5,12 +5,16 @@
  */
 import {
   evalGraph,
+  evalGraphCached,
   meshAndTag,
+  meshToPayload,
   resolveTopCap,
+  type EvalCache,
   type Graph,
   type GraphValue,
   type MeshPayload,
 } from "./nodes";
+import { writeBinarySTL } from "./stl";
 import type { Shape3D } from "replicad";
 
 export interface Params {
@@ -84,4 +88,107 @@ export async function exportSTL(p: Params): Promise<Uint8Array> {
   const solid = solidOf(p);
   const blob = solid.blobSTL() as Blob;
   return new Uint8Array(await blob.arrayBuffer());
+}
+
+/* ------------------------------------------------------------------ */
+/* Mesh-domain pipeline: import an STL, repair it, optionally cut it    */
+/* with the current SVG-extruded shape (Manifold boolean).              */
+/* ------------------------------------------------------------------ */
+
+export interface MeshImportParams {
+  /** cut the imported part with the SVG-extruded profile (mesh difference) */
+  cut: boolean;
+  svgPath: string;
+  /** offset applied to the cutter profile before extruding (mm) */
+  cutOffset: number;
+  /** cutter extrude height (mm) — make it taller than the part for a clean cut */
+  cutHeight: number;
+}
+
+export const DEFAULT_MESH_PARAMS: MeshImportParams = {
+  cut: false,
+  svgPath: DEFAULT_SVG,
+  cutOffset: -8,
+  cutHeight: 80,
+};
+
+function meshImportGraph(stl: ArrayBuffer, o: MeshImportParams): { graph: Graph; finalId: string } {
+  const graph: Graph = [
+    { id: "stl", type: "importSTL", params: { stl } },
+    { id: "fix", type: "repair", inputs: { in: "stl" } },
+  ];
+  let finalId = "fix";
+  if (o.cut) {
+    graph.push(
+      { id: "svg", type: "svgInput", params: { d: o.svgPath } },
+      { id: "off", type: "offset2d", inputs: { in: "svg" }, params: { distance: o.cutOffset } },
+      { id: "ext", type: "extrude", inputs: { in: "off" }, params: { height: o.cutHeight } },
+      { id: "tess", type: "tessellate", inputs: { in: "ext" } },
+      { id: "cut", type: "boolean", inputs: { a: "fix", b: "tess" }, params: { op: "difference" } },
+    );
+    finalId = "cut";
+  }
+  return { graph, finalId };
+}
+
+function meshDataOf(stl: ArrayBuffer, o: MeshImportParams) {
+  const { graph, finalId } = meshImportGraph(stl, o);
+  const v: GraphValue = evalGraph(graph).outputs[finalId];
+  if (v.kind !== "mesh") throw new Error("mesh pipeline did not produce a mesh");
+  return v.mesh;
+}
+
+/** Import + repair (+ optional cut) an STL and return a renderable payload. */
+export function importMesh(stl: ArrayBuffer, o: MeshImportParams): BuildResult {
+  const mesh = meshToPayload(meshDataOf(stl, o));
+  return { mesh, topCapFaceId: null, topCapZ: 0 };
+}
+
+/** Same pipeline, exported to binary STL bytes. */
+export function exportMeshSTL(stl: ArrayBuffer, o: MeshImportParams): Uint8Array {
+  return writeBinarySTL(meshDataOf(stl, o));
+}
+
+/* ------------------------------------------------------------------ */
+/* Generic graph evaluation — the entry point for the node editor.      */
+/* Takes a serialisable graph + which node to display, and returns a    */
+/* renderable payload whatever the output socket type is.               */
+/* ------------------------------------------------------------------ */
+
+export function evalToPayload(graph: Graph, outputId: string, cache?: EvalCache): BuildResult {
+  const outputs = cache ? evalGraphCached(graph, cache).outputs : evalGraph(graph).outputs;
+  const v: GraphValue | undefined = outputs[outputId];
+  if (!v) throw new Error(`unknown output node "${outputId}"`);
+  if (v.kind === "solid") {
+    let topCapFaceId: number | null = null;
+    let topCapZ = 0;
+    try {
+      const cap = resolveTopCap(v.solid);
+      topCapFaceId = cap.faceId;
+      topCapZ = cap.z;
+    } catch {
+      /* not every solid has a resolvable top cap — fine */
+    }
+    return { mesh: meshAndTag(v.solid), topCapFaceId, topCapZ };
+  }
+  if (v.kind === "mesh") {
+    return { mesh: meshToPayload(v.mesh), topCapFaceId: null, topCapZ: 0 };
+  }
+  throw new Error(`output node "${outputId}" is a ${v.kind}; only solid/mesh can be rendered`);
+}
+
+export async function exportGraphSTL(
+  graph: Graph,
+  outputId: string,
+  cache?: EvalCache,
+): Promise<Uint8Array> {
+  const outputs = cache ? evalGraphCached(graph, cache).outputs : evalGraph(graph).outputs;
+  const v: GraphValue | undefined = outputs[outputId];
+  if (!v) throw new Error(`unknown output node "${outputId}"`);
+  if (v.kind === "solid") {
+    const blob = v.solid.blobSTL() as Blob;
+    return new Uint8Array(await blob.arrayBuffer());
+  }
+  if (v.kind === "mesh") return writeBinarySTL(v.mesh);
+  throw new Error(`output node "${outputId}" is a ${v.kind}; cannot export`);
 }

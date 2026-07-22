@@ -3,8 +3,8 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  // OCCT is a huge prebuilt wasm+glue module; let Vite serve it as-is.
-  optimizeDeps: { exclude: ["replicad-opencascadejs"] },
+  // OCCT and Manifold are prebuilt wasm+glue modules; let Vite serve them as-is.
+  optimizeDeps: { exclude: ["replicad-opencascadejs", "manifold-3d"] },
   worker: { format: "es" },
   server: { host: true },
 });

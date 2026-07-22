@@ -3,3 +3,5 @@ dist/
 *.log
 pwtest.mjs
 introspect.mjs
+.idea/
+tsconfig.tsbuildinfo

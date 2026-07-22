@@ -14,7 +14,16 @@
  * logic runnable in both environments.
  */
 import { type Drawing, type Shape3D } from "replicad";
+import * as opentype from "opentype.js";
 import { svgPathToDrawing } from "./svgPath";
+import {
+  booleanMesh,
+  repairMesh,
+  segmentMesh,
+  type BooleanOp,
+  type MeshData,
+} from "./manifold";
+import { parseBinarySTL } from "./stl";
 
 /* ------------------------------------------------------------------ */
 /* Typed values that travel along the graph edges                      */
@@ -22,7 +31,8 @@ import { svgPathToDrawing } from "./svgPath";
 
 export type GraphValue =
   | { kind: "sketch2d"; drawing: Drawing }
-  | { kind: "solid"; solid: Shape3D };
+  | { kind: "solid"; solid: Shape3D }
+  | { kind: "mesh"; mesh: MeshData };
 
 /* ------------------------------------------------------------------ */
 /* Graph description                                                   */
@@ -43,6 +53,11 @@ type NodeImpl = (
   params: Record<string, unknown>,
 ) => GraphValue;
 
+// Node metadata (ports, params, socket colours) lives dependency-free in
+// `specs.ts` so the editor can import it without pulling in the WASM kernels.
+export type { SocketType, PortSpec, ParamSpec, NodeSpec } from "./specs";
+export { NODE_SPECS, SOCKET_COLORS } from "./specs";
+
 /* ------------------------------------------------------------------ */
 /* Node registry                                                       */
 /* ------------------------------------------------------------------ */
@@ -59,11 +74,44 @@ function expectSolid(v: GraphValue | undefined, node: string): Shape3D {
   return v.solid;
 }
 
+function expectMesh(v: GraphValue | undefined, node: string): MeshData {
+  if (!v || v.kind !== "mesh")
+    throw new Error(`[${node}] expected a mesh input, got ${v?.kind ?? "nothing"}`);
+  return v.mesh;
+}
+
+/** B-rep → mesh: tessellate a solid into a plain triangle payload. */
+function solidToMeshData(solid: Shape3D): MeshData {
+  const m = meshAndTag(solid);
+  return { vertices: m.vertices, indices: m.indices };
+}
+
 const REGISTRY: Record<string, NodeImpl> = {
   /** SVG input: parse an SVG path `d` string into a 2D drawing. */
   svgInput: (_inputs, params) => {
     const d = String(params.d ?? "");
     if (!d.trim()) throw new Error("[svgInput] empty SVG path");
+    return { kind: "sketch2d", drawing: svgPathToDrawing(d) };
+  },
+
+  /**
+   * Text → SVG → 2D profile. Converts a string to glyph outlines via
+   * opentype.js, emits an SVG path `d`, then reuses the SVG parser (whose
+   * multi-subpath/hole handling is exactly what letter counters need).
+   * `params.font` is a .ttf/.otf ArrayBuffer.
+   */
+  textToSvg: (_inputs, params) => {
+    const text = String(params.text ?? "");
+    const size = Number(params.size ?? 72);
+    const fontBuf = params.font;
+    if (!(fontBuf instanceof ArrayBuffer))
+      throw new Error("[textToSvg] a font file (.ttf/.otf) is required");
+    if (!text) throw new Error("[textToSvg] empty text");
+    const font = opentype.parse(fontBuf);
+    // baseline at y=0; opentype uses y-down, svgPathToDrawing flips to y-up.
+    const path = font.getPath(text, 0, 0, size);
+    const d = path.toPathData(3);
+    if (!d.trim()) throw new Error("[textToSvg] font produced no outlines for this text");
     return { kind: "sketch2d", drawing: svgPathToDrawing(d) };
   },
 
@@ -106,6 +154,42 @@ const REGISTRY: Record<string, NodeImpl> = {
     ) as Shape3D;
     return { kind: "solid", solid };
   },
+
+  /* --- mesh domain (Manifold) — the bridge from B-rep to STL land --- */
+
+  /** B-rep → mesh. Auto-inserted when a solid is fed into a mesh-only node. */
+  tessellate: (inputs) => {
+    const solid = expectSolid(inputs.in, "tessellate");
+    return { kind: "mesh", mesh: solidToMeshData(solid) };
+  },
+
+  /** Import a binary STL (`params.stl`: ArrayBuffer | Uint8Array) as a mesh. */
+  importSTL: (_inputs, params) => {
+    const raw = params.stl;
+    let buf: ArrayBuffer;
+    if (raw instanceof ArrayBuffer) buf = raw;
+    else if (raw instanceof Uint8Array)
+      buf = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
+    else throw new Error("[importSTL] params.stl must be an ArrayBuffer or Uint8Array");
+    return { kind: "mesh", mesh: parseBinarySTL(buf) };
+  },
+
+  /** Weld a triangle soup into a clean manifold mesh (STL repair). */
+  repair: (inputs) => {
+    const mesh = expectMesh(inputs.in, "repair");
+    return { kind: "mesh", mesh: repairMesh(mesh).mesh };
+  },
+
+  /**
+   * Robust mesh boolean. Inputs `a` and `b` must both be meshes; if a solid is
+   * wired in, tessellate it upstream first. `params.op`: union|difference|intersection.
+   */
+  boolean: (inputs, params) => {
+    const a = expectMesh(inputs.a, "boolean");
+    const b = expectMesh(inputs.b, "boolean");
+    const op = (params.op ?? "union") as BooleanOp;
+    return { kind: "mesh", mesh: booleanMesh(a, b, op) };
+  },
 };
 
 /* ------------------------------------------------------------------ */
@@ -143,6 +227,133 @@ export function evalGraph(graph: Graph): { outputs: Record<string, GraphValue>; 
   const outputs: Record<string, GraphValue> = {};
   for (const n of graph) outputs[n.id] = evalNode(n.id);
   return { outputs, order };
+}
+
+/* ------------------------------------------------------------------ */
+/* Incremental (content-addressed) evaluation                          */
+/*                                                                     */
+/* A persistent cache keyed by a content hash of each node             */
+/* (type + params + the hashes of its inputs). When a param changes,   */
+/* only that node's hash — and its descendants' — change; every        */
+/* untouched upstream node is served straight from cache. This is what */
+/* makes live editing cheap: change the boss height and OCCT does NOT  */
+/* re-extrude the base profile.                                        */
+/* ------------------------------------------------------------------ */
+
+export interface EvalCache {
+  entries: Map<string, { value: GraphValue; run: number }>;
+  run: number;
+}
+
+export function makeEvalCache(): EvalCache {
+  return { entries: new Map(), run: 0 };
+}
+
+function fnv1a(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  return h.toString(16);
+}
+
+function hashParams(params: Record<string, unknown>): string {
+  const parts: string[] = [];
+  for (const k of Object.keys(params).sort()) {
+    const v = params[k];
+    if (v instanceof ArrayBuffer) {
+      const b = new Uint8Array(v);
+      // cheap content signature — length + a few sampled bytes
+      parts.push(`${k}:ab${b.byteLength}:${b[0] ?? 0}:${b[b.length >> 1] ?? 0}:${b[b.length - 1] ?? 0}`);
+    } else {
+      parts.push(`${k}:${JSON.stringify(v)}`);
+    }
+  }
+  return parts.join("|");
+}
+
+/** Free the WASM object behind a cached B-rep value (mesh values are plain JS). */
+function disposeValue(v: GraphValue): void {
+  try {
+    if (v.kind === "solid") (v.solid as unknown as { delete?: () => void }).delete?.();
+    else if (v.kind === "sketch2d") (v.drawing as unknown as { delete?: () => void }).delete?.();
+  } catch {
+    /* best-effort — never let cleanup crash an eval */
+  }
+}
+
+export function evalGraphCached(
+  graph: Graph,
+  cache: EvalCache,
+): { outputs: Record<string, GraphValue>; hits: number; misses: number } {
+  cache.run++;
+  const byId = new Map(graph.map((n) => [n.id, n]));
+  const keyMemo = new Map<string, string>();
+  const valMemo = new Map<string, GraphValue>();
+  const visiting = new Set<string>();
+  let hits = 0;
+  let misses = 0;
+
+  const keyOf = (id: string): string => {
+    const memo = keyMemo.get(id);
+    if (memo) return memo;
+    const node = byId.get(id);
+    if (!node) throw new Error(`unknown node ${id}`);
+    const childParts: string[] = [];
+    for (const [port, srcId] of Object.entries(node.inputs ?? {})) {
+      childParts.push(`${port}=${keyOf(srcId)}`);
+    }
+    const key = fnv1a(
+      `${node.type}(${hashParams(node.params ?? {})})[${childParts.sort().join(",")}]`,
+    );
+    keyMemo.set(id, key);
+    return key;
+  };
+
+  const evalNode = (id: string): GraphValue => {
+    const done = valMemo.get(id);
+    if (done) return done;
+    if (visiting.has(id)) throw new Error(`cycle detected at node ${id}`);
+    const node = byId.get(id)!;
+    visiting.add(id);
+
+    const key = keyOf(id);
+    const hit = cache.entries.get(key);
+    let value: GraphValue;
+    if (hit) {
+      hit.run = cache.run; // refresh so it stays inside the retention window
+      value = hit.value;
+      hits++;
+    } else {
+      const inputs: Record<string, GraphValue> = {};
+      for (const [port, srcId] of Object.entries(node.inputs ?? {})) {
+        inputs[port] = evalNode(srcId);
+      }
+      const impl = REGISTRY[node.type];
+      if (!impl) throw new Error(`no implementation for node type "${node.type}"`);
+      value = impl(inputs, node.params ?? {});
+      cache.entries.set(key, { value, run: cache.run });
+      misses++;
+    }
+
+    visiting.delete(id);
+    valMemo.set(id, value);
+    return value;
+  };
+
+  const outputs: Record<string, GraphValue> = {};
+  for (const n of graph) outputs[n.id] = evalNode(n.id);
+
+  // evict entries untouched for more than one run (frees stale OCCT shapes)
+  for (const [k, e] of cache.entries) {
+    if (cache.run - e.run > 1) {
+      disposeValue(e.value);
+      cache.entries.delete(k);
+    }
+  }
+
+  return { outputs, hits, misses };
 }
 
 /* ------------------------------------------------------------------ */
@@ -201,6 +412,56 @@ export function meshAndTag(solid: Shape3D): MeshPayload {
       triangleCount: indices.length / 3,
       tagCounts,
     },
+  };
+}
+
+/**
+ * Turn a raw mesh (from Manifold) into a renderable MeshPayload, reusing the
+ * exact same structure the B-rep path produces so the viewport needs no changes.
+ *
+ * We segment the mesh into flat regions (the mesh-domain "faces"), then emit a
+ * flat-shaded, region-grouped geometry: vertices are expanded per-triangle so
+ * each region gets crisp edges and its own draw group, tagged top/side/bottom
+ * by its normal — mirroring `meshAndTag` for solids.
+ */
+export function meshToPayload(md: MeshData): MeshPayload {
+  const regions = segmentMesh(md);
+  const triTotal = md.indices.length / 3;
+  const vertices = new Float32Array(triTotal * 9);
+  const normals = new Float32Array(triTotal * 9);
+  const indices = new Uint32Array(triTotal * 3);
+  const groups: MeshPayload["groups"] = [];
+  const tagCounts: Record<FaceTag, number> = { top: 0, bottom: 0, side: 0 };
+
+  let tri = 0; // running triangle write cursor (expanded buffer)
+  regions.forEach((r, ri) => {
+    const start = tri * 3;
+    const [nx, ny, nz] = r.normal;
+    for (const t of r.triangles) {
+      for (let c = 0; c < 3; c++) {
+        const vi = md.indices[t * 3 + c];
+        const o = tri * 9 + c * 3;
+        vertices[o] = md.vertices[vi * 3];
+        vertices[o + 1] = md.vertices[vi * 3 + 1];
+        vertices[o + 2] = md.vertices[vi * 3 + 2];
+        normals[o] = nx;
+        normals[o + 1] = ny;
+        normals[o + 2] = nz;
+        indices[tri * 3 + c] = tri * 3 + c;
+      }
+      tri++;
+    }
+    const tag: FaceTag = nz > 0.7 ? "top" : nz < -0.7 ? "bottom" : "side";
+    tagCounts[tag] += r.triangles.length;
+    groups.push({ start, count: r.triangles.length * 3, faceId: ri, tag });
+  });
+
+  return {
+    vertices,
+    indices,
+    normals,
+    groups,
+    stats: { faceCount: regions.length, triangleCount: triTotal, tagCounts },
   };
 }
 

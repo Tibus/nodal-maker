@@ -6,5 +6,8 @@ const worker = new Worker(new URL("./worker.ts", import.meta.url), {
 });
 
 export const kernel = wrap<KernelAPI>(worker);
-export type { Params } from "./model";
-export type { MeshPayload, FaceTag } from "./nodes";
+export type { Params, MeshImportParams } from "./model";
+export type { MeshPayload, FaceTag, Graph, NodeDescriptor } from "./nodes";
+// metadata comes from the dependency-free specs module (no WASM in the UI bundle)
+export type { NodeSpec, ParamSpec, PortSpec, SocketType } from "./specs";
+export { NODE_SPECS, SOCKET_COLORS } from "./specs";
