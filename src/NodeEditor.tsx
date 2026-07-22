@@ -189,18 +189,19 @@ function ParamField({
       </label>
     );
   }
-  if (spec.kind === "stl" || spec.kind === "font") {
+  if (spec.kind === "font") {
+    return <FontField label={label} value={value} onChange={onChange} />;
+  }
+  if (spec.kind === "stl") {
     const loaded = value instanceof ArrayBuffer;
-    const accept = spec.kind === "stl" ? ".stl,model/stl" : ".ttf,.otf,font/ttf,font/otf";
-    const hint = spec.kind === "stl" ? "choose .stl" : "choose .ttf";
     return (
       <label className="pf pf--file">
         <span>{label}</span>
         <span className="pf__filebtn">
-          {loaded ? "✓ loaded" : hint}
+          {loaded ? "✓ loaded" : "choose .stl"}
           <input
             type="file"
-            accept={accept}
+            accept=".stl,model/stl"
             hidden
             onChange={async (e) => {
               const f = e.target.files?.[0];
@@ -221,6 +222,97 @@ function ParamField({
         onChange={(e) => onChange(e.target.value)}
       />
     </label>
+  );
+}
+
+/** A locally-installed font, as returned by the Local Font Access API. */
+interface LocalFontData {
+  postscriptName: string;
+  fullName: string;
+  family: string;
+  style: string;
+  blob(): Promise<Blob>;
+}
+type QueryLocalFonts = () => Promise<LocalFontData[]>;
+
+/**
+ * Font picker for the Text → SVG node. In Chromium the Local Font Access API
+ * (`queryLocalFonts`, permission-gated) lets us read the user's INSTALLED fonts
+ * directly — no upload needed. Everywhere else we fall back to a file upload.
+ */
+function FontField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: unknown;
+  onChange: (v: unknown) => void;
+}) {
+  const loaded = value instanceof ArrayBuffer;
+  const query = (window as unknown as { queryLocalFonts?: QueryLocalFonts }).queryLocalFonts;
+  const [fonts, setFonts] = useState<LocalFontData[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const loadSystemFonts = async () => {
+    if (!query) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      // de-dupe by family (keep the first/regular style we see)
+      const list = await query();
+      const seen = new Set<string>();
+      const uniq = list.filter((f) => (seen.has(f.family) ? false : (seen.add(f.family), true)));
+      uniq.sort((a, b) => a.family.localeCompare(b.family));
+      setFonts(uniq);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "access denied");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const pick = async (postscriptName: string) => {
+    const f = fonts?.find((x) => x.postscriptName === postscriptName);
+    if (!f) return;
+    onChange(await (await f.blob()).arrayBuffer());
+  };
+
+  return (
+    <div className="pf pf--file">
+      <span>{label}</span>
+      {query && !fonts && (
+        <button type="button" className="pf__filebtn" onClick={loadSystemFonts} disabled={busy}>
+          {busy ? "…" : "use a system font"}
+        </button>
+      )}
+      {fonts && (
+        <select className="pf__select" defaultValue="" onChange={(e) => pick(e.target.value)}>
+          <option value="" disabled>
+            {loaded ? "✓ pick another…" : `choose a font (${fonts.length})…`}
+          </option>
+          {fonts.map((f) => (
+            <option key={f.postscriptName} value={f.postscriptName}>
+              {f.family}
+            </option>
+          ))}
+        </select>
+      )}
+      <label className="pf__filebtn">
+        {loaded ? "✓ loaded — or upload" : "or upload .ttf/.otf"}
+        <input
+          type="file"
+          accept=".ttf,.otf,font/ttf,font/otf"
+          hidden
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            if (f) onChange(await f.arrayBuffer());
+          }}
+        />
+      </label>
+      {err && <span className="pf__err">font access: {err}</span>}
+    </div>
   );
 }
 

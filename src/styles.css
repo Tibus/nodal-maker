@@ -127,6 +127,11 @@ button.link {
   background: #2a2e36; border: 1px solid #3a3f48; border-radius: 5px;
   padding: 4px 8px; cursor: pointer; text-align: center;
 }
+.pf__select {
+  background: #0e1015; color: #d8dbe0; border: 1px solid #2a2e36;
+  border-radius: 5px; padding: 4px 6px; font-size: 11px; width: 100%;
+}
+.pf__err { color: #e06c75; font-size: 10px; }
 .react-flow__handle { width: 11px; height: 11px; }
 /* required / structural ports: filled disc (colour set inline) */
 .rf-port--req { border: 2px solid #14171c; }

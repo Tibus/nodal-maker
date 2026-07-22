@@ -131,7 +131,10 @@ l'impression 3D, que des utilisateurs customisent en changeant des paramètres
 - ✅ Éditeur : **undo/redo** (⌘Z / ⇧⌘Z + boutons, historique 100) et
   **validation des connexions** (`isValidConnection` → React Flow refuse le drop
   incompatible ; plus de rejet silencieux) — FAIT.
-- Nœud texte : polices bundlées (aujourd'hui upload obligatoire).
+- ✅ Nœud texte : **polices système** via la **Local Font Access API**
+  (`queryLocalFonts`, Chromium, permission + onglet visible requis) + repli upload
+  `.ttf/.otf` — FAIT (`FontField` dans NodeEditor). Erreur gérée proprement si
+  l'API est absente ou l'accès refusé.
 - Éditeur : auto-layout, groupes de nœuds, copier/coller.
 
 ### Spike n°2 — notes techniques (Manifold)
