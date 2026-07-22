@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "title": "Living hinge panel (laser) — a field of thin slits lets flat stock bend",
+  "outputId": "panel",
+  "nodes": [
+    {
+      "id": "sheet",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "rect",
+        "params": {
+          "width": 90,
+          "height": 50,
+          "radius": 2
+        }
+      }
+    },
+    {
+      "id": "slit",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "slot",
+        "params": {
+          "length": 38,
+          "width": 1.2
+        }
+      }
+    },
+    {
+      "id": "slitV",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "transform2d",
+        "params": {
+          "tx": -36,
+          "ty": 0,
+          "rotate": 90,
+          "scale": 1
+        }
+      }
+    },
+    {
+      "id": "slits",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "arrayLinear2d",
+        "params": {
+          "count": 13,
+          "dx": 6,
+          "dy": 0
+        }
+      }
+    },
+    {
+      "id": "panel",
+      "position": {
+        "x": 720,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean2d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "slit",
+      "sourceHandle": "out",
+      "target": "slitV",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "slitV",
+      "sourceHandle": "out",
+      "target": "slits",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "sheet",
+      "sourceHandle": "out",
+      "target": "panel",
+      "targetHandle": "a",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "slits",
+      "sourceHandle": "out",
+      "target": "panel",
+      "targetHandle": "b",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    }
+  ]
+}

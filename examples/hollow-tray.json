@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "title": "Hollow tray (3D print) — box, shell open-top, rounded corners",
+  "outputId": "round",
+  "nodes": [
+    {
+      "id": "body",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "box",
+        "params": {
+          "x": 70,
+          "y": 45,
+          "z": 22
+        }
+      }
+    },
+    {
+      "id": "topFace",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "faceSelect",
+        "params": {
+          "where": "top",
+          "offset": 22
+        }
+      }
+    },
+    {
+      "id": "hollow",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "shell",
+        "params": {
+          "thickness": 2.5
+        }
+      }
+    },
+    {
+      "id": "vEdges",
+      "position": {
+        "x": 0,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "edgeSelect",
+        "params": {
+          "where": "vertical"
+        }
+      }
+    },
+    {
+      "id": "round",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "fillet",
+        "params": {
+          "radius": 6
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "body",
+      "sourceHandle": "out",
+      "target": "hollow",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "topFace",
+      "sourceHandle": "out",
+      "target": "hollow",
+      "targetHandle": "faces",
+      "style": {
+        "stroke": "#d19a66"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "hollow",
+      "sourceHandle": "out",
+      "target": "round",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "vEdges",
+      "sourceHandle": "out",
+      "target": "round",
+      "targetHandle": "sel",
+      "style": {
+        "stroke": "#d19a66"
+      }
+    }
+  ]
+}

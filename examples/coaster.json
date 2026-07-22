@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "title": "Coaster (laser) — disc with a radial ring of holes",
+  "outputId": "coaster",
+  "nodes": [
+    {
+      "id": "disc",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "circle",
+        "params": {
+          "radius": 50
+        }
+      }
+    },
+    {
+      "id": "hole",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "circle",
+        "params": {
+          "radius": 5
+        }
+      }
+    },
+    {
+      "id": "holeOut",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "transform2d",
+        "params": {
+          "tx": 34,
+          "ty": 0,
+          "rotate": 0,
+          "scale": 1
+        }
+      }
+    },
+    {
+      "id": "ring",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "arrayRadial2d",
+        "params": {
+          "count": 10,
+          "radius": 0,
+          "angle": 360
+        }
+      }
+    },
+    {
+      "id": "coaster",
+      "position": {
+        "x": 720,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean2d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "hole",
+      "sourceHandle": "out",
+      "target": "holeOut",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "holeOut",
+      "sourceHandle": "out",
+      "target": "ring",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "disc",
+      "sourceHandle": "out",
+      "target": "coaster",
+      "targetHandle": "a",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "ring",
+      "sourceHandle": "out",
+      "target": "coaster",
+      "targetHandle": "b",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    }
+  ]
+}

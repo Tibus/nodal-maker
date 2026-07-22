@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "title": "Name plate (laser) — Score/Cut. Swap the inner shape for a Text → SVG.",
+  "outputId": "sc",
+  "nodes": [
+    {
+      "id": "plate",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "rect",
+        "params": {
+          "width": 90,
+          "height": 40,
+          "radius": 6
+        }
+      }
+    },
+    {
+      "id": "border",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "rect",
+        "params": {
+          "width": 80,
+          "height": 30,
+          "radius": 4
+        }
+      }
+    },
+    {
+      "id": "sc",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "scoreCut",
+        "params": {}
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "plate",
+      "sourceHandle": "out",
+      "target": "sc",
+      "targetHandle": "cut",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "border",
+      "sourceHandle": "out",
+      "target": "sc",
+      "targetHandle": "score",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    }
+  ]
+}

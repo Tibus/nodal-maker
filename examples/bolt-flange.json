@@ -1,0 +1,191 @@
+{
+  "version": 1,
+  "title": "Bolt flange (3D / CNC) — cylinder minus centre bore and a radial bolt circle",
+  "outputId": "flange",
+  "nodes": [
+    {
+      "id": "disc",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 34,
+          "height": 6
+        }
+      }
+    },
+    {
+      "id": "bore",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 9,
+          "height": 20
+        }
+      }
+    },
+    {
+      "id": "boreDown",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 0,
+          "ty": 0,
+          "tz": -5
+        }
+      }
+    },
+    {
+      "id": "drilled",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "bolt",
+      "position": {
+        "x": 0,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 3,
+          "height": 20
+        }
+      }
+    },
+    {
+      "id": "boltPos",
+      "position": {
+        "x": 240,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 24,
+          "ty": 0,
+          "tz": -5
+        }
+      }
+    },
+    {
+      "id": "bolts",
+      "position": {
+        "x": 480,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "arrayRadial3d",
+        "params": {
+          "count": 6,
+          "angle": 360
+        }
+      }
+    },
+    {
+      "id": "flange",
+      "position": {
+        "x": 720,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "bore",
+      "sourceHandle": "out",
+      "target": "boreDown",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "disc",
+      "sourceHandle": "out",
+      "target": "drilled",
+      "targetHandle": "a",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "boreDown",
+      "sourceHandle": "out",
+      "target": "drilled",
+      "targetHandle": "b",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "bolt",
+      "sourceHandle": "out",
+      "target": "boltPos",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "boltPos",
+      "sourceHandle": "out",
+      "target": "bolts",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e5",
+      "source": "drilled",
+      "sourceHandle": "out",
+      "target": "flange",
+      "targetHandle": "a",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e6",
+      "source": "bolts",
+      "sourceHandle": "out",
+      "target": "flange",
+      "targetHandle": "b",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    }
+  ]
+}
