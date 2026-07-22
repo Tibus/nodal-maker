@@ -226,6 +226,14 @@ export default function App() {
               setStatus("export error: " + (e instanceof Error ? e.message : String(e)));
             }
           }}
+          onExportSTEP={async (graph, outputId) => {
+            try {
+              const bytes = await kernel.exportGraphSTEP(graph, outputId);
+              download(bytes as unknown as BlobPart, "maker-graph.step", "application/step");
+            } catch (e) {
+              setStatus("export error: " + (e instanceof Error ? e.message : String(e)));
+            }
+          }}
         />
       ) : (
       <div className="panel">

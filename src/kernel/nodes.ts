@@ -366,6 +366,24 @@ const REGISTRY: Record<string, NodeImpl> = {
     return { kind: "solid", solid: out };
   },
 
+  /**
+   * Score/Cut for laser: `cut` is the through-cut outline, `score` the fold /
+   * engrave lines. The preview shows both fused; `exportGraphSVG` emits them on
+   * separate red (cut) / blue (score) layers.
+   */
+  scoreCut: (inputs) => {
+    const cut = expectSketch(inputs.cut, "scoreCut");
+    const score = inputs.score;
+    if (!score || score.kind !== "sketch2d") return { kind: "sketch2d", drawing: cut };
+    let drawing: Drawing;
+    try {
+      drawing = cut.fuse(score.drawing);
+    } catch {
+      drawing = cut; // open score paths may not fuse — preview the cut alone
+    }
+    return { kind: "sketch2d", drawing };
+  },
+
   /** Union several 2D profiles into one (overlaps resolved). */
   group: (inputs) => {
     const drs = ["a", "b", "c", "d"]

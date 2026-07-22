@@ -371,6 +371,17 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     output: "sketch2d",
     params: [{ name: "distance", kind: "number", default: 0, min: -20, max: 20, step: 0.5 }],
   },
+  scoreCut: {
+    type: "scoreCut",
+    label: "Score / Cut",
+    // cut = through-cut outline (red); score = fold/engrave lines (blue).
+    inputs: [
+      { name: "cut", type: "sketch2d" },
+      { name: "score", type: "sketch2d" },
+    ],
+    output: "sketch2d",
+    params: [],
+  },
   group: {
     type: "group",
     label: "Group 2D",

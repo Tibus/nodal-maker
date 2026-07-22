@@ -15,7 +15,7 @@ import {
   type MeshPayload,
 } from "./nodes";
 import { writeBinarySTL } from "./stl";
-import type { Shape3D } from "replicad";
+import type { Shape3D, Drawing } from "replicad";
 
 export interface Params {
   /** SVG path `d` attribute — the "SVG input" node */
@@ -187,11 +187,52 @@ export function evalToPayload(graph: Graph, outputId: string, cache?: EvalCache)
 
 /** Export the displayed node as SVG (2D profiles only). Curves are preserved. */
 export function exportGraphSVG(graph: Graph, outputId: string): string {
-  const v: GraphValue | undefined = evalGraph(graph).outputs[outputId];
+  const outputs = evalGraph(graph).outputs;
+  const node = graph.find((n) => n.id === outputId);
+
+  // Score/Cut node → layered SVG: red = cut (through), blue = score (fold/engrave)
+  if (node?.type === "scoreCut") {
+    const cutV = node.inputs?.cut ? outputs[node.inputs.cut] : undefined;
+    const scoreV = node.inputs?.score ? outputs[node.inputs.score] : undefined;
+    if (!cutV || cutV.kind !== "sketch2d") throw new Error("Score/Cut needs a cut profile");
+    const score = scoreV && scoreV.kind === "sketch2d" ? scoreV.drawing : undefined;
+    return scoreCutSVG(cutV.drawing, score);
+  }
+
+  const v: GraphValue | undefined = outputs[outputId];
   if (!v) throw new Error(`unknown output node "${outputId}"`);
   if (v.kind !== "sketch2d")
     throw new Error(`node "${outputId}" is a ${v.kind}; only 2D profiles export to SVG`);
   return v.drawing.toSVG(1);
+}
+
+function scoreCutSVG(cut: Drawing, score?: Drawing): string {
+  let combined = cut;
+  if (score) {
+    try {
+      combined = cut.fuse(score);
+    } catch {
+      /* keep cut bounds if score can't fuse */
+    }
+  }
+  const pathD = (dr: Drawing) => (dr.toSVGPaths() as (string | string[])[]).flat().join(" ");
+  const viewBox = combined.toSVGViewBox(2);
+  const parts = [
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" fill="none">`,
+    `<path d="${pathD(cut)}" stroke="#ff0000" stroke-width="0.3"/>`,
+  ];
+  if (score) parts.push(`<path d="${pathD(score)}" stroke="#0000ff" stroke-width="0.3"/>`);
+  parts.push(`</svg>`);
+  return parts.join("\n");
+}
+
+/** Export the displayed solid as STEP (CAD interchange). */
+export async function exportGraphSTEP(graph: Graph, outputId: string): Promise<Uint8Array> {
+  const v: GraphValue | undefined = evalGraph(graph).outputs[outputId];
+  if (!v) throw new Error(`unknown output node "${outputId}"`);
+  if (v.kind !== "solid") throw new Error(`node "${outputId}" is a ${v.kind}; STEP export needs a solid`);
+  const blob = v.solid.blobSTEP() as Blob;
+  return new Uint8Array(await blob.arrayBuffer());
 }
 
 export async function exportGraphSTL(

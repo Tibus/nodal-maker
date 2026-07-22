@@ -336,6 +336,7 @@ export interface NodeEditorProps {
   onReady?: (api: EditorApi) => void;
   onExportSTL?: (graph: Graph, outputId: string) => void;
   onExportSVG?: (graph: Graph, outputId: string) => void;
+  onExportSTEP?: (graph: Graph, outputId: string) => void;
 }
 
 let uid = 0;
@@ -390,6 +391,7 @@ export default function NodeEditor({
   onReady,
   onExportSTL,
   onExportSVG,
+  onExportSTEP,
 }: NodeEditorProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<GeoNode>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
@@ -650,16 +652,26 @@ export default function NodeEditor({
         {(() => {
           const outType = NODE_SPECS[nodes.find((n) => n.id === outputId)?.data.nodeType ?? ""]?.output;
           const svg = outType === "sketch2d";
+          const solid = outType === "solid";
           return (
-            <button
-              className="palette__btn"
-              onClick={() =>
-                (svg ? onExportSVG : onExportSTL)?.(toGraph(nodes, edges), outputId)
-              }
-              title={svg ? "export the 2D profile (curves preserved)" : "export the 3D model"}
-            >
-              ⬇ {svg ? "SVG" : "STL"}
-            </button>
+            <>
+              <button
+                className="palette__btn"
+                onClick={() => (svg ? onExportSVG : onExportSTL)?.(toGraph(nodes, edges), outputId)}
+                title={svg ? "export the 2D profile (curves preserved)" : "export the 3D model"}
+              >
+                ⬇ {svg ? "SVG" : "STL"}
+              </button>
+              {solid && (
+                <button
+                  className="palette__btn"
+                  onClick={() => onExportSTEP?.(toGraph(nodes, edges), outputId)}
+                  title="export as STEP (CAD interchange)"
+                >
+                  ⬇ STEP
+                </button>
+              )}
+            </>
           );
         })()}
         <button className="palette__btn" onClick={saveGraph}>💾 Save</button>
