@@ -59,7 +59,7 @@ export function paramPortType(p: ParamSpec): SocketType | null {
 /** Ordered palette categories (drives the grouped palette + search). */
 export const NODE_CATEGORIES: { name: string; types: string[] }[] = [
   { name: "Value", types: ["numberValue", "textValue", "math", "mathUnary", "clamp", "remap", "random"] },
-  { name: "2D Primitive", types: ["rect", "circle", "ellipse", "polygon", "star", "slot", "svgInput", "textToSvg"] },
+  { name: "2D Primitive", types: ["rect", "circle", "ellipse", "polygon", "star", "slot", "gear", "svgInput", "textToSvg"] },
   { name: "2D Op", types: ["offset2d", "fillet2d", "bevel2d", "boolean2d", "mirror2d", "transform2d", "arrayLinear2d", "arrayRadial2d", "group", "scoreCut"] },
   { name: "3D Primitive", types: ["box", "cylinder", "sphere", "cone", "torus"] },
   { name: "Sketch → Solid", types: ["extrude", "revolve", "bossOnCap"] },
@@ -172,6 +172,17 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     params: [
       { name: "radius", kind: "number", default: 20, min: 0.5, max: 300, step: 0.5 },
       { name: "sides", kind: "number", default: 6, min: 3, max: 24, step: 1 },
+    ],
+  },
+  gear: {
+    type: "gear",
+    label: "Gear 2D",
+    inputs: [],
+    output: "sketch2d",
+    params: [
+      { name: "teeth", kind: "number", default: 12, min: 3, max: 120, step: 1 },
+      { name: "radius", kind: "number", label: "pitch r", default: 30, min: 2, max: 300, step: 0.5 },
+      { name: "depth", kind: "number", label: "tooth", default: 6, min: 0.5, max: 60, step: 0.5 },
     ],
   },
   ellipse: {
@@ -327,6 +338,16 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     inputs: [{ name: "in", type: "sketch2d" }],
     output: "solid",
     params: [{ name: "angle", kind: "number", label: "angle°", default: 360, min: 1, max: 360, step: 1 }],
+  },
+  loft: {
+    type: "loft",
+    label: "Loft",
+    inputs: [
+      { name: "bottom", type: "sketch2d" },
+      { name: "top", type: "sketch2d" },
+    ],
+    output: "solid",
+    params: [{ name: "height", kind: "number", default: 30, min: 1, max: 300, step: 1 }],
   },
   boolean3d: {
     type: "boolean3d",

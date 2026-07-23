@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "title": "Pipe (3D print) — tube from two concentric cylinders",
+  "outputId": "pipe",
+  "nodes": [
+    {
+      "id": "outer",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 20,
+          "height": 60
+        }
+      }
+    },
+    {
+      "id": "inner",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 16,
+          "height": 80
+        }
+      }
+    },
+    {
+      "id": "innerDown",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 0,
+          "ty": 0,
+          "tz": -10
+        }
+      }
+    },
+    {
+      "id": "pipe",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "inner",
+      "sourceHandle": "out",
+      "target": "innerDown",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "outer",
+      "sourceHandle": "out",
+      "target": "pipe",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "innerDown",
+      "sourceHandle": "out",
+      "target": "pipe",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    }
+  ]
+}

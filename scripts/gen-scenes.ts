@@ -95,6 +95,134 @@ const scenes: Scene[] = [
       { id: "coaster", type: "boolean2d", inputs: { base: "disc", tool: "ring" }, params: { op: "difference" } },
     ],
   },
+  {
+    name: "rounded-box",
+    title: "Rounded box (3D print) — box with all edges filleted",
+    outputId: "r",
+    expect: "solid",
+    nodes: [
+      { id: "b", type: "box", params: { x: 50, y: 35, z: 20 } },
+      { id: "r", type: "fillet", inputs: { in: "b" }, params: { radius: 4 } },
+    ],
+  },
+  {
+    name: "spur-gear",
+    title: "Spur gear (laser/print) — 18-tooth gear extruded",
+    outputId: "g3d",
+    expect: "solid",
+    nodes: [
+      { id: "g", type: "gear", params: { teeth: 18, radius: 34, depth: 7 } },
+      { id: "bore", type: "circle", params: { radius: 6 } },
+      { id: "toothed", type: "boolean2d", inputs: { base: "g", tool: "bore" }, params: { op: "difference" } },
+      { id: "g3d", type: "extrude", inputs: { in: "toothed" }, params: { height: 8 } },
+    ],
+  },
+  {
+    name: "vase",
+    title: "Vase (3D print) — lofted from a square base to a round rim",
+    outputId: "l",
+    expect: "solid",
+    nodes: [
+      { id: "base", type: "rect", params: { width: 44, height: 44, radius: 8 } },
+      { id: "rim", type: "circle", params: { radius: 26 } },
+      { id: "l", type: "loft", inputs: { bottom: "base", top: "rim" }, params: { height: 70 } },
+    ],
+  },
+  {
+    name: "cup",
+    title: "Cup (3D print) — cylinder hollowed open at the top",
+    outputId: "cup",
+    expect: "solid",
+    nodes: [
+      { id: "body", type: "cylinder", params: { radius: 26, height: 60 } },
+      { id: "cup", type: "shell", inputs: { in: "body", faces: "body#cap" }, params: { thickness: 2.5 } },
+    ],
+  },
+  {
+    name: "washer",
+    title: "Washer (laser/CNC) — annulus (disc minus centre hole)",
+    outputId: "w",
+    expect: "sketch2d",
+    nodes: [
+      { id: "outer", type: "circle", params: { radius: 24 } },
+      { id: "inner", type: "circle", params: { radius: 10 } },
+      { id: "w", type: "boolean2d", inputs: { base: "outer", tool: "inner" }, params: { op: "difference" } },
+    ],
+  },
+  {
+    name: "pipe",
+    title: "Pipe (3D print) — tube from two concentric cylinders",
+    outputId: "pipe",
+    expect: "solid",
+    nodes: [
+      { id: "outer", type: "cylinder", params: { radius: 20, height: 60 } },
+      { id: "inner", type: "cylinder", params: { radius: 16, height: 80 } },
+      { id: "innerDown", type: "transform", inputs: { in: "inner" }, params: { tx: 0, ty: 0, tz: -10 } },
+      { id: "pipe", type: "boolean3d", inputs: { base: "outer", tool: "innerDown" }, params: { op: "difference" } },
+    ],
+  },
+  {
+    name: "hex-standoff",
+    title: "Hex standoff (3D print/CNC) — hex prism with a bore",
+    outputId: "so",
+    expect: "solid",
+    nodes: [
+      { id: "hex", type: "polygon", params: { radius: 12, sides: 6 } },
+      { id: "prism", type: "extrude", inputs: { in: "hex" }, params: { height: 25 } },
+      { id: "bore", type: "cylinder", params: { radius: 4, height: 40 } },
+      { id: "boreDown", type: "transform", inputs: { in: "bore" }, params: { tx: 0, ty: 0, tz: -8 } },
+      { id: "so", type: "boolean3d", inputs: { base: "prism", tool: "boreDown" }, params: { op: "difference" } },
+    ],
+  },
+  {
+    name: "star-badge",
+    title: "Star badge (3D print) — star extruded, top rim rounded via exposed selection",
+    outputId: "r",
+    expect: "solid",
+    nodes: [
+      { id: "s", type: "star", params: { outer: 34, inner: 15, points: 5 } },
+      { id: "e", type: "extrude", inputs: { in: "s" }, params: { height: 8 } },
+      { id: "r", type: "fillet", inputs: { in: "e", sel: "e#capEdges" }, params: { radius: 1.5 } },
+    ],
+  },
+  {
+    name: "mandala",
+    title: "Mandala (laser) — two radial rings of holes in a disc",
+    outputId: "m",
+    expect: "sketch2d",
+    nodes: [
+      { id: "disc", type: "circle", params: { radius: 55 } },
+      { id: "hOut", type: "circle", params: { radius: 6 } },
+      { id: "hOutP", type: "transform2d", inputs: { in: "hOut" }, params: { tx: 42, ty: 0, rotate: 0, scale: 1 } },
+      { id: "ringOut", type: "arrayRadial2d", inputs: { in: "hOutP" }, params: { count: 12, radius: 0, angle: 360 } },
+      { id: "hIn", type: "circle", params: { radius: 4 } },
+      { id: "hInP", type: "transform2d", inputs: { in: "hIn" }, params: { tx: 24, ty: 0, rotate: 0, scale: 1 } },
+      { id: "ringIn", type: "arrayRadial2d", inputs: { in: "hInP" }, params: { count: 8, radius: 0, angle: 360 } },
+      { id: "rings", type: "boolean2d", inputs: { base: "ringOut", tool: "ringIn" }, params: { op: "union" } },
+      { id: "m", type: "boolean2d", inputs: { base: "disc", tool: "rings" }, params: { op: "difference" } },
+    ],
+  },
+  {
+    name: "ring-torus",
+    title: "Ring (3D print) — a simple torus",
+    outputId: "t",
+    expect: "solid",
+    nodes: [{ id: "t", type: "torus", params: { radius: 22, tube: 6 } }],
+  },
+  {
+    name: "peg-board",
+    title: "Peg board (laser/CNC) — rounded plate with a grid of holes",
+    outputId: "board",
+    expect: "sketch2d",
+    nodes: [
+      { id: "plate", type: "rect", params: { width: 120, height: 80, radius: 6 } },
+      { id: "hole", type: "circle", params: { radius: 4 } },
+      { id: "holeP", type: "transform2d", inputs: { in: "hole" }, params: { tx: -48, ty: -28, rotate: 0, scale: 1 } },
+      { id: "row", type: "arrayLinear2d", inputs: { in: "holeP" }, params: { count: 9, dx: 12, dy: 0 } },
+      { id: "grid", type: "arrayLinear2d", inputs: { in: "row" }, params: { count: 5, dx: 0, dy: 14 } },
+      { id: "board", type: "boolean2d", inputs: { base: "plate", tool: "grid" }, params: { op: "difference" } },
+    ],
+  },
 ];
 
 /** left-to-right layout: x by dependency depth, y stacked within a depth. */
@@ -106,7 +234,7 @@ function layout(nodes: NodeDescriptor[]): Record<string, { x: number; y: number 
     if (seen.has(id)) return 0;
     seen.add(id);
     const n = byId.get(id)!;
-    const ins = Object.values(n.inputs ?? {});
+    const ins = Object.values(n.inputs ?? {}).map((s) => s.split("#")[0]);
     const d = ins.length ? 1 + Math.max(...ins.map((s) => compute(s, seen))) : 0;
     depth.set(id, d);
     return d;
@@ -128,12 +256,16 @@ function toSaveDoc(scene: Scene) {
   const edges: unknown[] = [];
   let e = 0;
   for (const n of scene.nodes) {
-    for (const [port, src] of Object.entries(n.inputs ?? {})) {
-      const srcType = NODE_SPECS[scene.nodes.find((x) => x.id === src)!.type].output;
+    for (const [port, ref] of Object.entries(n.inputs ?? {})) {
+      const hi = ref.indexOf("#");
+      const src = hi < 0 ? ref : ref.slice(0, hi);
+      const handle = hi < 0 ? "out" : ref.slice(hi + 1);
+      const srcType =
+        handle === "out" ? NODE_SPECS[scene.nodes.find((x) => x.id === src)!.type].output : "selection";
       edges.push({
         id: `e${e++}`,
         source: src,
-        sourceHandle: "out",
+        sourceHandle: handle,
         target: n.id,
         targetHandle: port,
         style: { stroke: SOCKET_COLORS[srcType] },

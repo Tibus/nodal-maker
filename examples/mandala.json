@@ -1,0 +1,216 @@
+{
+  "version": 1,
+  "title": "Mandala (laser) — two radial rings of holes in a disc",
+  "outputId": "m",
+  "nodes": [
+    {
+      "id": "disc",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "circle",
+        "params": {
+          "radius": 55
+        }
+      }
+    },
+    {
+      "id": "hOut",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "circle",
+        "params": {
+          "radius": 6
+        }
+      }
+    },
+    {
+      "id": "hOutP",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "transform2d",
+        "params": {
+          "tx": 42,
+          "ty": 0,
+          "rotate": 0,
+          "scale": 1
+        }
+      }
+    },
+    {
+      "id": "ringOut",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "arrayRadial2d",
+        "params": {
+          "count": 12,
+          "radius": 0,
+          "angle": 360
+        }
+      }
+    },
+    {
+      "id": "hIn",
+      "position": {
+        "x": 0,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "circle",
+        "params": {
+          "radius": 4
+        }
+      }
+    },
+    {
+      "id": "hInP",
+      "position": {
+        "x": 240,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "transform2d",
+        "params": {
+          "tx": 24,
+          "ty": 0,
+          "rotate": 0,
+          "scale": 1
+        }
+      }
+    },
+    {
+      "id": "ringIn",
+      "position": {
+        "x": 480,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "arrayRadial2d",
+        "params": {
+          "count": 8,
+          "radius": 0,
+          "angle": 360
+        }
+      }
+    },
+    {
+      "id": "rings",
+      "position": {
+        "x": 720,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean2d",
+        "params": {
+          "op": "union"
+        }
+      }
+    },
+    {
+      "id": "m",
+      "position": {
+        "x": 960,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean2d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "hOut",
+      "sourceHandle": "out",
+      "target": "hOutP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "hOutP",
+      "sourceHandle": "out",
+      "target": "ringOut",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "hIn",
+      "sourceHandle": "out",
+      "target": "hInP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "hInP",
+      "sourceHandle": "out",
+      "target": "ringIn",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "ringOut",
+      "sourceHandle": "out",
+      "target": "rings",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e5",
+      "source": "ringIn",
+      "sourceHandle": "out",
+      "target": "rings",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e6",
+      "source": "disc",
+      "sourceHandle": "out",
+      "target": "m",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e7",
+      "source": "rings",
+      "sourceHandle": "out",
+      "target": "m",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    }
+  ]
+}

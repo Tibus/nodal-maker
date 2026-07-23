@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "title": "Spur gear (laser/print) — 18-tooth gear extruded",
+  "outputId": "g3d",
+  "nodes": [
+    {
+      "id": "g",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "gear",
+        "params": {
+          "teeth": 18,
+          "radius": 34,
+          "depth": 7
+        }
+      }
+    },
+    {
+      "id": "bore",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "circle",
+        "params": {
+          "radius": 6
+        }
+      }
+    },
+    {
+      "id": "toothed",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean2d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "g3d",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "extrude",
+        "params": {
+          "height": 8
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "g",
+      "sourceHandle": "out",
+      "target": "toothed",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "bore",
+      "sourceHandle": "out",
+      "target": "toothed",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "toothed",
+      "sourceHandle": "out",
+      "target": "g3d",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    }
+  ]
+}

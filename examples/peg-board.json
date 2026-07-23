@@ -1,0 +1,146 @@
+{
+  "version": 1,
+  "title": "Peg board (laser/CNC) — rounded plate with a grid of holes",
+  "outputId": "board",
+  "nodes": [
+    {
+      "id": "plate",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "rect",
+        "params": {
+          "width": 120,
+          "height": 80,
+          "radius": 6
+        }
+      }
+    },
+    {
+      "id": "hole",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "circle",
+        "params": {
+          "radius": 4
+        }
+      }
+    },
+    {
+      "id": "holeP",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "transform2d",
+        "params": {
+          "tx": -48,
+          "ty": -28,
+          "rotate": 0,
+          "scale": 1
+        }
+      }
+    },
+    {
+      "id": "row",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "arrayLinear2d",
+        "params": {
+          "count": 9,
+          "dx": 12,
+          "dy": 0
+        }
+      }
+    },
+    {
+      "id": "grid",
+      "position": {
+        "x": 720,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "arrayLinear2d",
+        "params": {
+          "count": 5,
+          "dx": 0,
+          "dy": 14
+        }
+      }
+    },
+    {
+      "id": "board",
+      "position": {
+        "x": 960,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean2d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "hole",
+      "sourceHandle": "out",
+      "target": "holeP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "holeP",
+      "sourceHandle": "out",
+      "target": "row",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "row",
+      "sourceHandle": "out",
+      "target": "grid",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "plate",
+      "sourceHandle": "out",
+      "target": "board",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "grid",
+      "sourceHandle": "out",
+      "target": "board",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    }
+  ]
+}

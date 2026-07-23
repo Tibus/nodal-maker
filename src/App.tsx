@@ -107,6 +107,15 @@ export default function App() {
         }}
         onFit={() => viewportRef.current?.fit()}
         onTopView={() => viewportRef.current?.topView()}
+        onExportPNG={() => {
+          const url = viewportRef.current?.snapshotPNG();
+          if (url) {
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "maker-render.png";
+            a.click();
+          }
+        }}
         errorNodeId={graphError?.nodeId ?? null}
         errorMessage={graphError?.message ?? null}
         values={graphValues}

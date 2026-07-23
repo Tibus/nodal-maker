@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "title": "Cup (3D print) — cylinder hollowed open at the top",
+  "outputId": "cup",
+  "nodes": [
+    {
+      "id": "body",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 26,
+          "height": 60
+        }
+      }
+    },
+    {
+      "id": "cup",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "shell",
+        "params": {
+          "thickness": 2.5
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "body",
+      "sourceHandle": "out",
+      "target": "cup",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "body",
+      "sourceHandle": "cap",
+      "target": "cup",
+      "targetHandle": "faces",
+      "style": {
+        "stroke": "#d19a66"
+      }
+    }
+  ]
+}

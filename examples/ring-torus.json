@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "title": "Ring (3D print) — a simple torus",
+  "outputId": "t",
+  "nodes": [
+    {
+      "id": "t",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "torus",
+        "params": {
+          "radius": 22,
+          "tube": 6
+        }
+      }
+    }
+  ],
+  "edges": []
+}

@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "title": "Rounded box (3D print) — box with all edges filleted",
+  "outputId": "r",
+  "nodes": [
+    {
+      "id": "b",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "box",
+        "params": {
+          "x": 50,
+          "y": 35,
+          "z": 20
+        }
+      }
+    },
+    {
+      "id": "r",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "fillet",
+        "params": {
+          "radius": 4
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "b",
+      "sourceHandle": "out",
+      "target": "r",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    }
+  ]
+}

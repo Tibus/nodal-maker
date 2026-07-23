@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "title": "Vase (3D print) — lofted from a square base to a round rim",
+  "outputId": "l",
+  "nodes": [
+    {
+      "id": "base",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "rect",
+        "params": {
+          "width": 44,
+          "height": 44,
+          "radius": 8
+        }
+      }
+    },
+    {
+      "id": "rim",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "circle",
+        "params": {
+          "radius": 26
+        }
+      }
+    },
+    {
+      "id": "l",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "loft",
+        "params": {
+          "height": 70
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "base",
+      "sourceHandle": "out",
+      "target": "l",
+      "targetHandle": "bottom",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "rim",
+      "sourceHandle": "out",
+      "target": "l",
+      "targetHandle": "top",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    }
+  ]
+}

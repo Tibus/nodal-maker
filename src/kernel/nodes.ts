@@ -321,6 +321,28 @@ const REGISTRY: Record<string, NodeImpl> = {
     kind: "sketch2d",
     drawing: drawEllipse(Number(params.rx ?? 30), Number(params.ry ?? 18)),
   }),
+  gear: (_inputs, params) => {
+    // simplified spur-gear silhouette (trapezoidal teeth) — great for laser/print
+    const n = Math.max(3, Math.round(Number(params.teeth ?? 12)));
+    const pitch = Number(params.radius ?? 30);
+    const depth = Number(params.depth ?? 6);
+    const ro = pitch + depth / 2;
+    const ri = Math.max(0.5, pitch - depth / 2);
+    const step = (2 * Math.PI) / n;
+    const P = (r: number, a: number): [number, number] => [r * Math.cos(a), r * Math.sin(a)];
+    const pts: [number, number][] = [];
+    for (let i = 0; i < n; i++) {
+      const a = i * step;
+      pts.push(P(ri, a));
+      pts.push(P(ri, a + step * 0.3));
+      pts.push(P(ro, a + step * 0.42));
+      pts.push(P(ro, a + step * 0.58));
+      pts.push(P(ri, a + step * 0.7));
+    }
+    let pen = draw(pts[0]);
+    for (let i = 1; i < pts.length; i++) pen = pen.lineTo(pts[i]);
+    return { kind: "sketch2d", drawing: pen.close() };
+  },
   star: (_inputs, params) => {
     const outer = Number(params.outer ?? 30);
     const inner = Number(params.inner ?? 14);
@@ -429,6 +451,16 @@ const REGISTRY: Record<string, NodeImpl> = {
     const dr = expectSketch(inputs.in, "revolve");
     const angle = Number(params.angle ?? 360);
     const solid = dr.sketchOnPlane("XZ").revolve([0, 0, 1], { angle }) as Shape3D;
+    return { kind: "solid", solid };
+  },
+  loft: (inputs, params) => {
+    const bottom = expectSketch(inputs.bottom, "loft");
+    const top = expectSketch(inputs.top, "loft");
+    const h = Number(params.height ?? 30);
+    const bs = bottom.sketchOnPlane("XY", 0) as unknown as {
+      loftWith: (o: unknown) => Shape3D;
+    };
+    const solid = bs.loftWith(top.sketchOnPlane("XY", h)) as Shape3D;
     return { kind: "solid", solid };
   },
 

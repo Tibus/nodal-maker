@@ -35,7 +35,7 @@ export class Viewport {
   private gizmoBase = new THREE.Vector3();
 
   constructor(container: HTMLElement) {
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(container.clientWidth, container.clientHeight);
     this.renderer.shadowMap.enabled = true;
@@ -127,6 +127,12 @@ export class Viewport {
   /** Re-frame the camera on the current model now (Fit control). */
   fit() {
     if (this.mesh) this.frameCamera(new THREE.Box3().setFromObject(this.mesh));
+  }
+
+  /** Render now and return a PNG data URL of the viewport. */
+  snapshotPNG(): string {
+    this.renderer.render(this.scene, this.camera);
+    return this.renderer.domElement.toDataURL("image/png");
   }
 
   /** Look straight down the Z axis — a flat top view for 2D profiles. */

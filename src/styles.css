@@ -89,6 +89,10 @@ button.link {
   background: #0e1015; color: #d8dbe0; border: 1px solid #2a2e36;
   border-radius: 6px; padding: 6px 8px; font-size: 12px; width: 100%;
 }
+.palette__examples {
+  background: #2a2e36; color: #d8dbe0; border: 1px solid #3a3f48;
+  border-radius: 6px; padding: 5px 6px; font-size: 12px; width: 100%; cursor: pointer;
+}
 .palette__actions { display: flex; flex-wrap: wrap; gap: 4px; }
 .palette__actions button, .palette__loadbtn {
   background: #2a2e36; color: #d8dbe0; border: 1px solid #3a3f48; border-radius: 6px;

@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "title": "Washer (laser/CNC) — annulus (disc minus centre hole)",
+  "outputId": "w",
+  "nodes": [
+    {
+      "id": "outer",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "circle",
+        "params": {
+          "radius": 24
+        }
+      }
+    },
+    {
+      "id": "inner",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "circle",
+        "params": {
+          "radius": 10
+        }
+      }
+    },
+    {
+      "id": "w",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean2d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "outer",
+      "sourceHandle": "out",
+      "target": "w",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "inner",
+      "sourceHandle": "out",
+      "target": "w",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    }
+  ]
+}

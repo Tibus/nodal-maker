@@ -383,6 +383,7 @@ export interface NodeEditorProps {
   onExportSTEP?: (graph: Graph, outputId: string) => void;
   onFit?: () => void;
   onTopView?: () => void;
+  onExportPNG?: () => void;
 }
 
 let uid = 0;
@@ -434,6 +435,30 @@ function b642ab(s: string): ArrayBuffer {
   return b.buffer;
 }
 
+interface SceneDoc {
+  version?: number;
+  title?: string;
+  outputId: string;
+  components?: Record<string, ComponentDef>;
+  nodes: {
+    id: string;
+    position: { x: number; y: number };
+    data: { nodeType: string; component?: string; params: Record<string, unknown> };
+  }[];
+  edges: Edge[];
+}
+
+/** Bundled example projects, loaded from examples/*.json at build time. */
+const EXAMPLES = Object.entries(
+  import.meta.glob("../examples/*.json", { eager: true, import: "default" }),
+)
+  .map(([path, doc]) => {
+    const d = doc as SceneDoc;
+    const name = path.split("/").pop()!.replace(/\.json$/, "");
+    return { name, title: d.title ?? name, doc: d };
+  })
+  .sort((a, b) => a.title.localeCompare(b.title));
+
 export default function NodeEditor({
   initialNodes,
   initialEdges,
@@ -448,6 +473,7 @@ export default function NodeEditor({
   onExportSTEP,
   onFit,
   onTopView,
+  onExportPNG,
 }: NodeEditorProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<GeoNode>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
@@ -833,12 +859,9 @@ export default function NodeEditor({
     URL.revokeObjectURL(url);
   }, [nodes, edges, outputId, components]);
 
-  const loadGraph = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const f = e.target.files?.[0];
-      if (!f) return;
-      const doc = JSON.parse(await f.text());
-      const loadedNodes: GeoNode[] = doc.nodes.map((n: { id: string; position: { x: number; y: number }; data: { nodeType: string; component?: string; params: Record<string, unknown> } }) => ({
+  const applyDoc = useCallback(
+    (doc: SceneDoc) => {
+      const loadedNodes: GeoNode[] = doc.nodes.map((n) => ({
         id: n.id,
         type: "geo",
         position: n.position,
@@ -860,6 +883,16 @@ export default function NodeEditor({
       setOutputId(doc.outputId);
     },
     [setNodes, setEdges],
+  );
+
+  const loadGraph = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      applyDoc(JSON.parse(await f.text()) as SceneDoc);
+      e.target.value = ""; // allow re-loading the same file
+    },
+    [applyDoc],
   );
 
   // which (node, port) targets currently have an incoming wire
@@ -933,11 +966,30 @@ export default function NodeEditor({
             {outType === "solid" && (
               <button onClick={() => onExportSTEP?.(toGraph(nodes, edges), outputId)} title="Export STEP">⬇STEP</button>
             )}
+            <button onClick={() => onExportPNG?.()} title="Export a PNG render">⬇PNG</button>
             <button onClick={saveGraph} title="Save graph">💾</button>
             <label className="palette__loadbtn" title="Load graph">
               📂<input type="file" accept=".json,application/json" hidden onChange={loadGraph} />
             </label>
           </div>
+          <select
+            className="palette__examples"
+            value=""
+            onChange={(e) => {
+              const ex = EXAMPLES.find((x) => x.name === e.target.value);
+              if (ex) applyDoc(ex.doc);
+            }}
+            title="Load an example project"
+          >
+            <option value="" disabled>
+              📚 Examples…
+            </option>
+            {EXAMPLES.map((ex) => (
+              <option key={ex.name} value={ex.name}>
+                {ex.title}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="palette__list">
