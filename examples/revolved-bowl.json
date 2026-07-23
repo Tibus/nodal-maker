@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "title": "Revolved bowl (3D print) — revolve → hollow via the revolve's own 'top' port",
+  "outputId": "bowl",
+  "nodes": [
+    {
+      "id": "prof",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "rect",
+        "params": {
+          "width": 44,
+          "height": 30,
+          "radius": 0
+        }
+      }
+    },
+    {
+      "id": "pos",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "transform2d",
+        "params": {
+          "tx": 22,
+          "ty": 15,
+          "rotate": 0,
+          "scale": 1
+        }
+      }
+    },
+    {
+      "id": "rev",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "revolve",
+        "params": {
+          "angle": 360
+        }
+      }
+    },
+    {
+      "id": "bowl",
+      "position": {
+        "x": 720,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "shell",
+        "params": {
+          "thickness": 3
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "prof",
+      "sourceHandle": "out",
+      "target": "pos",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "pos",
+      "sourceHandle": "out",
+      "target": "rev",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "rev",
+      "sourceHandle": "out",
+      "target": "bowl",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "rev",
+      "sourceHandle": "top",
+      "target": "bowl",
+      "targetHandle": "faces",
+      "style": {
+        "stroke": "#d19a66"
+      }
+    }
+  ]
+}

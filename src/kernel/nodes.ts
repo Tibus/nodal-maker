@@ -157,8 +157,21 @@ const edgeXY = (z: number): GraphValue => ({
   apply: (e) => (e as EdgeFinder).inPlane("XY", z),
 });
 
-/** selection ports exposed by each modifier: handle → build(params) → selection */
-const SELECTION_PORTS: Record<string, Record<string, (p: Record<string, unknown>) => GraphValue>> = {
+/** min / max Z of a solid's bounding box — lets ports on nodes whose face
+ * heights depend on upstream geometry (revolve, boss) locate their caps. */
+function zBounds(solid: Shape3D): { min: number; max: number } {
+  const [lo, hi] = solid.boundingBox.bounds;
+  return { min: lo[2], max: hi[2] };
+}
+
+/**
+ * Selection ports exposed by each modifier: handle → build(params, solid?) →
+ * selection. `solid` is the evaluated source shape when available, so ports can
+ * read its actual bounds instead of guessing from params (needed for revolve /
+ * boss, whose cap heights come from upstream geometry).
+ */
+type PortBuilder = (p: Record<string, unknown>, solid?: Shape3D) => GraphValue;
+const SELECTION_PORTS: Record<string, Record<string, PortBuilder>> = {
   extrude: {
     cap: (p) => faceXY(Number(p.height ?? 1)),
     bottom: () => faceXY(0),
@@ -182,6 +195,19 @@ const SELECTION_PORTS: Record<string, Record<string, (p: Record<string, unknown>
     side: () => faceCyl(),
     capEdges: (p) => edgeXY(Number(p.height ?? 30)),
   },
+  // revolve caps sit at the profile's own Z extents → read them from the solid
+  revolve: {
+    top: (_p, s) => faceXY(s ? zBounds(s).max : 0),
+    bottom: (_p, s) => faceXY(s ? zBounds(s).min : 0),
+    side: () => faceCyl(),
+  },
+  // boss cap is the new topmost face; base bottom stays at the original floor
+  bossOnCap: {
+    top: (_p, s) => faceXY(s ? zBounds(s).max : 0),
+    bottom: (_p, s) => faceXY(s ? zBounds(s).min : 0),
+    bossSide: () => faceCyl(),
+    topEdges: (_p, s) => edgeXY(s ? zBounds(s).max : 0),
+  },
 };
 
 /** Resolve an input ref to its GraphValue, given an evaluator for main outputs. */
@@ -195,7 +221,10 @@ function resolveRef(
   const src = byId.get(node);
   const build = src ? SELECTION_PORTS[src.type]?.[handle] : undefined;
   if (!build) throw new Error(`no selection port "${handle}" on ${src?.type ?? node}`);
-  return build(src!.params ?? {});
+  // geometry-aware ports (revolve/boss) need the evaluated source solid
+  const v = evalNode(node);
+  const solid = v.kind === "solid" ? v.solid : undefined;
+  return build(src!.params ?? {}, solid);
 }
 
 /* ------------------------------------------------------------------ */

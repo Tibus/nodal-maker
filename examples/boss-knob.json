@@ -1,0 +1,112 @@
+{
+  "version": 1,
+  "title": "Boss knob (3D print) — boss on cap, fillet its rim via boss#topEdges",
+  "outputId": "knob",
+  "nodes": [
+    {
+      "id": "disc",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "circle",
+        "params": {
+          "radius": 24
+        }
+      }
+    },
+    {
+      "id": "base",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "extrude",
+        "params": {
+          "height": 8
+        }
+      }
+    },
+    {
+      "id": "boss",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "bossOnCap",
+        "params": {
+          "height": 14,
+          "shrink": 8
+        }
+      }
+    },
+    {
+      "id": "knob",
+      "position": {
+        "x": 720,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "fillet",
+        "params": {
+          "radius": 3
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "disc",
+      "sourceHandle": "out",
+      "target": "base",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "base",
+      "sourceHandle": "out",
+      "target": "boss",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "disc",
+      "sourceHandle": "out",
+      "target": "boss",
+      "targetHandle": "profile",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "boss",
+      "sourceHandle": "out",
+      "target": "knob",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "boss",
+      "sourceHandle": "topEdges",
+      "target": "knob",
+      "targetHandle": "sel",
+      "style": {
+        "stroke": "#d19a66"
+      }
+    }
+  ]
+}

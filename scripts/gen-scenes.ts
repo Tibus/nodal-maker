@@ -242,6 +242,30 @@ const scenes: Scene[] = [
       { id: "box", type: "fingerBox", params: { width: 70, depth: 70, height: 50, thickness: 4, finger: 14, lid: "closed" } },
     ],
   },
+  {
+    name: "revolved-bowl",
+    title: "Revolved bowl (3D print) — revolve → hollow via the revolve's own 'top' port",
+    outputId: "bowl",
+    expect: "solid",
+    nodes: [
+      { id: "prof", type: "rect", params: { width: 44, height: 30, radius: 0 } },
+      { id: "pos", type: "transform2d", inputs: { in: "prof" }, params: { tx: 22, ty: 15, rotate: 0, scale: 1 } },
+      { id: "rev", type: "revolve", inputs: { in: "pos" }, params: { angle: 360 } },
+      { id: "bowl", type: "shell", inputs: { in: "rev", faces: "rev#top" }, params: { thickness: 3 } },
+    ],
+  },
+  {
+    name: "boss-knob",
+    title: "Boss knob (3D print) — boss on cap, fillet its rim via boss#topEdges",
+    outputId: "knob",
+    expect: "solid",
+    nodes: [
+      { id: "disc", type: "circle", params: { radius: 24 } },
+      { id: "base", type: "extrude", inputs: { in: "disc" }, params: { height: 8 } },
+      { id: "boss", type: "bossOnCap", inputs: { in: "base", profile: "disc" }, params: { height: 14, shrink: 8 } },
+      { id: "knob", type: "fillet", inputs: { in: "boss", sel: "boss#topEdges" }, params: { radius: 3 } },
+    ],
+  },
 ];
 
 /** left-to-right layout: x by dependency depth, y stacked within a depth. */

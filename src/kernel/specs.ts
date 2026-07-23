@@ -353,6 +353,11 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     inputs: [{ name: "in", type: "sketch2d" }],
     output: "solid",
     params: [{ name: "angle", kind: "number", label: "angle°", default: 360, min: 1, max: 360, step: 1 }],
+    selectionOutputs: [
+      { name: "top", target: "face" },
+      { name: "bottom", target: "face" },
+      { name: "side", target: "face" },
+    ],
   },
   loft: {
     type: "loft",
@@ -564,6 +569,12 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     params: [
       { name: "height", kind: "number", default: 8, min: 1, max: 40, step: 1 },
       { name: "shrink", kind: "number", default: 10, min: 1, max: 30, step: 0.5 },
+    ],
+    selectionOutputs: [
+      { name: "top", target: "face" },
+      { name: "bottom", target: "face" },
+      { name: "bossSide", target: "face" },
+      { name: "topEdges", target: "edge" },
     ],
   },
   tessellate: {
