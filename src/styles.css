@@ -136,6 +136,31 @@ button.link {
 }
 .react-flow__controls-button:hover { background: #2a2e36; }
 
+/* comment / frame node — free-floating annotation, no ports */
+.note {
+  background: rgba(229, 192, 123, 0.12);
+  border: 1px dashed #e5c07b;
+  border-radius: 8px;
+  padding: 4px;
+  width: 100%;
+  height: 100%;
+  min-width: 120px;
+  min-height: 50px;
+}
+.note__text {
+  background: transparent;
+  border: 0;
+  color: #e5c07b;
+  font-size: 12px;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  width: 100%;
+  height: 100%;
+  resize: none;
+  outline: none;
+  line-height: 1.4;
+}
+.note__text::placeholder { color: rgba(229, 192, 123, 0.4); }
+
 .gnode {
   background: #1e2127; border: 1px solid #3a3f48; border-radius: 8px;
   min-width: 150px; font-size: 12px; color: #d8dbe0; box-shadow: 0 4px 14px rgba(0,0,0,0.35);

@@ -361,7 +361,24 @@ function FontField({
 /* Editor                                                              */
 /* ------------------------------------------------------------------ */
 
-const nodeTypes = { geo: GeoNodeView };
+/** A comment / frame node: free-floating editable text for organising the graph.
+ * It never reaches the graph engine (see `isNote`) — purely visual. */
+function NoteView({ id, data }: NodeProps<GeoNode>) {
+  const ctx = useContext(Ctx)!;
+  const text = String(data.params.text ?? "");
+  return (
+    <div className="note" onClick={(e) => e.stopPropagation()}>
+      <textarea
+        className="note__text nodrag"
+        value={text}
+        placeholder="Comment…"
+        onChange={(e) => ctx.setParam(id, "text", e.target.value)}
+      />
+    </div>
+  );
+}
+
+const nodeTypes = { geo: GeoNodeView, note: NoteView };
 
 export interface EditorApi {
   /** imperatively set a node param (used by the 3D gizmo to write tx/ty/tz) */
@@ -391,8 +408,11 @@ let uid = 0;
 const newId = (t: string) => `${t}_${++uid}`;
 
 /** Build serialisable instance descriptors from React Flow nodes + edges. */
+/** Comment/frame nodes carry no geometry — they never reach the graph engine. */
+const isNote = (n: GeoNode) => n.data.nodeType === "__note";
+
 function toGraph(nodes: GeoNode[], edges: Edge[]): InstanceDescriptor[] {
-  return nodes.map<InstanceDescriptor>((n) => {
+  return nodes.filter((n) => !isNote(n)).map<InstanceDescriptor>((n) => {
     const inputs: Record<string, string> = {};
     for (const e of edges) {
       if (e.target === n.id && e.targetHandle) {
@@ -443,7 +463,10 @@ interface SceneDoc {
   components?: Record<string, ComponentDef>;
   nodes: {
     id: string;
+    type?: string; // React Flow node type ("geo" | "note"); defaults to "geo"
     position: { x: number; y: number };
+    width?: number;
+    height?: number;
     data: { nodeType: string; component?: string; params: Record<string, unknown> };
   }[];
   edges: Edge[];
@@ -525,9 +548,10 @@ export default function NodeEditor({
   // param-edit all flow through one path, and deletion works for free.
   const lastSig = useRef<string>("");
   useEffect(() => {
-    const validOut = nodes.some((n) => n.id === outputId)
+    const geoNodes = nodes.filter((n) => !isNote(n));
+    const validOut = nodes.some((n) => n.id === outputId && !isNote(n))
       ? outputId
-      : (nodes[nodes.length - 1]?.id ?? "");
+      : (geoNodes[geoNodes.length - 1]?.id ?? "");
     if (validOut !== outputId) {
       setOutputId(validOut); // output node was deleted → fall back, re-runs effect
       return;
@@ -737,6 +761,29 @@ export default function NodeEditor({
     [nodes, setNodes, setEdges, nodeOutType],
   );
 
+  // drop a free-floating comment/frame node (visual only, never evaluated).
+  // placed just ABOVE the current node (empty space) and appended so it renders
+  // on top and stays clickable even over other nodes.
+  const addNote = useCallback(() => {
+    const id = newId("note");
+    const sel = nodes.find((n) => n.selected);
+    // default: centre of the visible canvas (so it's never dropped off-screen)
+    let position = { x: 40, y: 40 };
+    if (sel) position = { x: sel.position.x, y: sel.position.y - 110 };
+    else {
+      const pane = document.querySelector(".editor__canvas");
+      const rect = pane?.getBoundingClientRect();
+      if (rect && rf.current)
+        position = rf.current.screenToFlowPosition({ x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 });
+    }
+    setNodes((prev) => [
+      ...prev.map((n) => ({ ...n, selected: false })),
+      // explicit width/height so React Flow renders it immediately (it hides
+      // custom nodes until measured, and a note has no ports to force a size)
+      { id, type: "note", position, width: 190, height: 80, selected: true, data: { nodeType: "__note", params: { text: "" } } },
+    ]);
+  }, [nodes, setNodes]);
+
   // group the current selection into a reusable component instance
   const collapseSelection = useCallback(() => {
     const sel = nodes.filter((n) => n.selected && !n.data.component); // no nesting (MVP)
@@ -834,7 +881,10 @@ export default function NodeEditor({
       components,
       nodes: nodes.map((n) => ({
         id: n.id,
+        type: n.type,
         position: n.position,
+        width: n.width ?? undefined,
+        height: n.height ?? undefined,
         data: {
           nodeType: n.data.nodeType,
           component: n.data.component,
@@ -865,8 +915,10 @@ export default function NodeEditor({
     (doc: SceneDoc) => {
       const loadedNodes: GeoNode[] = doc.nodes.map((n) => ({
         id: n.id,
-        type: "geo",
+        type: n.type ?? "geo",
         position: n.position,
+        ...(n.width ? { width: n.width } : {}),
+        ...(n.height ? { height: n.height } : {}),
         data: {
           nodeType: n.data.nodeType,
           component: n.data.component,
@@ -959,6 +1011,7 @@ export default function NodeEditor({
             <button onClick={() => onFit?.()} title="Fit view">⊹</button>
             <button onClick={() => onTopView?.()} title="Top view (2D)">▣</button>
             <button onClick={collapseSelection} title="Group selection into a component">⧉</button>
+            <button onClick={addNote} title="Add a comment note">📝</button>
             <button
               onClick={() => (outType === "sketch2d" ? onExportSVG : onExportSTL)?.(toGraph(nodes, edges), outputId)}
               title={outType === "sketch2d" ? "Export SVG" : "Export STL"}
