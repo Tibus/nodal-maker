@@ -99,7 +99,7 @@ async function main() {
     { id: "off", type: "offset2d", inputs: { in: "svg" }, params: { distance: -8 } },
     { id: "ext", type: "extrude", inputs: { in: "off" }, params: { height: cutterHeight } },
     { id: "tess", type: "tessellate", inputs: { in: "ext" } },
-    { id: "cut", type: "boolean", inputs: { a: "fix", b: "tess" }, params: { op: "difference" } },
+    { id: "cut", type: "boolean", inputs: { base: "fix", tool: "tess" }, params: { op: "difference" } },
   ];
   const { outputs } = evalGraph(graph);
 
