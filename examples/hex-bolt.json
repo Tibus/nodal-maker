@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "title": "Hex bolt (3D print) — hexagonal head with a cylindrical shank",
+  "outputId": "bolt",
+  "nodes": [
+    {
+      "id": "hex",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "polygon",
+        "params": {
+          "radius": 8,
+          "sides": 6
+        }
+      }
+    },
+    {
+      "id": "head",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "extrude",
+        "params": {
+          "height": 6
+        }
+      }
+    },
+    {
+      "id": "shank",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 4,
+          "height": 30
+        }
+      }
+    },
+    {
+      "id": "shankP",
+      "position": {
+        "x": 240,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 0,
+          "ty": 0,
+          "tz": 6
+        }
+      }
+    },
+    {
+      "id": "bolt",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "union"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "hex",
+      "sourceHandle": "out",
+      "target": "head",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "shank",
+      "sourceHandle": "out",
+      "target": "shankP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "head",
+      "sourceHandle": "out",
+      "target": "bolt",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "shankP",
+      "sourceHandle": "out",
+      "target": "bolt",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    }
+  ]
+}

@@ -1,0 +1,239 @@
+{
+  "version": 1,
+  "title": "NEMA 17 mount (3D / CNC) — rounded plate, pilot bore, 31 mm bolt square",
+  "outputId": "mount",
+  "nodes": [
+    {
+      "id": "plate",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "box",
+        "params": {
+          "x": 50,
+          "y": 50,
+          "z": 6
+        }
+      }
+    },
+    {
+      "id": "vE",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "edgeSelect",
+        "params": {
+          "where": "vertical",
+          "offset": 0
+        }
+      }
+    },
+    {
+      "id": "rounded",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "fillet",
+        "params": {
+          "radius": 5
+        }
+      }
+    },
+    {
+      "id": "center",
+      "position": {
+        "x": 0,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 11,
+          "height": 20
+        }
+      }
+    },
+    {
+      "id": "centerP",
+      "position": {
+        "x": 240,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 0,
+          "ty": 0,
+          "tz": -6
+        }
+      }
+    },
+    {
+      "id": "bored",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "hole",
+      "position": {
+        "x": 0,
+        "y": 450
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 1.6,
+          "height": 20
+        }
+      }
+    },
+    {
+      "id": "holeP",
+      "position": {
+        "x": 240,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 15.5,
+          "ty": 15.5,
+          "tz": -6
+        }
+      }
+    },
+    {
+      "id": "holes",
+      "position": {
+        "x": 480,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "arrayRadial3d",
+        "params": {
+          "count": 4,
+          "angle": 360
+        }
+      }
+    },
+    {
+      "id": "mount",
+      "position": {
+        "x": 720,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "plate",
+      "sourceHandle": "out",
+      "target": "rounded",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "vE",
+      "sourceHandle": "out",
+      "target": "rounded",
+      "targetHandle": "sel",
+      "style": {
+        "stroke": "#d19a66"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "center",
+      "sourceHandle": "out",
+      "target": "centerP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "rounded",
+      "sourceHandle": "out",
+      "target": "bored",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "centerP",
+      "sourceHandle": "out",
+      "target": "bored",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e5",
+      "source": "hole",
+      "sourceHandle": "out",
+      "target": "holeP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e6",
+      "source": "holeP",
+      "sourceHandle": "out",
+      "target": "holes",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e7",
+      "source": "bored",
+      "sourceHandle": "out",
+      "target": "mount",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e8",
+      "source": "holes",
+      "sourceHandle": "out",
+      "target": "mount",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    }
+  ]
+}

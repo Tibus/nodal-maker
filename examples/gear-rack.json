@@ -1,0 +1,147 @@
+{
+  "version": 1,
+  "title": "Gear rack (3D print) — bar with a linear array of diamond teeth",
+  "outputId": "rack",
+  "nodes": [
+    {
+      "id": "bar",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "box",
+        "params": {
+          "x": 100,
+          "y": 12,
+          "z": 8
+        }
+      }
+    },
+    {
+      "id": "tooth",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "box",
+        "params": {
+          "x": 6,
+          "y": 12,
+          "z": 6
+        }
+      }
+    },
+    {
+      "id": "toothR",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "rotate3d",
+        "params": {
+          "angle": 45,
+          "axis": "Y"
+        }
+      }
+    },
+    {
+      "id": "toothP",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": -40,
+          "ty": 0,
+          "tz": 8
+        }
+      }
+    },
+    {
+      "id": "teeth",
+      "position": {
+        "x": 720,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "arrayLinear3d",
+        "params": {
+          "count": 11,
+          "dx": 8,
+          "dy": 0,
+          "dz": 0
+        }
+      }
+    },
+    {
+      "id": "rack",
+      "position": {
+        "x": 960,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "union"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "tooth",
+      "sourceHandle": "out",
+      "target": "toothR",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "toothR",
+      "sourceHandle": "out",
+      "target": "toothP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "toothP",
+      "sourceHandle": "out",
+      "target": "teeth",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "bar",
+      "sourceHandle": "out",
+      "target": "rack",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "teeth",
+      "sourceHandle": "out",
+      "target": "rack",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    }
+  ]
+}

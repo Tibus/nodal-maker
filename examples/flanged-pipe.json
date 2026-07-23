@@ -1,0 +1,238 @@
+{
+  "version": 1,
+  "title": "Flanged pipe (3D / CNC) — tube with a bolt-circle mounting flange",
+  "outputId": "pipe",
+  "nodes": [
+    {
+      "id": "outer",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 12,
+          "height": 50
+        }
+      }
+    },
+    {
+      "id": "innerC",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 9,
+          "height": 56
+        }
+      }
+    },
+    {
+      "id": "innerP",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 0,
+          "ty": 0,
+          "tz": -3
+        }
+      }
+    },
+    {
+      "id": "tube",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "flange",
+      "position": {
+        "x": 0,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 26,
+          "height": 6
+        }
+      }
+    },
+    {
+      "id": "withFlange",
+      "position": {
+        "x": 720,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "union"
+        }
+      }
+    },
+    {
+      "id": "boltH",
+      "position": {
+        "x": 0,
+        "y": 450
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 2.5,
+          "height": 12
+        }
+      }
+    },
+    {
+      "id": "boltHP",
+      "position": {
+        "x": 240,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 19,
+          "ty": 0,
+          "tz": -3
+        }
+      }
+    },
+    {
+      "id": "boltHoles",
+      "position": {
+        "x": 480,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "arrayRadial3d",
+        "params": {
+          "count": 4,
+          "angle": 360
+        }
+      }
+    },
+    {
+      "id": "pipe",
+      "position": {
+        "x": 960,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "innerC",
+      "sourceHandle": "out",
+      "target": "innerP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "outer",
+      "sourceHandle": "out",
+      "target": "tube",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "innerP",
+      "sourceHandle": "out",
+      "target": "tube",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "tube",
+      "sourceHandle": "out",
+      "target": "withFlange",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "flange",
+      "sourceHandle": "out",
+      "target": "withFlange",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e5",
+      "source": "boltH",
+      "sourceHandle": "out",
+      "target": "boltHP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e6",
+      "source": "boltHP",
+      "sourceHandle": "out",
+      "target": "boltHoles",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e7",
+      "source": "withFlange",
+      "sourceHandle": "out",
+      "target": "pipe",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e8",
+      "source": "boltHoles",
+      "sourceHandle": "out",
+      "target": "pipe",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    }
+  ]
+}

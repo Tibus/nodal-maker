@@ -1,0 +1,311 @@
+{
+  "version": 1,
+  "title": "Bearing housing (3D / CNC) — rounded block, counterbored seat, 4 bolts",
+  "outputId": "housing",
+  "nodes": [
+    {
+      "id": "block",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "box",
+        "params": {
+          "x": 44,
+          "y": 44,
+          "z": 18
+        }
+      }
+    },
+    {
+      "id": "vE",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "edgeSelect",
+        "params": {
+          "where": "vertical",
+          "offset": 0
+        }
+      }
+    },
+    {
+      "id": "rb",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "fillet",
+        "params": {
+          "radius": 6
+        }
+      }
+    },
+    {
+      "id": "seat",
+      "position": {
+        "x": 0,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 13,
+          "height": 12
+        }
+      }
+    },
+    {
+      "id": "seatP",
+      "position": {
+        "x": 240,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 0,
+          "ty": 0,
+          "tz": 8
+        }
+      }
+    },
+    {
+      "id": "s1",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "thru",
+      "position": {
+        "x": 0,
+        "y": 450
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 8,
+          "height": 30
+        }
+      }
+    },
+    {
+      "id": "thruP",
+      "position": {
+        "x": 240,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 0,
+          "ty": 0,
+          "tz": -6
+        }
+      }
+    },
+    {
+      "id": "s2",
+      "position": {
+        "x": 720,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "bolt",
+      "position": {
+        "x": 0,
+        "y": 600
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 2.2,
+          "height": 30
+        }
+      }
+    },
+    {
+      "id": "boltP",
+      "position": {
+        "x": 240,
+        "y": 450
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 16,
+          "ty": 16,
+          "tz": -6
+        }
+      }
+    },
+    {
+      "id": "bolts",
+      "position": {
+        "x": 480,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "arrayRadial3d",
+        "params": {
+          "count": 4,
+          "angle": 360
+        }
+      }
+    },
+    {
+      "id": "housing",
+      "position": {
+        "x": 960,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "block",
+      "sourceHandle": "out",
+      "target": "rb",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "vE",
+      "sourceHandle": "out",
+      "target": "rb",
+      "targetHandle": "sel",
+      "style": {
+        "stroke": "#d19a66"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "seat",
+      "sourceHandle": "out",
+      "target": "seatP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "rb",
+      "sourceHandle": "out",
+      "target": "s1",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "seatP",
+      "sourceHandle": "out",
+      "target": "s1",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e5",
+      "source": "thru",
+      "sourceHandle": "out",
+      "target": "thruP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e6",
+      "source": "s1",
+      "sourceHandle": "out",
+      "target": "s2",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e7",
+      "source": "thruP",
+      "sourceHandle": "out",
+      "target": "s2",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e8",
+      "source": "bolt",
+      "sourceHandle": "out",
+      "target": "boltP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e9",
+      "source": "boltP",
+      "sourceHandle": "out",
+      "target": "bolts",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e10",
+      "source": "s2",
+      "sourceHandle": "out",
+      "target": "housing",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e11",
+      "source": "bolts",
+      "sourceHandle": "out",
+      "target": "housing",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    }
+  ]
+}

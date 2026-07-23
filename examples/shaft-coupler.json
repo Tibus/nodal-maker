@@ -1,0 +1,321 @@
+{
+  "version": 1,
+  "title": "Shaft coupler (3D print) — twin end bores + cross set-screw holes",
+  "outputId": "coupler",
+  "nodes": [
+    {
+      "id": "body",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 10,
+          "height": 40
+        }
+      }
+    },
+    {
+      "id": "boreT",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 3.2,
+          "height": 22
+        }
+      }
+    },
+    {
+      "id": "boreTP",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 0,
+          "ty": 0,
+          "tz": 22
+        }
+      }
+    },
+    {
+      "id": "c1",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "boreB",
+      "position": {
+        "x": 0,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 3.2,
+          "height": 22
+        }
+      }
+    },
+    {
+      "id": "boreBP",
+      "position": {
+        "x": 240,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 0,
+          "ty": 0,
+          "tz": -4
+        }
+      }
+    },
+    {
+      "id": "c2",
+      "position": {
+        "x": 720,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "ss",
+      "position": {
+        "x": 0,
+        "y": 450
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 1.6,
+          "height": 24
+        }
+      }
+    },
+    {
+      "id": "ssR",
+      "position": {
+        "x": 240,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "rotate3d",
+        "params": {
+          "angle": 90,
+          "axis": "Y"
+        }
+      }
+    },
+    {
+      "id": "ssTop",
+      "position": {
+        "x": 480,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": -12,
+          "ty": 0,
+          "tz": 32
+        }
+      }
+    },
+    {
+      "id": "c3",
+      "position": {
+        "x": 960,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "ssBot",
+      "position": {
+        "x": 480,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": -12,
+          "ty": 0,
+          "tz": 8
+        }
+      }
+    },
+    {
+      "id": "coupler",
+      "position": {
+        "x": 1200,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "boreT",
+      "sourceHandle": "out",
+      "target": "boreTP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "body",
+      "sourceHandle": "out",
+      "target": "c1",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "boreTP",
+      "sourceHandle": "out",
+      "target": "c1",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "boreB",
+      "sourceHandle": "out",
+      "target": "boreBP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "c1",
+      "sourceHandle": "out",
+      "target": "c2",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e5",
+      "source": "boreBP",
+      "sourceHandle": "out",
+      "target": "c2",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e6",
+      "source": "ss",
+      "sourceHandle": "out",
+      "target": "ssR",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e7",
+      "source": "ssR",
+      "sourceHandle": "out",
+      "target": "ssTop",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e8",
+      "source": "c2",
+      "sourceHandle": "out",
+      "target": "c3",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e9",
+      "source": "ssTop",
+      "sourceHandle": "out",
+      "target": "c3",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e10",
+      "source": "ssR",
+      "sourceHandle": "out",
+      "target": "ssBot",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e11",
+      "source": "c3",
+      "sourceHandle": "out",
+      "target": "coupler",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e12",
+      "source": "ssBot",
+      "sourceHandle": "out",
+      "target": "coupler",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    }
+  ]
+}

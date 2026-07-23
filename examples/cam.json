@@ -1,0 +1,167 @@
+{
+  "version": 1,
+  "title": "Eccentric cam (3D print) — two blended lobes with an off-centre bore",
+  "outputId": "cam",
+  "nodes": [
+    {
+      "id": "main",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 20,
+          "height": 8
+        }
+      }
+    },
+    {
+      "id": "lobe",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 12,
+          "height": 8
+        }
+      }
+    },
+    {
+      "id": "lobeP",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 16,
+          "ty": 0,
+          "tz": 0
+        }
+      }
+    },
+    {
+      "id": "blob",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "union"
+        }
+      }
+    },
+    {
+      "id": "bore",
+      "position": {
+        "x": 0,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 4,
+          "height": 20
+        }
+      }
+    },
+    {
+      "id": "boreP",
+      "position": {
+        "x": 240,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 0,
+          "ty": 0,
+          "tz": -6
+        }
+      }
+    },
+    {
+      "id": "cam",
+      "position": {
+        "x": 720,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "lobe",
+      "sourceHandle": "out",
+      "target": "lobeP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "main",
+      "sourceHandle": "out",
+      "target": "blob",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "lobeP",
+      "sourceHandle": "out",
+      "target": "blob",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "bore",
+      "sourceHandle": "out",
+      "target": "boreP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "blob",
+      "sourceHandle": "out",
+      "target": "cam",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e5",
+      "source": "boreP",
+      "sourceHandle": "out",
+      "target": "cam",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    }
+  ]
+}

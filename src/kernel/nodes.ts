@@ -835,7 +835,9 @@ const REGISTRY: Record<string, NodeImpl> = {
     const ty = Number(params.ty ?? 0);
     const tz = Number(params.tz ?? 0);
     if (tx === 0 && ty === 0 && tz === 0) return { kind: "solid", solid };
-    return { kind: "solid", solid: solid.translate(tx, ty, tz) as Shape3D };
+    // clone first: replicad's translate mutates/consumes the shape, and this
+    // node's output may feed several consumers (the eval cache shares one object)
+    return { kind: "solid", solid: solid.clone().translate(tx, ty, tz) as Shape3D };
   },
 
   /**
