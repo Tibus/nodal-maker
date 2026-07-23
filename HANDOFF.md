@@ -173,13 +173,16 @@ l'impression 3D, que des utilisateurs customisent en changeant des paramètres
   (entrées/params/sortie exposés) ; expansion à plat avant éval (kernel inchangé) ;
   sérialisation scène v2 avec `components`. Cœur vérifié headless + navigateur.
 
-### À FAIRE (demandé) — sélections exposées par les modifieurs (façon Blender)
-Au lieu de sélecteurs par critère (imprécis), chaque nœud géométrique devrait
-**exposer des sorties de sélection nommées** (extrude → `cap`, `sides`,
-`sideEdges`… ; box → 6 faces, 12 arêtes) à brancher directement dans fillet/
-bevel/shell. Nécessite des **nœuds multi-sorties** (le modèle actuel = 1 sortie).
-C'est le "topological naming" fait proprement (le nœud qui crée la géo sait ce
-qu'il a créé).
+### ✅ Sélections exposées par les modifieurs (façon Blender) — FAIT
+Chaque modifieur expose des **sorties de sélection nommées** (extrude → cap/
+bottom/sideEdges/capEdges/bottomEdges ; box → top/bottom/left/right/front/back/
+verticalEdges/topEdges ; cylinder → cap/bottom/side/capEdges), à brancher dans
+fillet/bevel/shell. Impl **multi-sorties** sans casser l'éval : refs d'entrée
+`src#handle` résolus via `SELECTION_PORTS` (le nœud calcule la sélection depuis
+sa géométrie connue). Vérifié headless + navigateur.
+- **Suite possible** : sorties de sélection sur revolve/boss/bossOnCap ; que les
+  ops (fillet, boolean…) propagent aussi des sélections ; suivi à travers un
+  transform intermédiaire (les critères de plan ne suivent pas encore).
 
 ### Session nocturne — grande vague de nœuds (7 lots, tous vérifiés headless)
 
