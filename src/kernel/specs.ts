@@ -59,7 +59,7 @@ export function paramPortType(p: ParamSpec): SocketType | null {
 /** Ordered palette categories (drives the grouped palette + search). */
 export const NODE_CATEGORIES: { name: string; types: string[] }[] = [
   { name: "Value", types: ["numberValue", "textValue", "math", "mathUnary", "clamp", "remap", "random"] },
-  { name: "2D Primitive", types: ["rect", "circle", "ellipse", "polygon", "star", "slot", "gear", "svgInput", "textToSvg"] },
+  { name: "2D Primitive", types: ["rect", "circle", "ellipse", "polygon", "star", "slot", "gear", "fingerBox", "svgInput", "textToSvg"] },
   { name: "2D Op", types: ["offset2d", "fillet2d", "bevel2d", "boolean2d", "mirror2d", "transform2d", "arrayLinear2d", "arrayRadial2d", "group", "scoreCut"] },
   { name: "3D Primitive", types: ["box", "cylinder", "sphere", "cone", "torus"] },
   { name: "Sketch → Solid", types: ["extrude", "revolve", "bossOnCap"] },
@@ -214,6 +214,21 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     params: [
       { name: "length", kind: "number", default: 40, min: 1, max: 300, step: 1 },
       { name: "width", kind: "number", default: 12, min: 1, max: 300, step: 0.5 },
+    ],
+  },
+  fingerBox: {
+    type: "fingerBox",
+    label: "Finger-joint Box",
+    // flat pattern (5 or 6 panels) for a press-fit laser-cut box
+    inputs: [],
+    output: "sketch2d",
+    params: [
+      { name: "width", kind: "number", default: 80, min: 10, max: 400, step: 1 },
+      { name: "depth", kind: "number", default: 60, min: 10, max: 400, step: 1 },
+      { name: "height", kind: "number", default: 40, min: 10, max: 400, step: 1 },
+      { name: "thickness", kind: "number", label: "material", default: 3, min: 0.5, max: 12, step: 0.5 },
+      { name: "finger", kind: "number", label: "finger", default: 12, min: 3, max: 60, step: 1 },
+      { name: "lid", kind: "select", default: "open", options: ["open", "closed"] },
     ],
   },
   boolean2d: {

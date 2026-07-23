@@ -135,6 +135,14 @@ export default function App() {
             setStatus("export error: " + (e instanceof Error ? e.message : String(e)));
           }
         }}
+        onExportDXF={async (graph, outputId) => {
+          try {
+            const dxf = await kernel.exportGraphDXF(graph, outputId);
+            download(dxf, "maker-graph.dxf", "application/dxf");
+          } catch (e) {
+            setStatus("export error: " + (e instanceof Error ? e.message : String(e)));
+          }
+        }}
         onExportSTEP={async (graph, outputId) => {
           try {
             const bytes = await kernel.exportGraphSTEP(graph, outputId);

@@ -24,6 +24,7 @@ import {
   evalToPayload,
   exportGraphSTL,
   exportGraphSVG,
+  exportGraphDXF,
   exportGraphSTEP,
   type Params,
   type MeshImportParams,
@@ -83,6 +84,10 @@ const api = {
   async exportGraphSVG(graph: Graph, outputId: string) {
     await ensureKernels();
     return exportGraphSVG(graph, outputId);
+  },
+  async exportGraphDXF(graph: Graph, outputId: string) {
+    await ensureKernels();
+    return exportGraphDXF(graph, outputId);
   },
   async exportGraphSTEP(graph: Graph, outputId: string) {
     await ensureKernels();

@@ -158,6 +158,18 @@ l'impression 3D, que des utilisateurs customisent en changeant des paramètres
     auto-intersections MAIS **facette** (à réserver quand OCCT échoue).
 - Éditeur : auto-layout, groupes de nœuds, copier/coller.
 
+### Librairie d'exemples in-app + derniers nœuds
+- **📚 Examples** (menu dans la palette) : 16 projets bundlés (`import.meta.glob`
+  sur `examples/*.json`), chargés en un clic — hollow-tray, bolt-flange, coaster,
+  name-plate, living-hinge, rounded-box, spur-gear, vase, cup, washer, pipe,
+  hex-standoff, star-badge, mandala, ring-torus, peg-board. `npm run scenes`
+  régénère + revalide (gère les sélections exposées `#handle`).
+- Nœuds ajoutés : **gear** (engrenage 2D), **loft** (profil→profil). Export **PNG**.
+- **Fix majeur** : `boolean2d` avec un outil **multi-régions** (trous d'array)
+  était cassé (replicad cut/fuse) → décomposition en régions, op région par
+  région. Ports booléens renommés **base/tool** (`difference = base − tool`).
+- Reste (petit) : nœuds commentaire/cadre ; sélections exposées sur revolve/boss.
+
 ### Déploiement
 - **En ligne : https://tibus.github.io/nodal-maker/** (GitHub Pages via
   `.github/workflows/deploy.yml`, build Vite base `/nodal-maker/`). Les 2 WASM

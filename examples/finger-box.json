@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "title": "Finger-joint box (laser) — press-fit flat pattern, export DXF/SVG",
+  "outputId": "cut",
+  "nodes": [
+    {
+      "id": "box",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "fingerBox",
+        "params": {
+          "width": 90,
+          "depth": 60,
+          "height": 40,
+          "thickness": 3,
+          "finger": 12,
+          "lid": "open"
+        }
+      }
+    },
+    {
+      "id": "cut",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "scoreCut",
+        "params": {}
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "box",
+      "sourceHandle": "out",
+      "target": "cut",
+      "targetHandle": "cut",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    }
+  ]
+}

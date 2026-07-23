@@ -223,6 +223,25 @@ const scenes: Scene[] = [
       { id: "board", type: "boolean2d", inputs: { base: "plate", tool: "grid" }, params: { op: "difference" } },
     ],
   },
+  {
+    name: "finger-box",
+    title: "Finger-joint box (laser) — press-fit flat pattern, export DXF/SVG",
+    outputId: "cut",
+    expect: "sketch2d",
+    nodes: [
+      { id: "box", type: "fingerBox", params: { width: 90, depth: 60, height: 40, thickness: 3, finger: 12, lid: "open" } },
+      { id: "cut", type: "scoreCut", inputs: { cut: "box" } },
+    ],
+  },
+  {
+    name: "closed-box",
+    title: "Closed finger-joint box (laser) — all 6 panels with a lid",
+    outputId: "box",
+    expect: "sketch2d",
+    nodes: [
+      { id: "box", type: "fingerBox", params: { width: 70, depth: 70, height: 50, thickness: 4, finger: 14, lid: "closed" } },
+    ],
+  },
 ];
 
 /** left-to-right layout: x by dependency depth, y stacked within a depth. */

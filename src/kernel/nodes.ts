@@ -228,6 +228,108 @@ function drawingRegions(d: Drawing): Drawing[] {
   return [d];
 }
 
+/**
+ * Merge several disjoint drawings into ONE compound Drawing WITHOUT a boolean.
+ * replicad's `fuse` of disjoint regions is slow and occasionally wrong; here we
+ * just collect every underlying Blueprint and wrap them in a single Blueprints
+ * compound — exactly the inverse of `drawingRegions`.
+ */
+function combineDrawings(drawings: Drawing[]): Drawing {
+  const bps = drawings.flatMap((d) => {
+    const inner = (d as unknown as { innerShape?: unknown }).innerShape;
+    if (inner instanceof Blueprints) return inner.blueprints;
+    return inner ? [inner as never] : [];
+  });
+  if (bps.length === 1) return new Drawing(bps[0]);
+  return new Drawing(new Blueprints(bps) as never);
+}
+
+type Vec2 = [number, number];
+
+/** Build a closed drawing from a point loop, dropping coincident points so no
+ * zero-length edge reaches OCCT (which aborts on them). `close()` re-adds the
+ * segment back to the first point, so a trailing duplicate of the start is
+ * removed too. */
+function polyDrawing(pts: Vec2[]): Drawing {
+  const eps = 1e-6;
+  const clean: Vec2[] = [];
+  for (const p of pts) {
+    const last = clean[clean.length - 1];
+    if (!last || Math.hypot(p[0] - last[0], p[1] - last[1]) > eps) clean.push(p);
+  }
+  if (clean.length > 1) {
+    const a = clean[0];
+    const b = clean[clean.length - 1];
+    if (Math.hypot(a[0] - b[0], a[1] - b[1]) <= eps) clean.pop();
+  }
+  let pen = draw(clean[0]);
+  for (let i = 1; i < clean.length; i++) pen = pen.lineTo(clean[i]);
+  return pen.close();
+}
+
+/**
+ * Walk one straight box-joint edge and return its points (the start corner is
+ * assumed already emitted). Tabs bulge OUTWARD (along `nrm`) by the material
+ * thickness; slots stay on the nominal line. An ODD finger count makes two
+ * mating edges (one `tabFirst`, one not) interlock automatically, because they
+ * are traversed from opposite corners.
+ */
+function fingerEdge(
+  p0: Vec2,
+  u: Vec2,
+  nrm: Vec2,
+  length: number,
+  finger: number,
+  thickness: number,
+  tabFirst: boolean,
+): Vec2[] {
+  const n = Math.max(3, 2 * Math.floor(length / (2 * Math.max(0.5, finger))) + 1);
+  const f = length / n;
+  const at = (d: number, out: number): Vec2 => [
+    p0[0] + u[0] * d + nrm[0] * out,
+    p0[1] + u[1] * d + nrm[1] * out,
+  ];
+  const pts: Vec2[] = [];
+  let cur = 0;
+  for (let k = 0; k < n; k++) {
+    const isTab = (k % 2 === 0) === tabFirst;
+    const target = isTab ? thickness : 0;
+    if (target !== cur) {
+      pts.push(at(k * f, target)); // vertical riser to the new line
+      cur = target;
+    }
+    pts.push(at((k + 1) * f, cur)); // run along this segment
+  }
+  if (cur !== 0) pts.push(at(length, 0)); // drop back to nominal at the end corner
+  return pts;
+}
+
+/**
+ * A rectangular panel (w × d) whose four edges are each flat or fingered.
+ * Edges are given bottom, right, top, left (CCW from the bottom-left corner).
+ * A fingered edge with `tabFirst:true` starts with a protruding tab.
+ */
+type EdgeSpec = { finger: boolean; tabFirst: boolean };
+function fingerPanel(
+  w: number,
+  d: number,
+  thickness: number,
+  finger: number,
+  edges: [EdgeSpec, EdgeSpec, EdgeSpec, EdgeSpec],
+): Drawing {
+  const c: Vec2[] = [[0, 0], [w, 0], [w, d], [0, d]]; // bottom-left → CCW
+  const dirs: Vec2[] = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+  const nrms: Vec2[] = [[0, -1], [1, 0], [0, 1], [-1, 0]]; // outward = right of direction
+  const lens = [w, d, w, d];
+  const pts: Vec2[] = [c[0]];
+  for (let e = 0; e < 4; e++) {
+    const spec = edges[e];
+    if (spec.finger) pts.push(...fingerEdge(c[e], dirs[e], nrms[e], lens[e], finger, thickness, spec.tabFirst));
+    else pts.push(c[(e + 1) % 4]);
+  }
+  return polyDrawing(pts);
+}
+
 function expectMesh(v: GraphValue | undefined, node: string): MeshData {
   if (!v || v.kind !== "mesh")
     throw new Error(`[${node}] expected a mesh input, got ${v?.kind ?? "nothing"}`);
@@ -361,6 +463,42 @@ const REGISTRY: Record<string, NodeImpl> = {
     const len = Number(params.length ?? 40);
     const w = Number(params.width ?? 12);
     return { kind: "sketch2d", drawing: drawRectangle(len, w, w / 2) };
+  },
+  fingerBox: (_inputs, params) => {
+    // Flat pattern for a press-fit, finger-jointed box (laser cutting). Emits
+    // the 5 (or 6) panels laid out side by side; feed the result into a
+    // Score/Cut node as the "cut" layer, then export SVG.
+    const W = Number(params.width ?? 80);
+    const D = Number(params.depth ?? 60);
+    const H = Number(params.height ?? 40);
+    const T = Number(params.thickness ?? 3);
+    const F = Number(params.finger ?? 10);
+    const closed = String(params.lid ?? "open") === "closed";
+
+    const flat = { finger: false, tabFirst: false };
+    const tab = { finger: true, tabFirst: true }; // protruding fingers
+    const slot = { finger: true, tabFirst: false }; // complementary recesses
+    const top = closed ? slot : flat;
+
+    // edges are [bottom, right, top, left] (CCW). bottom-panel & lid: tabs on
+    // all four; walls: slots into the bottom/lid, tabs↔slots on the verticals.
+    const parts: { panel: ReturnType<typeof fingerPanel>; w: number }[] = [
+      { panel: fingerPanel(W, D, T, F, [tab, tab, tab, tab]), w: W }, // bottom
+      { panel: fingerPanel(W, H, T, F, [slot, tab, top, tab]), w: W }, // front
+      { panel: fingerPanel(W, H, T, F, [slot, tab, top, tab]), w: W }, // back
+      { panel: fingerPanel(D, H, T, F, [slot, slot, top, slot]), w: D }, // left
+      { panel: fingerPanel(D, H, T, F, [slot, slot, top, slot]), w: D }, // right
+    ];
+    if (closed) parts.push({ panel: fingerPanel(W, D, T, F, [tab, tab, tab, tab]), w: W }); // lid
+
+    const gap = Math.max(6, T * 2);
+    let x = 0;
+    const placed = parts.map(({ panel, w }) => {
+      const out = panel.translate(x + T, T);
+      x += w + 2 * T + gap;
+      return out;
+    });
+    return { kind: "sketch2d", drawing: combineDrawings(placed) };
   },
   boolean2d: (inputs, params) => {
     const a = expectSketch(inputs.base, "boolean2d");

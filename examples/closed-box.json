@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "title": "Closed finger-joint box (laser) — all 6 panels with a lid",
+  "outputId": "box",
+  "nodes": [
+    {
+      "id": "box",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "fingerBox",
+        "params": {
+          "width": 70,
+          "depth": 70,
+          "height": 50,
+          "thickness": 4,
+          "finger": 14,
+          "lid": "closed"
+        }
+      }
+    }
+  ],
+  "edges": []
+}

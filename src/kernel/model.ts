@@ -128,7 +128,7 @@ function meshImportGraph(stl: ArrayBuffer, o: MeshImportParams): { graph: Graph;
       { id: "off", type: "offset2d", inputs: { in: "svg" }, params: { distance: o.cutOffset } },
       { id: "ext", type: "extrude", inputs: { in: "off" }, params: { height: o.cutHeight } },
       { id: "tess", type: "tessellate", inputs: { in: "ext" } },
-      { id: "cut", type: "boolean", inputs: { a: "fix", b: "tess" }, params: { op: "difference" } },
+      { id: "cut", type: "boolean", inputs: { base: "fix", tool: "tess" }, params: { op: "difference" } },
     );
     finalId = "cut";
   }
@@ -235,6 +235,102 @@ function scoreCutSVG(cut: Drawing, score?: Drawing): string {
   if (score) parts.push(`<path d="${pathD(score)}" stroke="#0000ff" stroke-width="0.3"/>`);
   parts.push(`</svg>`);
   return parts.join("\n");
+}
+
+/* ------------------------------------------------------------------ */
+/* DXF export — flat 2D profiles for laser cutters (LightBurn, etc.).   */
+/* Curves are flattened to polylines; Score/Cut maps to CUT (red) and   */
+/* SCORE (blue) layers so the cutter can assign power per layer.        */
+/* ------------------------------------------------------------------ */
+
+type Pt2 = [number, number];
+
+/** Sample one blueprint's chained curves into a closed polyline. Lines keep
+ * their endpoints; arcs/splines are discretised. */
+function flattenBlueprint(bp: { curves: { firstParameter: number; lastParameter: number; geomType: string; value: (t: number) => Pt2 }[] }): Pt2[] {
+  const pts: Pt2[] = [];
+  for (const c of bp.curves) {
+    const t0 = c.firstParameter;
+    const t1 = c.lastParameter;
+    const steps = c.geomType === "LINE" ? 1 : 24;
+    for (let i = 0; i < steps; i++) pts.push(c.value(t0 + (t1 - t0) * (i / steps)));
+  }
+  return pts;
+}
+
+/** Recurse a Drawing's inner shape (Blueprint | Blueprints | CompoundBlueprint)
+ * into a flat list of closed polylines. Duck-typed to avoid importing the
+ * concrete classes into this thin model layer. */
+function drawingToPolylines(d: Drawing): Pt2[][] {
+  const out: Pt2[][] = [];
+  const visit = (shape: unknown): void => {
+    if (!shape || typeof shape !== "object") return;
+    const s = shape as { curves?: unknown; blueprints?: unknown[] };
+    if (Array.isArray(s.curves)) out.push(flattenBlueprint(s as never));
+    else if (Array.isArray(s.blueprints)) for (const b of s.blueprints) visit(b);
+  };
+  visit((d as unknown as { innerShape?: unknown }).innerShape);
+  return out;
+}
+
+interface DxfLayer {
+  name: string;
+  color: number; // AutoCAD color index (1=red, 5=blue, 7=white/black)
+  polylines: Pt2[][];
+}
+
+function buildDXF(layers: DxfLayer[]): string {
+  const L: (string | number)[] = [];
+  const p = (code: number, val: string | number) => L.push(code, val);
+
+  p(0, "SECTION"); p(2, "HEADER");
+  p(9, "$ACADVER"); p(1, "AC1015"); // R2000 — supports LWPOLYLINE + layers
+  p(9, "$INSUNITS"); p(70, 4); // 4 = millimetres
+  p(0, "ENDSEC");
+
+  p(0, "SECTION"); p(2, "TABLES");
+  p(0, "TABLE"); p(2, "LAYER"); p(70, layers.length);
+  for (const layer of layers) {
+    p(0, "LAYER"); p(2, layer.name); p(70, 0); p(62, layer.color); p(6, "CONTINUOUS");
+  }
+  p(0, "ENDTAB"); p(0, "ENDSEC");
+
+  p(0, "SECTION"); p(2, "ENTITIES");
+  for (const layer of layers) {
+    for (const poly of layer.polylines) {
+      if (poly.length < 2) continue;
+      p(0, "LWPOLYLINE"); p(8, layer.name);
+      p(90, poly.length); p(70, 1); p(43, 0); // closed, zero constant width
+      for (const [x, y] of poly) { p(10, x); p(20, y); }
+    }
+  }
+  p(0, "ENDSEC");
+  p(0, "EOF");
+
+  // DXF is a strict pair-per-line format: code then value, each on its own line.
+  return L.join("\n") + "\n";
+}
+
+/** Export the displayed node (or a Score/Cut node) to a DXF for laser cutting. */
+export function exportGraphDXF(graph: Graph, outputId: string): string {
+  const outputs = evalGraph(graph).outputs;
+  const node = graph.find((n) => n.id === outputId);
+
+  if (node?.type === "scoreCut") {
+    const cutV = node.inputs?.cut ? outputs[node.inputs.cut] : undefined;
+    const scoreV = node.inputs?.score ? outputs[node.inputs.score] : undefined;
+    if (!cutV || cutV.kind !== "sketch2d") throw new Error("Score/Cut needs a cut profile");
+    const layers: DxfLayer[] = [{ name: "CUT", color: 1, polylines: drawingToPolylines(cutV.drawing) }];
+    if (scoreV && scoreV.kind === "sketch2d")
+      layers.push({ name: "SCORE", color: 5, polylines: drawingToPolylines(scoreV.drawing) });
+    return buildDXF(layers);
+  }
+
+  const v: GraphValue | undefined = outputs[outputId];
+  if (!v) throw new Error(`unknown output node "${outputId}"`);
+  if (v.kind !== "sketch2d")
+    throw new Error(`node "${outputId}" is a ${v.kind}; only 2D profiles export to DXF`);
+  return buildDXF([{ name: "CUT", color: 1, polylines: drawingToPolylines(v.drawing) }]);
 }
 
 /** Export the displayed solid as STEP (CAD interchange). */
