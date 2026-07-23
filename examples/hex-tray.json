@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "title": "Hex tray (3D print) — hexagon extruded, hollowed via the extrude's cap",
+  "outputId": "tray",
+  "nodes": [
+    {
+      "id": "hexP",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "polygon",
+        "params": {
+          "radius": 40,
+          "sides": 6
+        }
+      }
+    },
+    {
+      "id": "body",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "extrude",
+        "params": {
+          "height": 22
+        }
+      }
+    },
+    {
+      "id": "tray",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "shell",
+        "params": {
+          "thickness": 3
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "hexP",
+      "sourceHandle": "out",
+      "target": "body",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "body",
+      "sourceHandle": "out",
+      "target": "tray",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "body",
+      "sourceHandle": "cap",
+      "target": "tray",
+      "targetHandle": "faces",
+      "style": {
+        "stroke": "#d19a66"
+      }
+    }
+  ]
+}

@@ -1,0 +1,192 @@
+{
+  "version": 1,
+  "title": "Lamp shade (3D print) — thin tube slotted by a radial array of cutters",
+  "outputId": "shade",
+  "nodes": [
+    {
+      "id": "outer",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 40,
+          "height": 60
+        }
+      }
+    },
+    {
+      "id": "inner",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 36,
+          "height": 64
+        }
+      }
+    },
+    {
+      "id": "innerP",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 0,
+          "ty": 0,
+          "tz": -2
+        }
+      }
+    },
+    {
+      "id": "tube",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "cutter",
+      "position": {
+        "x": 0,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "box",
+        "params": {
+          "x": 8,
+          "y": 6,
+          "z": 44
+        }
+      }
+    },
+    {
+      "id": "cutterP",
+      "position": {
+        "x": 240,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 38,
+          "ty": 0,
+          "tz": 8
+        }
+      }
+    },
+    {
+      "id": "cutters",
+      "position": {
+        "x": 480,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "arrayRadial3d",
+        "params": {
+          "count": 12,
+          "angle": 360
+        }
+      }
+    },
+    {
+      "id": "shade",
+      "position": {
+        "x": 720,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "inner",
+      "sourceHandle": "out",
+      "target": "innerP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "outer",
+      "sourceHandle": "out",
+      "target": "tube",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "innerP",
+      "sourceHandle": "out",
+      "target": "tube",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "cutter",
+      "sourceHandle": "out",
+      "target": "cutterP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "cutterP",
+      "sourceHandle": "out",
+      "target": "cutters",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e5",
+      "source": "tube",
+      "sourceHandle": "out",
+      "target": "shade",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e6",
+      "source": "cutters",
+      "sourceHandle": "out",
+      "target": "shade",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    }
+  ]
+}

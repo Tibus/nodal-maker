@@ -1,0 +1,195 @@
+{
+  "version": 1,
+  "title": "L-bracket (3D / CNC) — two plates unioned with a pair of bolt holes",
+  "outputId": "bracket",
+  "nodes": [
+    {
+      "id": "vert",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "box",
+        "params": {
+          "x": 60,
+          "y": 8,
+          "z": 40
+        }
+      }
+    },
+    {
+      "id": "horiz",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "box",
+        "params": {
+          "x": 60,
+          "y": 40,
+          "z": 8
+        }
+      }
+    },
+    {
+      "id": "horizP",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 0,
+          "ty": 16,
+          "tz": 0
+        }
+      }
+    },
+    {
+      "id": "lshape",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "union"
+        }
+      }
+    },
+    {
+      "id": "bolt",
+      "position": {
+        "x": 0,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 4,
+          "height": 20
+        }
+      }
+    },
+    {
+      "id": "boltP",
+      "position": {
+        "x": 240,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": -18,
+          "ty": 24,
+          "tz": -6
+        }
+      }
+    },
+    {
+      "id": "bolts",
+      "position": {
+        "x": 480,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "arrayLinear3d",
+        "params": {
+          "count": 2,
+          "dx": 36,
+          "dy": 0,
+          "dz": 0
+        }
+      }
+    },
+    {
+      "id": "bracket",
+      "position": {
+        "x": 720,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "horiz",
+      "sourceHandle": "out",
+      "target": "horizP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "vert",
+      "sourceHandle": "out",
+      "target": "lshape",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "horizP",
+      "sourceHandle": "out",
+      "target": "lshape",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "bolt",
+      "sourceHandle": "out",
+      "target": "boltP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "boltP",
+      "sourceHandle": "out",
+      "target": "bolts",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e5",
+      "source": "lshape",
+      "sourceHandle": "out",
+      "target": "bracket",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e6",
+      "source": "bolts",
+      "sourceHandle": "out",
+      "target": "bracket",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    }
+  ]
+}

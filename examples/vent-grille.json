@@ -1,0 +1,123 @@
+{
+  "version": 1,
+  "title": "Vent grille (3D print) — plate cut by a rank of slots",
+  "outputId": "grille",
+  "nodes": [
+    {
+      "id": "plate",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "box",
+        "params": {
+          "x": 80,
+          "y": 50,
+          "z": 6
+        }
+      }
+    },
+    {
+      "id": "slot",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "box",
+        "params": {
+          "x": 4,
+          "y": 40,
+          "z": 16
+        }
+      }
+    },
+    {
+      "id": "slotP",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": -32,
+          "ty": 0,
+          "tz": -5
+        }
+      }
+    },
+    {
+      "id": "slots",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "arrayLinear3d",
+        "params": {
+          "count": 9,
+          "dx": 8,
+          "dy": 0,
+          "dz": 0
+        }
+      }
+    },
+    {
+      "id": "grille",
+      "position": {
+        "x": 720,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "slot",
+      "sourceHandle": "out",
+      "target": "slotP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "slotP",
+      "sourceHandle": "out",
+      "target": "slots",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "plate",
+      "sourceHandle": "out",
+      "target": "grille",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "slots",
+      "sourceHandle": "out",
+      "target": "grille",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    }
+  ]
+}

@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "title": "Pen holder (3D print) — hollow cylinder with radial drainage holes",
+  "outputId": "holder",
+  "nodes": [
+    {
+      "id": "body",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 35,
+          "height": 80
+        }
+      }
+    },
+    {
+      "id": "caddy",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "shell",
+        "params": {
+          "thickness": 3
+        }
+      }
+    },
+    {
+      "id": "hole",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 4,
+          "height": 20
+        }
+      }
+    },
+    {
+      "id": "holeP",
+      "position": {
+        "x": 240,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 16,
+          "ty": 0,
+          "tz": -8
+        }
+      }
+    },
+    {
+      "id": "holes",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "arrayRadial3d",
+        "params": {
+          "count": 6,
+          "angle": 360
+        }
+      }
+    },
+    {
+      "id": "holder",
+      "position": {
+        "x": 720,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "body",
+      "sourceHandle": "out",
+      "target": "caddy",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "body",
+      "sourceHandle": "cap",
+      "target": "caddy",
+      "targetHandle": "faces",
+      "style": {
+        "stroke": "#d19a66"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "hole",
+      "sourceHandle": "out",
+      "target": "holeP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "holeP",
+      "sourceHandle": "out",
+      "target": "holes",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "caddy",
+      "sourceHandle": "out",
+      "target": "holder",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e5",
+      "source": "holes",
+      "sourceHandle": "out",
+      "target": "holder",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    }
+  ]
+}

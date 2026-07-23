@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "title": "Rosette (laser) — 12 elliptical petals around a hub",
+  "outputId": "rose",
+  "nodes": [
+    {
+      "id": "petal",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "ellipse",
+        "params": {
+          "rx": 8,
+          "ry": 22
+        }
+      }
+    },
+    {
+      "id": "petalP",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "transform2d",
+        "params": {
+          "tx": 0,
+          "ty": 22,
+          "rotate": 0,
+          "scale": 1
+        }
+      }
+    },
+    {
+      "id": "petals",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "arrayRadial2d",
+        "params": {
+          "count": 12,
+          "radius": 0,
+          "angle": 360
+        }
+      }
+    },
+    {
+      "id": "hub",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "circle",
+        "params": {
+          "radius": 12
+        }
+      }
+    },
+    {
+      "id": "rose",
+      "position": {
+        "x": 720,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "group",
+        "params": {}
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "petal",
+      "sourceHandle": "out",
+      "target": "petalP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "petalP",
+      "sourceHandle": "out",
+      "target": "petals",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "petals",
+      "sourceHandle": "out",
+      "target": "rose",
+      "targetHandle": "a",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "hub",
+      "sourceHandle": "out",
+      "target": "rose",
+      "targetHandle": "b",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    }
+  ]
+}

@@ -1,0 +1,168 @@
+{
+  "version": 1,
+  "title": "Rounded die (3D print) — filleted cube with dimpled pips",
+  "outputId": "die",
+  "nodes": [
+    {
+      "id": "body",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "box",
+        "params": {
+          "x": 30,
+          "y": 30,
+          "z": 30
+        }
+      }
+    },
+    {
+      "id": "allE",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "edgeSelect",
+        "params": {
+          "where": "all",
+          "offset": 0
+        }
+      }
+    },
+    {
+      "id": "rounded",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "fillet",
+        "params": {
+          "radius": 3
+        }
+      }
+    },
+    {
+      "id": "pip",
+      "position": {
+        "x": 0,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "sphere",
+        "params": {
+          "radius": 3
+        }
+      }
+    },
+    {
+      "id": "pipP",
+      "position": {
+        "x": 240,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": -8,
+          "ty": 0,
+          "tz": 30
+        }
+      }
+    },
+    {
+      "id": "pips",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "arrayLinear3d",
+        "params": {
+          "count": 3,
+          "dx": 8,
+          "dy": 0,
+          "dz": 0
+        }
+      }
+    },
+    {
+      "id": "die",
+      "position": {
+        "x": 720,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "body",
+      "sourceHandle": "out",
+      "target": "rounded",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "allE",
+      "sourceHandle": "out",
+      "target": "rounded",
+      "targetHandle": "sel",
+      "style": {
+        "stroke": "#d19a66"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "pip",
+      "sourceHandle": "out",
+      "target": "pipP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "pipP",
+      "sourceHandle": "out",
+      "target": "pips",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "rounded",
+      "sourceHandle": "out",
+      "target": "die",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e5",
+      "source": "pips",
+      "sourceHandle": "out",
+      "target": "die",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    }
+  ]
+}

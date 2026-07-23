@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "title": "Twisted vase (3D print) — loft from a square to a 45°-rotated square",
+  "outputId": "vase",
+  "nodes": [
+    {
+      "id": "base",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "rect",
+        "params": {
+          "width": 44,
+          "height": 44,
+          "radius": 6
+        }
+      }
+    },
+    {
+      "id": "topSq",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "rect",
+        "params": {
+          "width": 44,
+          "height": 44,
+          "radius": 6
+        }
+      }
+    },
+    {
+      "id": "topR",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "transform2d",
+        "params": {
+          "tx": 0,
+          "ty": 0,
+          "rotate": 45,
+          "scale": 1
+        }
+      }
+    },
+    {
+      "id": "vase",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "loft",
+        "params": {
+          "height": 70
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "topSq",
+      "sourceHandle": "out",
+      "target": "topR",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "base",
+      "sourceHandle": "out",
+      "target": "vase",
+      "targetHandle": "bottom",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "topR",
+      "sourceHandle": "out",
+      "target": "vase",
+      "targetHandle": "top",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    }
+  ]
+}

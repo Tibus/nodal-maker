@@ -1,0 +1,144 @@
+{
+  "version": 1,
+  "title": "Snowflake (laser) — crossing bars + tips unioned into one profile",
+  "outputId": "flake",
+  "nodes": [
+    {
+      "id": "arm",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "rect",
+        "params": {
+          "width": 48,
+          "height": 4,
+          "radius": 0
+        }
+      }
+    },
+    {
+      "id": "arms",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "arrayRadial2d",
+        "params": {
+          "count": 6,
+          "radius": 0,
+          "angle": 360
+        }
+      }
+    },
+    {
+      "id": "tip",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "circle",
+        "params": {
+          "radius": 5
+        }
+      }
+    },
+    {
+      "id": "tipP",
+      "position": {
+        "x": 240,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "transform2d",
+        "params": {
+          "tx": 24,
+          "ty": 0,
+          "rotate": 0,
+          "scale": 1
+        }
+      }
+    },
+    {
+      "id": "tips",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "arrayRadial2d",
+        "params": {
+          "count": 6,
+          "radius": 0,
+          "angle": 360
+        }
+      }
+    },
+    {
+      "id": "flake",
+      "position": {
+        "x": 720,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "group",
+        "params": {}
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "arm",
+      "sourceHandle": "out",
+      "target": "arms",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "tip",
+      "sourceHandle": "out",
+      "target": "tipP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "tipP",
+      "sourceHandle": "out",
+      "target": "tips",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "arms",
+      "sourceHandle": "out",
+      "target": "flake",
+      "targetHandle": "a",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "tips",
+      "sourceHandle": "out",
+      "target": "flake",
+      "targetHandle": "b",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    }
+  ]
+}

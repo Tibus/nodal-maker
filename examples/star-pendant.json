@@ -1,0 +1,150 @@
+{
+  "version": 1,
+  "title": "Star pendant (laser) — star, hanging hole, engraved inset outline",
+  "outputId": "sc",
+  "nodes": [
+    {
+      "id": "outer",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "star",
+        "params": {
+          "outer": 40,
+          "inner": 18,
+          "points": 6
+        }
+      }
+    },
+    {
+      "id": "hole",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "circle",
+        "params": {
+          "radius": 3.5
+        }
+      }
+    },
+    {
+      "id": "holeP",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "transform2d",
+        "params": {
+          "tx": 0,
+          "ty": 33,
+          "rotate": 0,
+          "scale": 1
+        }
+      }
+    },
+    {
+      "id": "body",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean2d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "inset",
+      "position": {
+        "x": 240,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "offset2d",
+        "params": {
+          "distance": -4
+        }
+      }
+    },
+    {
+      "id": "sc",
+      "position": {
+        "x": 720,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "scoreCut",
+        "params": {}
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "hole",
+      "sourceHandle": "out",
+      "target": "holeP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "outer",
+      "sourceHandle": "out",
+      "target": "body",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "holeP",
+      "sourceHandle": "out",
+      "target": "body",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "outer",
+      "sourceHandle": "out",
+      "target": "inset",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "body",
+      "sourceHandle": "out",
+      "target": "sc",
+      "targetHandle": "cut",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e5",
+      "source": "inset",
+      "sourceHandle": "out",
+      "target": "sc",
+      "targetHandle": "score",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    }
+  ]
+}

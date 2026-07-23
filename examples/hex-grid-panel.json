@@ -1,0 +1,147 @@
+{
+  "version": 1,
+  "title": "Hex-grid panel (laser/CNC) — plate perforated by a field of hexagons",
+  "outputId": "panel",
+  "nodes": [
+    {
+      "id": "plate",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "rect",
+        "params": {
+          "width": 120,
+          "height": 84,
+          "radius": 6
+        }
+      }
+    },
+    {
+      "id": "hex",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "polygon",
+        "params": {
+          "radius": 7,
+          "sides": 6
+        }
+      }
+    },
+    {
+      "id": "hexP",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "transform2d",
+        "params": {
+          "tx": -48,
+          "ty": -30,
+          "rotate": 0,
+          "scale": 1
+        }
+      }
+    },
+    {
+      "id": "row",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "arrayLinear2d",
+        "params": {
+          "count": 8,
+          "dx": 13.5,
+          "dy": 0
+        }
+      }
+    },
+    {
+      "id": "grid",
+      "position": {
+        "x": 720,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "arrayLinear2d",
+        "params": {
+          "count": 5,
+          "dx": 0,
+          "dy": 15
+        }
+      }
+    },
+    {
+      "id": "panel",
+      "position": {
+        "x": 960,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean2d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "hex",
+      "sourceHandle": "out",
+      "target": "hexP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "hexP",
+      "sourceHandle": "out",
+      "target": "row",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "row",
+      "sourceHandle": "out",
+      "target": "grid",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "plate",
+      "sourceHandle": "out",
+      "target": "panel",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "grid",
+      "sourceHandle": "out",
+      "target": "panel",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    }
+  ]
+}
