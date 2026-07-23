@@ -64,11 +64,12 @@ export default function App() {
         viewportRef.current?.setGeometry(res.mesh);
         setStatus(`${res.mesh.stats.faceCount} regions · ${res.mesh.stats.triangleCount} triangles`);
 
-        // gizmo bound to the displayed Transform node (translate)
+        // gizmo bound to the displayed transform-family node
         const out = graph.find((n) => n.id === outputId);
+        const vp = viewportRef.current;
         if (out?.type === "transform") {
           const r = (v: number) => Math.round(v * 2) / 2;
-          viewportRef.current?.showTranslateGizmo(
+          vp?.showTranslateGizmo(
             [Number(out.params?.tx ?? 0), Number(out.params?.ty ?? 0), Number(out.params?.tz ?? 0)],
             ([nx, ny, nz]) => {
               editorApi.current?.setParam(outputId, "tx", r(nx));
@@ -76,8 +77,17 @@ export default function App() {
               editorApi.current?.setParam(outputId, "tz", r(nz));
             },
           );
+        } else if (out?.type === "rotate3d") {
+          const axis = String(out.params?.axis ?? "Z") as "X" | "Y" | "Z";
+          vp?.showRotateGizmo(axis, Number(out.params?.angle ?? 0), (deg) =>
+            editorApi.current?.setParam(outputId, "angle", Math.round(deg)),
+          );
+        } else if (out?.type === "scale3d") {
+          vp?.showScaleGizmo(Number(out.params?.factor ?? 1), (f) =>
+            editorApi.current?.setParam(outputId, "factor", Math.round(f * 20) / 20),
+          );
         } else {
-          viewportRef.current?.hideGizmo();
+          vp?.hideGizmo();
         }
       } catch (e) {
         setStatus("error: " + (e instanceof Error ? e.message : String(e)));
@@ -96,6 +106,7 @@ export default function App() {
           editorApi.current = api;
         }}
         onFit={() => viewportRef.current?.fit()}
+        onTopView={() => viewportRef.current?.topView()}
         errorNodeId={graphError?.nodeId ?? null}
         errorMessage={graphError?.message ?? null}
         values={graphValues}

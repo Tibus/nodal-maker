@@ -26,7 +26,11 @@ export class Viewport {
   private gizmo: TransformControls | null = null;
   private gizmoProxy: THREE.Object3D | null = null;
   private gizmoDragging = false;
-  private onGizmoMove: ((pos: [number, number, number]) => void) | null = null;
+  private gizmoMode: "translate" | "rotate" | "scale" = "translate";
+  private gizmoAxis: "X" | "Y" | "Z" = "Z";
+  private onTranslate: ((t: [number, number, number]) => void) | null = null;
+  private onRotate: ((deg: number) => void) | null = null;
+  private onScale: ((factor: number) => void) | null = null;
   /** object centre with the node's translation removed — stable drag reference */
   private gizmoBase = new THREE.Vector3();
 
@@ -125,6 +129,22 @@ export class Viewport {
     if (this.mesh) this.frameCamera(new THREE.Box3().setFromObject(this.mesh));
   }
 
+  /** Look straight down the Z axis — a flat top view for 2D profiles. */
+  topView() {
+    if (!this.mesh) return;
+    const box = new THREE.Box3().setFromObject(this.mesh);
+    if (box.isEmpty()) return;
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const radius = Math.max(size.x, size.y, 1);
+    this.controls.target.copy(center);
+    this.camera.position.set(center.x, center.y, center.z + radius * 2.2);
+    this.camera.up.set(0, 1, 0);
+    this.camera.near = radius / 100;
+    this.camera.far = radius * 100;
+    this.camera.updateProjectionMatrix();
+  }
+
   /** Aim the camera at the model without moving the model itself. */
   private frameCamera(box: THREE.Box3) {
     if (box.isEmpty()) return;
@@ -150,40 +170,83 @@ export class Viewport {
    * (stable) un-translated centre. While dragging we leave it alone so eval
    * feedback doesn't fight the user; otherwise it re-snaps to the model.
    */
-  showTranslateGizmo(
-    translation: [number, number, number],
-    onMove: (t: [number, number, number]) => void,
-  ) {
-    this.onGizmoMove = onMove;
-    const center = this.mesh
+  private ensureGizmo() {
+    if (this.gizmo) return;
+    this.gizmoProxy = new THREE.Object3D();
+    this.scene.add(this.gizmoProxy);
+    this.gizmo = new TransformControls(this.camera, this.renderer.domElement);
+    this.gizmo.setSize(0.9);
+    this.gizmo.attach(this.gizmoProxy);
+    this.scene.add(this.gizmo as unknown as THREE.Object3D);
+    this.gizmo.addEventListener("dragging-changed", (e) => {
+      this.gizmoDragging = (e as unknown as { value: boolean }).value;
+      this.controls.enabled = !this.gizmoDragging;
+    });
+    this.gizmo.addEventListener("objectChange", () => {
+      const p = this.gizmoProxy!;
+      if (this.gizmoMode === "translate") {
+        this.onTranslate?.([p.position.x - this.gizmoBase.x, p.position.y - this.gizmoBase.y, p.position.z - this.gizmoBase.z]);
+      } else if (this.gizmoMode === "rotate") {
+        const e = p.rotation;
+        const rad = this.gizmoAxis === "X" ? e.x : this.gizmoAxis === "Y" ? e.y : e.z;
+        this.onRotate?.((rad * 180) / Math.PI);
+      } else {
+        this.onScale?.(p.scale.x);
+      }
+    });
+  }
+
+  private modelCenter(): THREE.Vector3 {
+    return this.mesh
       ? new THREE.Box3().setFromObject(this.mesh).getCenter(new THREE.Vector3())
       : new THREE.Vector3();
+  }
 
-    if (!this.gizmo) {
-      this.gizmoProxy = new THREE.Object3D();
-      this.scene.add(this.gizmoProxy);
-      this.gizmo = new TransformControls(this.camera, this.renderer.domElement);
-      this.gizmo.setMode("translate");
-      this.gizmo.setSize(0.9);
-      this.gizmo.attach(this.gizmoProxy);
-      this.scene.add(this.gizmo as unknown as THREE.Object3D);
-      this.gizmo.addEventListener("dragging-changed", (e) => {
-        this.gizmoDragging = (e as unknown as { value: boolean }).value;
-        this.controls.enabled = !this.gizmoDragging;
-      });
-      this.gizmo.addEventListener("objectChange", () => {
-        const p = this.gizmoProxy!.position;
-        this.onGizmoMove?.([
-          p.x - this.gizmoBase.x,
-          p.y - this.gizmoBase.y,
-          p.z - this.gizmoBase.z,
-        ]);
-      });
-    }
+  showTranslateGizmo(translation: [number, number, number], onMove: (t: [number, number, number]) => void) {
+    this.ensureGizmo();
+    this.gizmoMode = "translate";
+    this.onTranslate = onMove;
+    this.onRotate = this.onScale = null;
+    this.gizmo!.setMode("translate");
+    this.gizmo!.showX = this.gizmo!.showY = this.gizmo!.showZ = true;
     if (!this.gizmoDragging && this.gizmoProxy) {
-      // un-translated centre = current centre − applied translation
+      const center = this.modelCenter();
       this.gizmoBase.copy(center).sub(new THREE.Vector3(...translation));
       this.gizmoProxy.position.copy(center);
+      this.gizmoProxy.rotation.set(0, 0, 0);
+      this.gizmoProxy.scale.set(1, 1, 1);
+    }
+  }
+
+  showRotateGizmo(axis: "X" | "Y" | "Z", angleDeg: number, onMove: (deg: number) => void) {
+    this.ensureGizmo();
+    this.gizmoMode = "rotate";
+    this.gizmoAxis = axis;
+    this.onRotate = onMove;
+    this.onTranslate = this.onScale = null;
+    this.gizmo!.setMode("rotate");
+    this.gizmo!.showX = axis === "X";
+    this.gizmo!.showY = axis === "Y";
+    this.gizmo!.showZ = axis === "Z";
+    if (!this.gizmoDragging && this.gizmoProxy) {
+      this.gizmoProxy.position.copy(this.modelCenter());
+      this.gizmoProxy.scale.set(1, 1, 1);
+      const rad = (angleDeg * Math.PI) / 180;
+      this.gizmoProxy.rotation.set(axis === "X" ? rad : 0, axis === "Y" ? rad : 0, axis === "Z" ? rad : 0);
+    }
+  }
+
+  showScaleGizmo(factor: number, onMove: (f: number) => void) {
+    this.ensureGizmo();
+    this.gizmoMode = "scale";
+    this.onScale = onMove;
+    this.onTranslate = this.onRotate = null;
+    this.gizmo!.setMode("scale");
+    this.gizmo!.showX = this.gizmo!.showY = this.gizmo!.showZ = true;
+    if (!this.gizmoDragging && this.gizmoProxy) {
+      this.gizmoProxy.position.copy(this.modelCenter());
+      this.gizmoProxy.rotation.set(0, 0, 0);
+      this.gizmoProxy.scale.set(factor, factor, factor);
     }
   }
 
@@ -195,7 +258,7 @@ export class Viewport {
     this.gizmo = null;
     if (this.gizmoProxy) this.scene.remove(this.gizmoProxy);
     this.gizmoProxy = null;
-    this.onGizmoMove = null;
+    this.onTranslate = this.onRotate = this.onScale = null;
     this.controls.enabled = true;
   }
 

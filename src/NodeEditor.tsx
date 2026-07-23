@@ -354,6 +354,7 @@ export interface NodeEditorProps {
   onExportSVG?: (graph: Graph, outputId: string) => void;
   onExportSTEP?: (graph: Graph, outputId: string) => void;
   onFit?: () => void;
+  onTopView?: () => void;
 }
 
 let uid = 0;
@@ -413,6 +414,7 @@ export default function NodeEditor({
   onExportSVG,
   onExportSTEP,
   onFit,
+  onTopView,
 }: NodeEditorProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<GeoNode>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
@@ -766,6 +768,7 @@ export default function NodeEditor({
             <button onClick={undo} disabled={histLen.undo === 0} title="Undo (⌘Z)">↶</button>
             <button onClick={redo} disabled={histLen.redo === 0} title="Redo (⇧⌘Z)">↷</button>
             <button onClick={() => onFit?.()} title="Fit view">⊹</button>
+            <button onClick={() => onTopView?.()} title="Top view (2D)">▣</button>
             <button
               onClick={() => (outType === "sketch2d" ? onExportSVG : onExportSTL)?.(toGraph(nodes, edges), outputId)}
               title={outType === "sketch2d" ? "Export SVG" : "Export STL"}
