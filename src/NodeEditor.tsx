@@ -488,19 +488,65 @@ export default function NodeEditor({
     setHistLen({ undo: undoStack.current.length, redo: redoStack.current.length });
   }, [setNodes, setEdges]);
 
+  // copy / paste / duplicate of the current selection (+ internal edges)
+  const clipboard = useRef<{ nodes: GeoNode[]; edges: Edge[] } | null>(null);
+  const copySelection = useCallback(() => {
+    const sel = nodes.filter((n) => n.selected);
+    if (!sel.length) return false;
+    const ids = new Set(sel.map((n) => n.id));
+    clipboard.current = {
+      nodes: sel.map((n) => ({ ...n, data: { ...n.data, params: { ...n.data.params } } })),
+      edges: edges.filter((e) => ids.has(e.source) && ids.has(e.target)),
+    };
+    return true;
+  }, [nodes, edges]);
+  const pasteClipboard = useCallback(() => {
+    const cb = clipboard.current;
+    if (!cb) return;
+    const idMap = new Map<string, string>();
+    cb.nodes.forEach((n) => idMap.set(n.id, newId(n.data.nodeType)));
+    const newNodes: GeoNode[] = cb.nodes.map((n) => ({
+      ...n,
+      id: idMap.get(n.id)!,
+      selected: true,
+      position: { x: n.position.x + 32, y: n.position.y + 32 },
+      data: { ...n.data, params: { ...n.data.params } },
+    }));
+    const newEdges: Edge[] = cb.edges.map((e) => ({
+      ...e,
+      id: newId("e"),
+      source: idMap.get(e.source)!,
+      target: idMap.get(e.target)!,
+    }));
+    setNodes((prev) => [...prev.map((n) => ({ ...n, selected: false })), ...newNodes]);
+    setEdges((prev) => [...prev, ...newEdges]);
+  }, [setNodes, setEdges]);
+  const duplicateSelection = useCallback(() => {
+    if (copySelection()) pasteClipboard();
+  }, [copySelection, pasteClipboard]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
-      if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return; // let fields keep their own undo
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
+      if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && e.key.toLowerCase() === "z") {
         e.preventDefault();
         if (e.shiftKey) redo();
         else undo();
+      } else if (mod && e.key.toLowerCase() === "c") {
+        copySelection();
+      } else if (mod && e.key.toLowerCase() === "v") {
+        e.preventDefault();
+        pasteClipboard();
+      } else if (mod && e.key.toLowerCase() === "d") {
+        e.preventDefault();
+        duplicateSelection();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [undo, redo]);
+  }, [undo, redo, copySelection, pasteClipboard, duplicateSelection]);
 
   const isValidConnection = useCallback(
     (c: Connection | Edge) => {
