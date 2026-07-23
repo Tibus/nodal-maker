@@ -14,7 +14,8 @@
  * logic runnable in both environments.
  */
 import {
-  type Drawing,
+  Drawing,
+  Blueprints,
   type Shape3D,
   type EdgeFinder,
   type FaceFinder,
@@ -213,6 +214,20 @@ function expectSolid(v: GraphValue | undefined, node: string): Shape3D {
   return v.solid;
 }
 
+/**
+ * Split a drawing into its disjoint regions (a `Blueprints`), so 2D booleans can
+ * be applied one region at a time — replicad's cut/fuse misbehaves with a
+ * multi-region tool. A single region (Blueprint) or a region-with-holes
+ * (CompoundBlueprint) is returned as-is (one drawing).
+ */
+function drawingRegions(d: Drawing): Drawing[] {
+  const inner = (d as unknown as { innerShape?: unknown }).innerShape;
+  if (inner instanceof Blueprints) {
+    return inner.blueprints.map((bp) => new Drawing(bp));
+  }
+  return [d];
+}
+
 function expectMesh(v: GraphValue | undefined, node: string): MeshData {
   if (!v || v.kind !== "mesh")
     throw new Error(`[${node}] expected a mesh input, got ${v?.kind ?? "nothing"}`);
@@ -329,7 +344,20 @@ const REGISTRY: Record<string, NodeImpl> = {
     const a = expectSketch(inputs.base, "boolean2d");
     const b = expectSketch(inputs.tool, "boolean2d");
     const op = String(params.op ?? "union");
-    const out = op === "difference" ? a.cut(b) : op === "intersection" ? a.intersect(b) : a.fuse(b);
+    // replicad's 2D boolean is unreliable when the TOOL has several disjoint
+    // regions (e.g. a ring of holes from an array) — it mixes up windings and
+    // returns garbage. Applying the op region-by-region uses only the robust
+    // single-region path. (A CompoundBlueprint — one region with holes — stays
+    // whole, so its holes aren't split off.)
+    const tools = drawingRegions(b);
+    let out: Drawing;
+    if (op === "difference") {
+      out = tools.reduce((acc, t) => acc.cut(t), a);
+    } else if (op === "intersection") {
+      out = tools.map((t) => a.intersect(t)).reduce((p, c) => p.fuse(c));
+    } else {
+      out = tools.reduce((acc, t) => acc.fuse(t), a);
+    }
     return { kind: "sketch2d", drawing: out };
   },
   mirror2d: (inputs, params) => {
