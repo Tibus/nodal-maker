@@ -645,6 +645,18 @@ const scenes: Scene[] = [
       { id: "sc", type: "scoreCut", inputs: { cut: "gasket" } },
     ],
   },
+  {
+    name: "raised-pad",
+    title: "Selection follows transform — a lifted block filleted via move#topEdges",
+    outputId: "round",
+    expect: "solid",
+    nodes: [
+      { id: "block", type: "box", params: { x: 44, y: 44, z: 12 } },
+      { id: "move", type: "transform", inputs: { in: "block" }, params: { tx: 0, ty: 0, tz: 24 } },
+      // the pick tracks the moved geometry: move#topEdges = block#topEdges + tz
+      { id: "round", type: "fillet", inputs: { in: "move", sel: "move#topEdges" }, params: { radius: 4 } },
+    ],
+  },
 ];
 
 /** left-to-right layout: x by dependency depth, y stacked within a depth. */

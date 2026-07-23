@@ -50,6 +50,12 @@ type GeoData = {
 };
 type GeoNode = Node<GeoData>;
 
+/** Nodes a selection can be carried through — must mirror FORWARD_TYPES in the
+ * kernel. Each re-exposes the selection ports of whatever feeds its `in` port. */
+const FORWARD_SEL = new Set(["transform", "scale3d", "mirror3d", "rotate3d"]);
+
+type SelOut = { name: string; target: "face" | "edge" };
+
 interface EditorCtx {
   outputId: string;
   setOutput: (id: string) => void;
@@ -59,6 +65,8 @@ interface EditorCtx {
   errorMessage: string | null;
   valueOf: (nodeId: string) => string | undefined;
   componentDef: (defId: string) => ComponentDef | undefined;
+  /** effective selection outputs of a node (own, or forwarded from its input) */
+  selOutputs: (nodeId: string) => SelOut[];
 }
 const Ctx = createContext<EditorCtx | null>(null);
 
@@ -158,8 +166,9 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
           );
         })}
 
-        {/* exposed selection outputs (cap / sides / edges…) on the right */}
-        {spec.selectionOutputs?.map((so) => {
+        {/* exposed selection outputs (cap / sides / edges…) on the right —
+            forward-nodes re-expose their input's ports so picks track geometry */}
+        {ctx.selOutputs(id).map((so) => {
           const t: SocketType = "selection";
           return (
             <div className="gnode__row gnode__row--out" key={`so-${so.name}`}>
@@ -515,7 +524,9 @@ export default function NodeEditor({
     (n: GeoNode, handle: string = "out"): SocketType | undefined => {
       if (handle !== "out") {
         const so = NODE_SPECS[n.data.nodeType]?.selectionOutputs?.find((o) => o.name === handle);
-        return so ? "selection" : undefined;
+        if (so) return "selection";
+        // forward-nodes re-expose their input's selection ports (also "selection")
+        return FORWARD_SEL.has(n.data.nodeType) ? "selection" : undefined;
       }
       return n.data.component ? components[n.data.component]?.outputType : NODE_SPECS[n.data.nodeType]?.output;
     },
@@ -956,6 +967,27 @@ export default function NodeEditor({
     return s;
   }, [edges]);
 
+  // effective selection outputs per node: a leaf's own ports, or — for a
+  // transform-family node — the ports of whatever feeds its `in`, walked back
+  // through the chain so a downstream pick tracks the moved geometry.
+  const selOutputsMap = useMemo(() => {
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+    const compute = (node: GeoNode, depth: number): SelOut[] => {
+      if (depth > 16) return [];
+      const own = node.data.component ? undefined : NODE_SPECS[node.data.nodeType]?.selectionOutputs;
+      if (own?.length) return own;
+      if (FORWARD_SEL.has(node.data.nodeType)) {
+        const e = edges.find((ed) => ed.target === node.id && ed.targetHandle === "in");
+        const src = e ? byId.get(e.source) : undefined;
+        return src ? compute(src, depth + 1) : [];
+      }
+      return [];
+    };
+    const m = new Map<string, SelOut[]>();
+    for (const n of nodes) m.set(n.id, compute(n, 0));
+    return m;
+  }, [nodes, edges]);
+
   const ctx = useMemo<EditorCtx>(
     () => ({
       outputId,
@@ -966,8 +998,9 @@ export default function NodeEditor({
       errorMessage: errorMessage ?? null,
       valueOf: (nodeId) => values?.[nodeId],
       componentDef: (defId) => components[defId],
+      selOutputs: (nodeId) => selOutputsMap.get(nodeId) ?? [],
     }),
-    [outputId, setOutput, setParam, linkedSet, errorNodeId, errorMessage, values, components],
+    [outputId, setOutput, setParam, linkedSet, errorNodeId, errorMessage, values, components, selOutputsMap],
   );
 
   const outType = NODE_SPECS[nodes.find((n) => n.id === outputId)?.data.nodeType ?? ""]?.output;

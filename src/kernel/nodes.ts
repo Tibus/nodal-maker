@@ -126,36 +126,57 @@ export function parseRef(ref: string): { node: string; handle: string } {
   return i < 0 ? { node: ref, handle: "out" } : { node: ref.slice(0, i), handle: ref.slice(i + 1) };
 }
 
-const faceXY = (z: number): GraphValue => ({
-  kind: "selection",
-  target: "face",
-  apply: (f) => (f as FaceFinder).inPlane("XY", z),
-});
-const faceYZ = (x: number): GraphValue => ({
-  kind: "selection",
-  target: "face",
-  apply: (f) => (f as FaceFinder).inPlane("YZ", x),
-});
-const faceXZ = (y: number): GraphValue => ({
-  kind: "selection",
-  target: "face",
-  apply: (f) => (f as FaceFinder).inPlane("XZ", y),
-});
-const faceCyl = (): GraphValue => ({
-  kind: "selection",
-  target: "face",
-  apply: (f) => (f as FaceFinder).ofSurfaceType("CYLINDRE"),
-});
-const edgeDir = (d: [number, number, number]): GraphValue => ({
-  kind: "selection",
-  target: "edge",
-  apply: (e) => (e as EdgeFinder).inDirection(d),
-});
-const edgeXY = (z: number): GraphValue => ({
-  kind: "selection",
-  target: "edge",
-  apply: (e) => (e as EdgeFinder).inPlane("XY", z),
-});
+/**
+ * A selection expressed as DATA (not an opaque finder closure) so it can be
+ * carried through geometry transforms — a face/edge picked on an upstream node
+ * still resolves after the geometry is moved / scaled / mirrored downstream.
+ */
+type Vec3 = [number, number, number];
+type Crit =
+  | { target: "face"; t: "planeXY"; z: number }
+  | { target: "face"; t: "planeYZ"; x: number }
+  | { target: "face"; t: "planeXZ"; y: number }
+  | { target: "face"; t: "cyl" }
+  | { target: "face"; t: "planar" }
+  | { target: "face"; t: "parallel"; plane: "XY" | "YZ" | "XZ" }
+  | { target: "face"; t: "all" }
+  | { target: "edge"; t: "dir"; d: Vec3 }
+  | { target: "edge"; t: "planeXY"; z: number }
+  | { target: "edge"; t: "all" };
+
+const faceXY = (z: number): Crit => ({ target: "face", t: "planeXY", z });
+const faceYZ = (x: number): Crit => ({ target: "face", t: "planeYZ", x });
+const faceXZ = (y: number): Crit => ({ target: "face", t: "planeXZ", y });
+const faceCyl = (): Crit => ({ target: "face", t: "cyl" });
+const edgeDir = (d: Vec3): Crit => ({ target: "edge", t: "dir", d });
+const edgeXY = (z: number): Crit => ({ target: "edge", t: "planeXY", z });
+
+/** Compile a crit into the finder-mutating closure that fillet/bevel/shell call. */
+function critApply(c: Crit): (finder: unknown) => unknown {
+  if (c.target === "face") {
+    return (f) => {
+      const ff = f as FaceFinder;
+      switch (c.t) {
+        case "planeXY": return ff.inPlane("XY", c.z);
+        case "planeYZ": return ff.inPlane("YZ", c.x);
+        case "planeXZ": return ff.inPlane("XZ", c.y);
+        case "cyl": return ff.ofSurfaceType("CYLINDRE");
+        case "planar": return ff.ofSurfaceType("PLANE");
+        case "parallel": return ff.parallelTo(c.plane);
+        case "all": return ff;
+      }
+    };
+  }
+  return (e) => {
+    const ee = e as EdgeFinder;
+    switch (c.t) {
+      case "dir": return ee.inDirection(c.d);
+      case "planeXY": return ee.inPlane("XY", c.z);
+      case "all": return ee;
+    }
+  };
+}
+const critToSelection = (c: Crit): GraphValue => ({ kind: "selection", target: c.target, apply: critApply(c) });
 
 /** min / max Z of a solid's bounding box — lets ports on nodes whose face
  * heights depend on upstream geometry (revolve, boss) locate their caps. */
@@ -165,13 +186,12 @@ function zBounds(solid: Shape3D): { min: number; max: number } {
 }
 
 /**
- * Selection ports exposed by each modifier: handle → build(params, solid?) →
- * selection. `solid` is the evaluated source shape when available, so ports can
- * read its actual bounds instead of guessing from params (needed for revolve /
- * boss, whose cap heights come from upstream geometry).
+ * "Leaf" selection ports: handle → crit(params, solid?). `solid` is the evaluated
+ * source shape when available, so ports can read its actual bounds instead of
+ * guessing from params (needed for revolve / boss, whose caps come from upstream).
  */
-type PortBuilder = (p: Record<string, unknown>, solid?: Shape3D) => GraphValue;
-const SELECTION_PORTS: Record<string, Record<string, PortBuilder>> = {
+type CritBuilder = (p: Record<string, unknown>, solid?: Shape3D) => Crit;
+const LEAF_PORTS: Record<string, Record<string, CritBuilder>> = {
   extrude: {
     cap: (p) => faceXY(Number(p.height ?? 1)),
     bottom: () => faceXY(0),
@@ -195,13 +215,11 @@ const SELECTION_PORTS: Record<string, Record<string, PortBuilder>> = {
     side: () => faceCyl(),
     capEdges: (p) => edgeXY(Number(p.height ?? 30)),
   },
-  // revolve caps sit at the profile's own Z extents → read them from the solid
   revolve: {
     top: (_p, s) => faceXY(s ? zBounds(s).max : 0),
     bottom: (_p, s) => faceXY(s ? zBounds(s).min : 0),
     side: () => faceCyl(),
   },
-  // boss cap is the new topmost face; base bottom stays at the original floor
   bossOnCap: {
     top: (_p, s) => faceXY(s ? zBounds(s).max : 0),
     bottom: (_p, s) => faceXY(s ? zBounds(s).min : 0),
@@ -209,6 +227,84 @@ const SELECTION_PORTS: Record<string, Record<string, PortBuilder>> = {
     topEdges: (_p, s) => edgeXY(s ? zBounds(s).max : 0),
   },
 };
+
+/** Transform-family nodes a selection can be carried through. Their geometry
+ * input is on the `in` port, and each has a closed-form effect on a crit. */
+const FORWARD_TYPES = new Set(["transform", "scale3d", "mirror3d", "rotate3d"]);
+
+function translateCrit(c: Crit, dx: number, dy: number, dz: number): Crit {
+  if (c.t === "planeXY") return { ...c, z: c.z + dz };
+  if (c.target === "face" && c.t === "planeYZ") return { ...c, x: c.x + dx };
+  if (c.target === "face" && c.t === "planeXZ") return { ...c, y: c.y + dy };
+  return c; // parallel / cyl / planar / dir / all are translation-invariant
+}
+function scaleCrit(c: Crit, f: number): Crit {
+  if (c.t === "planeXY") return { ...c, z: c.z * f };
+  if (c.target === "face" && c.t === "planeYZ") return { ...c, x: c.x * f };
+  if (c.target === "face" && c.t === "planeXZ") return { ...c, y: c.y * f };
+  return c;
+}
+function mirrorCrit(c: Crit, plane: "XY" | "XZ" | "YZ"): Crit {
+  if (c.t === "planeXY") return plane === "XY" ? { ...c, z: -c.z } : c;
+  if (c.target === "face" && c.t === "planeYZ") return plane === "YZ" ? { ...c, x: -c.x } : c;
+  if (c.target === "face" && c.t === "planeXZ") return plane === "XZ" ? { ...c, y: -c.y } : c;
+  if (c.target === "edge" && c.t === "dir") {
+    const d: Vec3 = plane === "YZ" ? [-c.d[0], c.d[1], c.d[2]]
+      : plane === "XZ" ? [c.d[0], -c.d[1], c.d[2]]
+      : [c.d[0], c.d[1], -c.d[2]];
+    return { ...c, d };
+  }
+  return c;
+}
+/** Z-axis rotation. Returns null for crits that become non-axis-aligned (a
+ * tilted plane can't be expressed by `inPlane`), so those ports aren't forwarded. */
+function rotateZCrit(c: Crit, angleDeg: number): Crit | null {
+  if (c.t === "planeXY" || c.t === "cyl" || c.t === "planar" || c.t === "all") return c;
+  if (c.target === "face" && c.t === "parallel" && c.plane === "XY") return c;
+  if (c.target === "edge" && c.t === "dir") {
+    if (c.d[0] === 0 && c.d[1] === 0) return c; // a Z-aligned edge is invariant
+    const a = (angleDeg * Math.PI) / 180;
+    const [x, y, z] = c.d;
+    return { ...c, d: [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a), z] };
+  }
+  return null; // planeYZ / planeXZ / parallel-YZ|XZ tilt out of axis alignment
+}
+function forwardCrit(c: Crit, nodeType: string, p: Record<string, unknown>): Crit | null {
+  const n = (k: string, d: number) => Number(p[k] ?? d);
+  switch (nodeType) {
+    case "transform": return translateCrit(c, n("tx", 0), n("ty", 0), n("tz", 0));
+    case "scale3d": return scaleCrit(c, n("factor", 1));
+    case "mirror3d": return mirrorCrit(c, String(p.plane ?? "YZ") as "XY" | "XZ" | "YZ");
+    case "rotate3d": return String(p.axis ?? "Z") === "Z" ? rotateZCrit(c, n("angle", 0)) : null;
+    default: return null;
+  }
+}
+
+/** Resolve a `node#handle` selection ref to a crit, following it back through
+ * any transform-family nodes so the pick tracks the geometry it was taken on. */
+function resolveCrit(
+  ref: string,
+  byId: Map<string, NodeDescriptor>,
+  evalNode: (id: string) => GraphValue,
+): Crit {
+  const { node, handle } = parseRef(ref);
+  const src = byId.get(node);
+  if (!src) throw new Error(`unknown node "${node}"`);
+  const leaf = LEAF_PORTS[src.type]?.[handle];
+  if (leaf) {
+    const v = evalNode(node);
+    return leaf(src.params ?? {}, v.kind === "solid" ? v.solid : undefined);
+  }
+  if (FORWARD_TYPES.has(src.type)) {
+    const inputRef = src.inputs?.in;
+    if (!inputRef) throw new Error(`[${src.type}] nothing to forward selection "${handle}" from`);
+    const up = resolveCrit(`${parseRef(inputRef).node}#${handle}`, byId, evalNode);
+    const out = forwardCrit(up, src.type, src.params ?? {});
+    if (!out) throw new Error(`selection "${handle}" can't follow a ${src.type}`);
+    return out;
+  }
+  throw new Error(`no selection port "${handle}" on ${src.type}`);
+}
 
 /** Resolve an input ref to its GraphValue, given an evaluator for main outputs. */
 function resolveRef(
@@ -218,13 +314,7 @@ function resolveRef(
 ): GraphValue {
   const { node, handle } = parseRef(ref);
   if (handle === "out") return evalNode(node);
-  const src = byId.get(node);
-  const build = src ? SELECTION_PORTS[src.type]?.[handle] : undefined;
-  if (!build) throw new Error(`no selection port "${handle}" on ${src?.type ?? node}`);
-  // geometry-aware ports (revolve/boss) need the evaluated source solid
-  const v = evalNode(node);
-  const solid = v.kind === "solid" ? v.solid : undefined;
-  return build(src!.params ?? {}, solid);
+  return critToSelection(resolveCrit(ref, byId, evalNode));
 }
 
 /* ------------------------------------------------------------------ */

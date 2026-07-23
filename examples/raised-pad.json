@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "title": "Selection follows transform — a lifted block filleted via move#topEdges",
+  "outputId": "round",
+  "nodes": [
+    {
+      "id": "block",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "box",
+        "params": {
+          "x": 44,
+          "y": 44,
+          "z": 12
+        }
+      }
+    },
+    {
+      "id": "move",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 0,
+          "ty": 0,
+          "tz": 24
+        }
+      }
+    },
+    {
+      "id": "round",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "fillet",
+        "params": {
+          "radius": 4
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "block",
+      "sourceHandle": "out",
+      "target": "move",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "move",
+      "sourceHandle": "out",
+      "target": "round",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "move",
+      "sourceHandle": "topEdges",
+      "target": "round",
+      "targetHandle": "sel",
+      "style": {
+        "stroke": "#d19a66"
+      }
+    }
+  ]
+}
