@@ -630,6 +630,36 @@ const REGISTRY: Record<string, NodeImpl> = {
     const solid = bs.loftWith(top.sketchOnPlane("XY", h)) as Shape3D;
     return { kind: "solid", solid };
   },
+  loftSections: (inputs, params) => {
+    // stack 2–4 profiles at evenly-spaced Z and loft through all of them
+    const secs = ["s0", "s1", "s2", "s3"]
+      .map((k) => inputs[k])
+      .filter((v): v is Extract<GraphValue, { kind: "sketch2d" }> => !!v && v.kind === "sketch2d")
+      .map((v) => v.drawing);
+    if (secs.length < 2) throw new Error("[loftSections] connect at least two profiles (s0, s1, …)");
+    const h = Number(params.height ?? 60);
+    const n = secs.length;
+    const base = secs[0].sketchOnPlane("XY", 0) as unknown as {
+      loftWith: (o: unknown[]) => Shape3D;
+    };
+    const others = secs.slice(1).map((d, i) => d.sketchOnPlane("XY", (h * (i + 1)) / (n - 1)));
+    const solid = base.loftWith(others) as Shape3D;
+    return { kind: "solid", solid };
+  },
+  sweep: (inputs) => {
+    // sweep a cross-section `profile` along a `path` spine (laid in the XZ plane
+    // so the path rises in Z). replicad frames the profile perpendicular to the
+    // spine at each step.
+    const profile = expectSketch(inputs.profile, "sweep");
+    const path = expectSketch(inputs.path, "sweep");
+    const spine = path.sketchOnPlane("XZ") as unknown as {
+      sweepSketch: (cb: (plane: unknown, origin: unknown) => unknown) => Shape3D;
+    };
+    const prof = profile as unknown as { sketchOnPlane: (p: unknown, o: unknown) => unknown };
+    // call sketchOnPlane as a method so `this` stays bound to the profile
+    const solid = spine.sweepSketch((plane, origin) => prof.sketchOnPlane(plane, origin)) as Shape3D;
+    return { kind: "solid", solid };
+  },
 
   /* --- ops 3D --- */
   boolean3d: (inputs, params) => {
@@ -741,6 +771,16 @@ const REGISTRY: Record<string, NodeImpl> = {
     const dr = expectSketch(inputs.in, "offset2d");
     const r = Number(params.distance ?? 0);
     return { kind: "sketch2d", drawing: r === 0 ? dr : dr.offset(r) };
+  },
+  kerf: (inputs, params) => {
+    // Laser kerf compensation: the beam removes ~kerf width of material, so an
+    // outline must GROW by half the kerf, and a hole/pocket must SHRINK by it,
+    // for the cut part to end up at nominal size.
+    const dr = expectSketch(inputs.in, "kerf");
+    const kerf = Number(params.kerf ?? 0.15);
+    const outer = String(params.mode ?? "outer") === "outer";
+    const d = (outer ? 1 : -1) * (kerf / 2);
+    return { kind: "sketch2d", drawing: d === 0 ? dr : dr.offset(d) };
   },
 
   /** Extrude a 2D profile into a solid. */

@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "title": "Swept handle (3D print) — round profile swept along a rounded-rect path",
+  "outputId": "handle",
+  "nodes": [
+    {
+      "id": "path",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "rect",
+        "params": {
+          "width": 90,
+          "height": 50,
+          "radius": 20
+        }
+      }
+    },
+    {
+      "id": "prof",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "circle",
+        "params": {
+          "radius": 5
+        }
+      }
+    },
+    {
+      "id": "handle",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "sweep",
+        "params": {}
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "prof",
+      "sourceHandle": "out",
+      "target": "handle",
+      "targetHandle": "profile",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "path",
+      "sourceHandle": "out",
+      "target": "handle",
+      "targetHandle": "path",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    }
+  ]
+}

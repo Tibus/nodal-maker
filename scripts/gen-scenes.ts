@@ -605,6 +605,46 @@ const scenes: Scene[] = [
       { id: "housing", type: "boolean3d", inputs: { base: "s2", tool: "bolts" }, params: { op: "difference" } },
     ],
   },
+
+  /* ---- sweep / multi-section loft / kerf ---- */
+  {
+    name: "swept-handle",
+    title: "Swept handle (3D print) — round profile swept along a rounded-rect path",
+    outputId: "handle",
+    expect: "solid",
+    nodes: [
+      { id: "path", type: "rect", params: { width: 90, height: 50, radius: 20 } },
+      { id: "prof", type: "circle", params: { radius: 5 } },
+      { id: "handle", type: "sweep", inputs: { profile: "prof", path: "path" } },
+    ],
+  },
+  {
+    name: "loft-vase",
+    title: "Section-lofted vase (3D print) — circle → square → circle → circle",
+    outputId: "vase",
+    expect: "solid",
+    nodes: [
+      { id: "c0", type: "circle", params: { radius: 22 } },
+      { id: "s1", type: "rect", params: { width: 40, height: 40, radius: 6 } },
+      { id: "c2", type: "circle", params: { radius: 14 } },
+      { id: "c3", type: "circle", params: { radius: 20 } },
+      { id: "vase", type: "loftSections", inputs: { s0: "c0", s1: "s1", s2: "c2", s3: "c3" }, params: { height: 90 } },
+    ],
+  },
+  {
+    name: "kerf-gasket",
+    title: "Kerf-compensated gasket (laser) — outer grows, hole shrinks by ½ kerf",
+    outputId: "sc",
+    expect: "sketch2d",
+    nodes: [
+      { id: "outer", type: "circle", params: { radius: 40 } },
+      { id: "outerK", type: "kerf", inputs: { in: "outer" }, params: { kerf: 0.2, mode: "outer" } },
+      { id: "inner", type: "circle", params: { radius: 25 } },
+      { id: "innerK", type: "kerf", inputs: { in: "inner" }, params: { kerf: 0.2, mode: "inner" } },
+      { id: "gasket", type: "boolean2d", inputs: { base: "outerK", tool: "innerK" }, params: { op: "difference" } },
+      { id: "sc", type: "scoreCut", inputs: { cut: "gasket" } },
+    ],
+  },
 ];
 
 /** left-to-right layout: x by dependency depth, y stacked within a depth. */

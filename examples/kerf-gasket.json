@@ -1,0 +1,137 @@
+{
+  "version": 1,
+  "title": "Kerf-compensated gasket (laser) — outer grows, hole shrinks by ½ kerf",
+  "outputId": "sc",
+  "nodes": [
+    {
+      "id": "outer",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "circle",
+        "params": {
+          "radius": 40
+        }
+      }
+    },
+    {
+      "id": "outerK",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "kerf",
+        "params": {
+          "kerf": 0.2,
+          "mode": "outer"
+        }
+      }
+    },
+    {
+      "id": "inner",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "circle",
+        "params": {
+          "radius": 25
+        }
+      }
+    },
+    {
+      "id": "innerK",
+      "position": {
+        "x": 240,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "kerf",
+        "params": {
+          "kerf": 0.2,
+          "mode": "inner"
+        }
+      }
+    },
+    {
+      "id": "gasket",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean2d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "sc",
+      "position": {
+        "x": 720,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "scoreCut",
+        "params": {}
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "outer",
+      "sourceHandle": "out",
+      "target": "outerK",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "inner",
+      "sourceHandle": "out",
+      "target": "innerK",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "outerK",
+      "sourceHandle": "out",
+      "target": "gasket",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "innerK",
+      "sourceHandle": "out",
+      "target": "gasket",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "gasket",
+      "sourceHandle": "out",
+      "target": "sc",
+      "targetHandle": "cut",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    }
+  ]
+}

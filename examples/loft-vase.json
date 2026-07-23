@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "title": "Section-lofted vase (3D print) — circle → square → circle → circle",
+  "outputId": "vase",
+  "nodes": [
+    {
+      "id": "c0",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "circle",
+        "params": {
+          "radius": 22
+        }
+      }
+    },
+    {
+      "id": "s1",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "rect",
+        "params": {
+          "width": 40,
+          "height": 40,
+          "radius": 6
+        }
+      }
+    },
+    {
+      "id": "c2",
+      "position": {
+        "x": 0,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "circle",
+        "params": {
+          "radius": 14
+        }
+      }
+    },
+    {
+      "id": "c3",
+      "position": {
+        "x": 0,
+        "y": 450
+      },
+      "data": {
+        "nodeType": "circle",
+        "params": {
+          "radius": 20
+        }
+      }
+    },
+    {
+      "id": "vase",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "loftSections",
+        "params": {
+          "height": 90
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "c0",
+      "sourceHandle": "out",
+      "target": "vase",
+      "targetHandle": "s0",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "s1",
+      "sourceHandle": "out",
+      "target": "vase",
+      "targetHandle": "s1",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "c2",
+      "sourceHandle": "out",
+      "target": "vase",
+      "targetHandle": "s2",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "c3",
+      "sourceHandle": "out",
+      "target": "vase",
+      "targetHandle": "s3",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    }
+  ]
+}

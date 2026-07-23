@@ -60,9 +60,9 @@ export function paramPortType(p: ParamSpec): SocketType | null {
 export const NODE_CATEGORIES: { name: string; types: string[] }[] = [
   { name: "Value", types: ["numberValue", "textValue", "math", "mathUnary", "clamp", "remap", "random"] },
   { name: "2D Primitive", types: ["rect", "circle", "ellipse", "polygon", "star", "slot", "gear", "fingerBox", "svgInput", "textToSvg"] },
-  { name: "2D Op", types: ["offset2d", "fillet2d", "bevel2d", "boolean2d", "mirror2d", "transform2d", "arrayLinear2d", "arrayRadial2d", "group", "scoreCut"] },
+  { name: "2D Op", types: ["offset2d", "kerf", "fillet2d", "bevel2d", "boolean2d", "mirror2d", "transform2d", "arrayLinear2d", "arrayRadial2d", "group", "scoreCut"] },
   { name: "3D Primitive", types: ["box", "cylinder", "sphere", "cone", "torus"] },
-  { name: "Sketch → Solid", types: ["extrude", "revolve", "bossOnCap"] },
+  { name: "Sketch → Solid", types: ["extrude", "revolve", "loft", "loftSections", "sweep", "bossOnCap"] },
   { name: "3D Op", types: ["transform", "rotate3d", "scale3d", "mirror3d", "fillet", "bevel", "shell", "boolean3d", "arrayLinear3d", "arrayRadial3d"] },
   { name: "Selector", types: ["edgeSelect", "faceSelect"] },
   { name: "Mesh", types: ["tessellate", "importSTL", "repair", "boolean", "transformMesh", "convexHull", "minkowski", "decimate", "subdivide"] },
@@ -369,6 +369,30 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     output: "solid",
     params: [{ name: "height", kind: "number", default: 30, min: 1, max: 300, step: 1 }],
   },
+  loftSections: {
+    type: "loftSections",
+    label: "Loft sections",
+    // 2–4 stacked profiles (s0 = bottom … up), evenly spaced over `height`
+    inputs: [
+      { name: "s0", type: "sketch2d" },
+      { name: "s1", type: "sketch2d" },
+      { name: "s2", type: "sketch2d" },
+      { name: "s3", type: "sketch2d" },
+    ],
+    output: "solid",
+    params: [{ name: "height", kind: "number", default: 60, min: 1, max: 400, step: 1 }],
+  },
+  sweep: {
+    type: "sweep",
+    label: "Sweep",
+    // sweep a cross-section `profile` along a `path` spine (path rises in Z)
+    inputs: [
+      { name: "profile", type: "sketch2d" },
+      { name: "path", type: "sketch2d" },
+    ],
+    output: "solid",
+    params: [],
+  },
   boolean3d: {
     type: "boolean3d",
     label: "Boolean 3D",
@@ -443,6 +467,16 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     inputs: [{ name: "in", type: "sketch2d" }],
     output: "sketch2d",
     params: [{ name: "distance", kind: "number", default: 0, min: -20, max: 20, step: 0.5 }],
+  },
+  kerf: {
+    type: "kerf",
+    label: "Kerf comp",
+    inputs: [{ name: "in", type: "sketch2d" }],
+    output: "sketch2d",
+    params: [
+      { name: "kerf", kind: "number", label: "kerf (mm)", default: 0.15, min: 0, max: 3, step: 0.01 },
+      { name: "mode", kind: "select", default: "outer", options: ["outer", "inner"] },
+    ],
   },
   scoreCut: {
     type: "scoreCut",
