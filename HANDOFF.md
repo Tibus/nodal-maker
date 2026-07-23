@@ -158,6 +158,29 @@ l'impression 3D, que des utilisateurs customisent en changeant des paramètres
     auto-intersections MAIS **facette** (à réserver quand OCCT échoue).
 - Éditeur : auto-layout, groupes de nœuds, copier/coller.
 
+### Déploiement
+- **En ligne : https://tibus.github.io/nodal-maker/** (GitHub Pages via
+  `.github/workflows/deploy.yml`, build Vite base `/nodal-maker/`). Les 2 WASM
+  s'initialisent sur Pages, le graphe s'évalue. Push sur `main` → redéploie.
+
+### Refonte UX de l'éditeur (6 lots)
+- **Graph-only** (Form supprimé), palette catégorisée + recherche, **quick-add**
+  au double-clic, **auto-connexion** au nœud sélectionné.
+- **Erreurs par nœud** (rouge + message) + **aperçu de valeur** inline (number/text).
+- **Copier/coller/dupliquer** (⌘C/⌘V/⌘D), **MiniMap**, **Fit**, **vue 2D dessus**.
+- **Gizmo** translate/rotate/scale (bindé transform/rotate3d/scale3d).
+- **Composants réutilisables** : bouton ⧉ groupe une sélection en composant
+  (entrées/params/sortie exposés) ; expansion à plat avant éval (kernel inchangé) ;
+  sérialisation scène v2 avec `components`. Cœur vérifié headless + navigateur.
+
+### À FAIRE (demandé) — sélections exposées par les modifieurs (façon Blender)
+Au lieu de sélecteurs par critère (imprécis), chaque nœud géométrique devrait
+**exposer des sorties de sélection nommées** (extrude → `cap`, `sides`,
+`sideEdges`… ; box → 6 faces, 12 arêtes) à brancher directement dans fillet/
+bevel/shell. Nécessite des **nœuds multi-sorties** (le modèle actuel = 1 sortie).
+C'est le "topological naming" fait proprement (le nœud qui crée la géo sait ce
+qu'il a créé).
+
 ### Session nocturne — grande vague de nœuds (7 lots, tous vérifiés headless)
 
 - **Lot 1 Valeurs/logique** : math, mathUnary, clamp, remap, random (seedé).
