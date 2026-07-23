@@ -180,9 +180,14 @@ l'impression 3D, que des utilisateurs customisent en changeant des paramètres
   SCORE (bleu). Bouton ⬇DXF quand la sortie est un profil 2D.
 - **Nœud commentaire** (type RF `note`, `isNote()` l'exclut du graphe) :
   dimensions explicites (RF masque sinon), placé au centre visible, persisté.
-- Scènes ajoutées : `finger-box`, `closed-box` (18 exemples au total).
-- Reste (petit) : sélections exposées sur revolve/boss ; suivi de sélection à
-  travers un transform ; sweep/loft multi-profils ; générateur kerf.
+- Scènes ajoutées : `finger-box`, `closed-box`.
+- **Sélections exposées sur revolve & bossOnCap** (fait) : `resolveRef` évalue le
+  solide source et le passe au builder ; les ports top/bottom lisent la bounding
+  box (`zBounds`). revolve → top/bottom/side ; bossOnCap → top/bottom/bossSide/
+  topEdges. Scènes `revolved-bowl` + `boss-knob` (20 exemples au total).
+- Reste (petit) : **suivi de sélection à travers un transform** (vrai problème de
+  topological-naming, non trivial — les ports lisent des coords monde, un
+  transform en aval les décale) ; sweep/loft multi-profils ; générateur kerf.
 
 ### Déploiement
 - **En ligne : https://tibus.github.io/nodal-maker/** (GitHub Pages via
