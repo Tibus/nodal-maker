@@ -33,15 +33,20 @@ import {
   NODE_CATEGORIES,
   SOCKET_COLORS,
   paramPortType,
+  expandDescriptors,
+  expandOutputId,
   type Graph,
-  type NodeDescriptor,
   type ParamSpec,
   type SocketType,
+  type ComponentDef,
+  type InstanceDescriptor,
 } from "./kernel/client";
 
 type GeoData = {
   nodeType: string;
   params: Record<string, unknown>;
+  /** set when this node is a component instance (points at a ComponentDef id) */
+  component?: string;
 };
 type GeoNode = Node<GeoData>;
 
@@ -53,6 +58,7 @@ interface EditorCtx {
   errorNodeId: string | null;
   errorMessage: string | null;
   valueOf: (nodeId: string) => string | undefined;
+  componentDef: (defId: string) => ComponentDef | undefined;
 }
 const Ctx = createContext<EditorCtx | null>(null);
 
@@ -66,27 +72,28 @@ function handleType(nodeType: string, handle: string): SocketType | undefined {
   return param ? (paramPortType(param) ?? undefined) : undefined;
 }
 
-/**
- * Can this source output feed that target input? Same type, or the one implicit
- * coercion we support: a B-rep solid into a mesh port (auto-tessellated).
- */
-function isCompatible(srcType: string, tgtType: string, tgtHandle: string): boolean {
-  const out = NODE_SPECS[srcType]?.output;
-  const inp = handleType(tgtType, tgtHandle);
-  if (!out || !inp) return false;
-  return out === inp || (out === "solid" && inp === "mesh");
-}
-
 /* ------------------------------------------------------------------ */
 /* Custom node                                                         */
 /* ------------------------------------------------------------------ */
 
 function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
   const ctx = useContext(Ctx)!;
-  const spec = NODE_SPECS[data.nodeType];
+  // a component instance derives its ports/params from its ComponentDef
+  const def = data.component ? ctx.componentDef(data.component) : undefined;
+  const spec = def
+    ? {
+        type: "__component",
+        label: def.name,
+        inputs: def.inputs.map((i) => ({ name: i.name, type: i.type })),
+        output: def.outputType,
+        params: def.params.map((p) => ({ ...p.spec, name: p.name, label: p.label })),
+      }
+    : NODE_SPECS[data.nodeType];
   const isOutput = ctx.outputId === id;
   const isError = ctx.errorNodeId === id;
   const value = ctx.valueOf(id);
+
+  if (!spec) return <div className="gnode gnode--error">unknown node</div>;
 
   return (
     <div
@@ -360,14 +367,16 @@ export interface NodeEditorProps {
 let uid = 0;
 const newId = (t: string) => `${t}_${++uid}`;
 
-/** Build a serialisable Graph from React Flow nodes + edges. */
-function toGraph(nodes: GeoNode[], edges: Edge[]): Graph {
-  return nodes.map<NodeDescriptor>((n) => {
+/** Build serialisable instance descriptors from React Flow nodes + edges. */
+function toGraph(nodes: GeoNode[], edges: Edge[]): InstanceDescriptor[] {
+  return nodes.map<InstanceDescriptor>((n) => {
     const inputs: Record<string, string> = {};
     for (const e of edges) {
       if (e.target === n.id && e.targetHandle) inputs[e.targetHandle] = e.source;
     }
-    return { id: n.id, type: n.data.nodeType, params: n.data.params, inputs };
+    const d: InstanceDescriptor = { id: n.id, type: n.data.nodeType, params: n.data.params, inputs };
+    if (n.data.component) d.component = n.data.component;
+    return d;
   });
 }
 
@@ -424,6 +433,21 @@ export default function NodeEditor({
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [quick, setQuick] = useState<{ sx: number; sy: number; flow: { x: number; y: number }; q: string } | null>(null);
+  const [components, setComponents] = useState<Record<string, ComponentDef>>({});
+
+  // socket type of a node's output / an input handle — component-aware
+  const nodeOutType = useCallback(
+    (n: GeoNode): SocketType | undefined =>
+      n.data.component ? components[n.data.component]?.outputType : NODE_SPECS[n.data.nodeType]?.output,
+    [components],
+  );
+  const nodeInType = useCallback(
+    (n: GeoNode, handle: string): SocketType | undefined => {
+      if (n.data.component) return components[n.data.component]?.inputs.find((i) => i.name === handle)?.type;
+      return handleType(n.data.nodeType, handle);
+    },
+    [components],
+  );
 
   // undo/redo: snapshots of {nodes, edges, outputId}. `applying` suppresses
   // history recording while we replay a snapshot; `prevSnap` always mirrors the
@@ -451,8 +475,11 @@ export default function NodeEditor({
       setOutputId(validOut); // output node was deleted → fall back, re-runs effect
       return;
     }
-    const graph = toGraph(nodes, edges);
-    const sig = graphSignature(graph, validOut);
+    const descs = toGraph(nodes, edges);
+    // expand component instances into a flat graph for the evaluator
+    const flat = expandDescriptors(descs, components);
+    const flatOut = expandOutputId(validOut, descs, components);
+    const sig = graphSignature(flat, flatOut);
     if (sig !== lastSig.current) {
       const isFirst = lastSig.current === "";
       if (!applying.current && !isFirst) {
@@ -463,10 +490,10 @@ export default function NodeEditor({
       }
       applying.current = false;
       lastSig.current = sig;
-      onChange(graph, validOut);
+      onChange(flat, flatOut);
     }
     prevSnap.current = { nodes, edges, outputId: validOut };
-  }, [nodes, edges, outputId, onChange]);
+  }, [nodes, edges, outputId, onChange, components]);
 
   const undo = useCallback(() => {
     const snap = undoStack.current.pop();
@@ -555,9 +582,12 @@ export default function NodeEditor({
       if (!c.source || !c.target || !c.targetHandle || c.source === c.target) return false;
       const src = nodes.find((n) => n.id === c.source);
       const tgt = nodes.find((n) => n.id === c.target);
-      return !!src && !!tgt && isCompatible(src.data.nodeType, tgt.data.nodeType, c.targetHandle);
+      if (!src || !tgt) return false;
+      const out = nodeOutType(src);
+      const inp = nodeInType(tgt, c.targetHandle);
+      return !!out && !!inp && (out === inp || (out === "solid" && inp === "mesh"));
     },
-    [nodes],
+    [nodes, nodeOutType, nodeInType],
   );
 
   const setParam = useCallback(
@@ -584,9 +614,9 @@ export default function NodeEditor({
       const src = nodes.find((n) => n.id === c.source);
       const tgt = nodes.find((n) => n.id === c.target);
       if (!src || !tgt || !c.targetHandle) return;
-      const outType = NODE_SPECS[src.data.nodeType].output;
-      const inType = handleType(tgt.data.nodeType, c.targetHandle);
-      if (!inType) return;
+      const outType = nodeOutType(src);
+      const inType = nodeInType(tgt, c.targetHandle);
+      if (!outType || !inType) return;
 
       // one input port takes at most one wire — drop any existing edge into it
       const freed = edges.filter((e) => !(e.target === tgt.id && e.targetHandle === c.targetHandle));
@@ -616,7 +646,7 @@ export default function NodeEditor({
       }
       // otherwise: incompatible types, silently ignore
     },
-    [nodes, edges, setEdges, setNodes],
+    [nodes, edges, setEdges, setNodes, nodeOutType, nodeInType],
   );
 
   const addNode = useCallback(
@@ -632,8 +662,8 @@ export default function NodeEditor({
       setNodes((prev) => [...prev.map((n) => ({ ...n, selected: false })), { id, type: "geo", position, selected: true, data: { nodeType: type, params } }]);
 
       // auto-connect from the selected node's output → first compatible input
-      if ((opts?.autoConnect ?? true) && sel) {
-        const outType = NODE_SPECS[sel.data.nodeType].output;
+      const outType = sel ? nodeOutType(sel) : undefined;
+      if ((opts?.autoConnect ?? true) && sel && outType) {
         const port =
           spec.inputs.find((p) => p.type === outType)?.name ??
           spec.params.map((p) => [p.name, paramPortType(p)] as const).find(([, t]) => t === outType)?.[0];
@@ -647,18 +677,110 @@ export default function NodeEditor({
         }
       }
     },
-    [nodes, setNodes, setEdges],
+    [nodes, setNodes, setEdges, nodeOutType],
   );
+
+  // group the current selection into a reusable component instance
+  const collapseSelection = useCallback(() => {
+    const sel = nodes.filter((n) => n.selected && !n.data.component); // no nesting (MVP)
+    if (sel.length < 2) return;
+    const ids = new Set(sel.map((n) => n.id));
+    const internal = edges.filter((e) => ids.has(e.source) && ids.has(e.target));
+    const inbound = edges.filter((e) => !ids.has(e.source) && ids.has(e.target));
+    const outbound = edges.filter((e) => ids.has(e.source) && !ids.has(e.target));
+    const internalTargets = new Set(internal.map((e) => `${e.target}.${e.targetHandle}`));
+
+    const outputNode =
+      (outbound[0] && sel.find((n) => n.id === outbound[0].source)) ||
+      (ids.has(outputId) ? sel.find((n) => n.id === outputId) : undefined) ||
+      sel[sel.length - 1];
+
+    const innerNodes = sel.map((n) => {
+      const inputs: Record<string, string> = {};
+      for (const e of internal) if (e.target === n.id && e.targetHandle) inputs[e.targetHandle] = e.source;
+      return { id: n.id, type: n.data.nodeType, params: { ...n.data.params }, inputs };
+    });
+
+    const defInputs: ComponentDef["inputs"] = [];
+    const instInputWires: Record<string, string> = {};
+    const seenIn = new Set<string>();
+    for (const e of inbound) {
+      if (!e.targetHandle) continue;
+      const key = `${e.target}.${e.targetHandle}`;
+      if (seenIn.has(key)) continue;
+      seenIn.add(key);
+      const tgt = sel.find((n) => n.id === e.target)!;
+      const type = nodeInType(tgt, e.targetHandle);
+      if (!type) continue;
+      const name = `${NODE_SPECS[tgt.data.nodeType]?.label ?? "in"} ${e.targetHandle}`;
+      defInputs.push({ name, type, node: e.target, nodePort: e.targetHandle });
+      instInputWires[name] = e.source;
+    }
+
+    const defParams: ComponentDef["params"] = [];
+    const instParams: Record<string, unknown> = {};
+    for (const n of sel) {
+      const s = NODE_SPECS[n.data.nodeType];
+      if (!s) continue;
+      for (const ps of s.params) {
+        if (ps.kind === "stl" || ps.kind === "font") continue;
+        if (internalTargets.has(`${n.id}.${ps.name}`)) continue;
+        const name = `${s.label} ${ps.label ?? ps.name}`;
+        defParams.push({ name, label: name, node: n.id, param: ps.name, spec: ps });
+        instParams[name] = n.data.params[ps.name] ?? ps.default;
+      }
+    }
+
+    const defId = newId("def");
+    const def: ComponentDef = {
+      name: "Component",
+      nodes: innerNodes,
+      inputs: defInputs,
+      params: defParams,
+      output: outputNode.id,
+      outputType: nodeOutType(outputNode) ?? "solid",
+    };
+    setComponents((prev) => ({ ...prev, [defId]: def }));
+
+    const cx = sel.reduce((s, n) => s + n.position.x, 0) / sel.length;
+    const cy = sel.reduce((s, n) => s + n.position.y, 0) / sel.length;
+    const instId = newId("component");
+    const instance: GeoNode = {
+      id: instId,
+      type: "geo",
+      position: { x: cx, y: cy },
+      selected: true,
+      data: { nodeType: "__component", component: defId, params: instParams },
+    };
+
+    const keptNodes = nodes.filter((n) => !ids.has(n.id)).map((n) => ({ ...n, selected: false }));
+    const keptEdges = edges.filter((e) => !ids.has(e.source) && !ids.has(e.target));
+    const newEdges: Edge[] = [...keptEdges];
+    for (const [name, src] of Object.entries(instInputWires)) {
+      const t = defInputs.find((i) => i.name === name)!;
+      newEdges.push({ id: newId("e"), source: src, sourceHandle: "out", target: instId, targetHandle: name, style: { stroke: SOCKET_COLORS[t.type] } });
+    }
+    for (const e of outbound) {
+      if (e.source !== outputNode.id) continue; // only the exposed output survives
+      newEdges.push({ ...e, id: newId("e"), source: instId, sourceHandle: "out" });
+    }
+
+    setNodes([...keptNodes, instance]);
+    setEdges(newEdges);
+    if (ids.has(outputId)) setOutputId(instId);
+  }, [nodes, edges, outputId, nodeInType, nodeOutType, setNodes, setEdges]);
 
   const saveGraph = useCallback(() => {
     const payload = {
-      version: 1,
+      version: 2,
       outputId,
+      components,
       nodes: nodes.map((n) => ({
         id: n.id,
         position: n.position,
         data: {
           nodeType: n.data.nodeType,
+          component: n.data.component,
           params: Object.fromEntries(
             Object.entries(n.data.params).map(([k, v]) => [
               k,
@@ -677,22 +799,23 @@ export default function NodeEditor({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "graph.json";
+    a.download = "scene.json";
     a.click();
     URL.revokeObjectURL(url);
-  }, [nodes, edges, outputId]);
+  }, [nodes, edges, outputId, components]);
 
   const loadGraph = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const f = e.target.files?.[0];
       if (!f) return;
       const doc = JSON.parse(await f.text());
-      const loadedNodes: GeoNode[] = doc.nodes.map((n: { id: string; position: { x: number; y: number }; data: { nodeType: string; params: Record<string, unknown> } }) => ({
+      const loadedNodes: GeoNode[] = doc.nodes.map((n: { id: string; position: { x: number; y: number }; data: { nodeType: string; component?: string; params: Record<string, unknown> } }) => ({
         id: n.id,
         type: "geo",
         position: n.position,
         data: {
           nodeType: n.data.nodeType,
+          component: n.data.component,
           params: Object.fromEntries(
             Object.entries(n.data.params).map(([k, v]) => [
               k,
@@ -702,6 +825,7 @@ export default function NodeEditor({
         },
       }));
       lastSig.current = ""; // force re-emit
+      setComponents((doc.components ?? {}) as Record<string, ComponentDef>);
       setNodes(loadedNodes);
       setEdges(doc.edges as Edge[]);
       setOutputId(doc.outputId);
@@ -725,8 +849,9 @@ export default function NodeEditor({
       errorNodeId: errorNodeId ?? null,
       errorMessage: errorMessage ?? null,
       valueOf: (nodeId) => values?.[nodeId],
+      componentDef: (defId) => components[defId],
     }),
-    [outputId, setOutput, setParam, linkedSet, errorNodeId, errorMessage, values],
+    [outputId, setOutput, setParam, linkedSet, errorNodeId, errorMessage, values, components],
   );
 
   const outType = NODE_SPECS[nodes.find((n) => n.id === outputId)?.data.nodeType ?? ""]?.output;
@@ -769,6 +894,7 @@ export default function NodeEditor({
             <button onClick={redo} disabled={histLen.redo === 0} title="Redo (⇧⌘Z)">↷</button>
             <button onClick={() => onFit?.()} title="Fit view">⊹</button>
             <button onClick={() => onTopView?.()} title="Top view (2D)">▣</button>
+            <button onClick={collapseSelection} title="Group selection into a component">⧉</button>
             <button
               onClick={() => (outType === "sketch2d" ? onExportSVG : onExportSTL)?.(toGraph(nodes, edges), outputId)}
               title={outType === "sketch2d" ? "Export SVG" : "Export STL"}
