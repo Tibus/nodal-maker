@@ -15,6 +15,7 @@ import {
   ReactFlow,
   Background,
   Controls,
+  MiniMap,
   Handle,
   Position,
   addEdge,
@@ -24,10 +25,12 @@ import {
   type Edge,
   type Connection,
   type NodeProps,
+  type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
   NODE_SPECS,
+  NODE_CATEGORIES,
   SOCKET_COLORS,
   paramPortType,
   type Graph,
@@ -350,6 +353,7 @@ export interface NodeEditorProps {
   onExportSTL?: (graph: Graph, outputId: string) => void;
   onExportSVG?: (graph: Graph, outputId: string) => void;
   onExportSTEP?: (graph: Graph, outputId: string) => void;
+  onFit?: () => void;
 }
 
 let uid = 0;
@@ -408,10 +412,16 @@ export default function NodeEditor({
   onExportSTL,
   onExportSVG,
   onExportSTEP,
+  onFit,
 }: NodeEditorProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<GeoNode>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
   const [outputId, setOutputId] = useState(initialOutputId);
+
+  const rf = useRef<ReactFlowInstance<GeoNode, Edge> | null>(null);
+  const [search, setSearch] = useState("");
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [quick, setQuick] = useState<{ sx: number; sy: number; flow: { x: number; y: number }; q: string } | null>(null);
 
   // undo/redo: snapshots of {nodes, edges, outputId}. `applying` suppresses
   // history recording while we replay a snapshot; `prevSnap` always mirrors the
@@ -562,21 +572,34 @@ export default function NodeEditor({
   );
 
   const addNode = useCallback(
-    (type: string) => {
+    (type: string, opts?: { position?: { x: number; y: number }; autoConnect?: boolean }) => {
       const spec = NODE_SPECS[type];
       const params: Record<string, unknown> = {};
       for (const p of spec.params) params[p.name] = p.default;
-      setNodes((prev) => [
-        ...prev,
-        {
-          id: newId(type),
-          type: "geo",
-          position: { x: 40 + Math.random() * 80, y: 40 + Math.random() * 220 },
-          data: { nodeType: type, params },
-        },
-      ]);
+      const id = newId(type);
+      const sel = nodes.find((n) => n.selected);
+      const position =
+        opts?.position ??
+        (sel ? { x: sel.position.x + 240, y: sel.position.y } : { x: 60 + Math.random() * 60, y: 60 + Math.random() * 180 });
+      setNodes((prev) => [...prev.map((n) => ({ ...n, selected: false })), { id, type: "geo", position, selected: true, data: { nodeType: type, params } }]);
+
+      // auto-connect from the selected node's output → first compatible input
+      if ((opts?.autoConnect ?? true) && sel) {
+        const outType = NODE_SPECS[sel.data.nodeType].output;
+        const port =
+          spec.inputs.find((p) => p.type === outType)?.name ??
+          spec.params.map((p) => [p.name, paramPortType(p)] as const).find(([, t]) => t === outType)?.[0];
+        if (port) {
+          setEdges((es) =>
+            addEdge(
+              { source: sel.id, sourceHandle: "out", target: id, targetHandle: port, style: { stroke: SOCKET_COLORS[outType] } },
+              es,
+            ),
+          );
+        }
+      }
     },
-    [setNodes],
+    [nodes, setNodes, setEdges],
   );
 
   const saveGraph = useCallback(() => {
@@ -658,65 +681,147 @@ export default function NodeEditor({
     [outputId, setOutput, setParam, linkedSet, errorNodeId, errorMessage, values],
   );
 
+  const outType = NODE_SPECS[nodes.find((n) => n.id === outputId)?.data.nodeType ?? ""]?.output;
+  const searchHits = search.trim()
+    ? Object.values(NODE_SPECS).filter((s) => s.label.toLowerCase().includes(search.trim().toLowerCase()))
+    : [];
+
+  const openQuickAdd = (e: React.MouseEvent) => {
+    const t = e.target as HTMLElement;
+    // ignore double-clicks that land on a node, control, or minimap
+    if (t.closest(".react-flow__node") || t.closest(".react-flow__controls") || t.closest(".react-flow__minimap"))
+      return;
+    if (!rf.current) return;
+    const flow = rf.current.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    setQuick({ sx: e.clientX, sy: e.clientY, flow, q: "" });
+  };
+  const quickHits = quick
+    ? Object.values(NODE_SPECS)
+        .filter((s) => s.label.toLowerCase().includes(quick.q.toLowerCase()))
+        .slice(0, 8)
+    : [];
+  const addFromQuick = (type: string) => {
+    if (!quick) return;
+    addNode(type, { position: quick.flow, autoConnect: true });
+    setQuick(null);
+  };
+
   return (
     <div className="editor">
       <div className="palette">
-        {Object.values(NODE_SPECS).map((s) => (
-          <button key={s.type} className="palette__btn" onClick={() => addNode(s.type)}>
-            + {s.label}
-          </button>
-        ))}
-        <button className="palette__btn" onClick={undo} disabled={histLen.undo === 0} title="⌘Z">↶ Undo</button>
-        <button className="palette__btn" onClick={redo} disabled={histLen.redo === 0} title="⇧⌘Z">↷ Redo</button>
-        {(() => {
-          const outType = NODE_SPECS[nodes.find((n) => n.id === outputId)?.data.nodeType ?? ""]?.output;
-          const svg = outType === "sketch2d";
-          const solid = outType === "solid";
-          return (
-            <>
-              <button
-                className="palette__btn"
-                onClick={() => (svg ? onExportSVG : onExportSTL)?.(toGraph(nodes, edges), outputId)}
-                title={svg ? "export the 2D profile (curves preserved)" : "export the 3D model"}
-              >
-                ⬇ {svg ? "SVG" : "STL"}
+        <div className="palette__top">
+          <input
+            className="palette__search"
+            placeholder="search nodes…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <div className="palette__actions">
+            <button onClick={undo} disabled={histLen.undo === 0} title="Undo (⌘Z)">↶</button>
+            <button onClick={redo} disabled={histLen.redo === 0} title="Redo (⇧⌘Z)">↷</button>
+            <button onClick={() => onFit?.()} title="Fit view">⊹</button>
+            <button
+              onClick={() => (outType === "sketch2d" ? onExportSVG : onExportSTL)?.(toGraph(nodes, edges), outputId)}
+              title={outType === "sketch2d" ? "Export SVG" : "Export STL"}
+            >
+              ⬇{outType === "sketch2d" ? "SVG" : "STL"}
+            </button>
+            {outType === "solid" && (
+              <button onClick={() => onExportSTEP?.(toGraph(nodes, edges), outputId)} title="Export STEP">⬇STEP</button>
+            )}
+            <button onClick={saveGraph} title="Save graph">💾</button>
+            <label className="palette__loadbtn" title="Load graph">
+              📂<input type="file" accept=".json,application/json" hidden onChange={loadGraph} />
+            </label>
+          </div>
+        </div>
+
+        <div className="palette__list">
+          {search.trim() ? (
+            searchHits.map((s) => (
+              <button key={s.type} className="palette__node" onClick={() => addNode(s.type)}>
+                {s.label}
               </button>
-              {solid && (
-                <button
-                  className="palette__btn"
-                  onClick={() => onExportSTEP?.(toGraph(nodes, edges), outputId)}
-                  title="export as STEP (CAD interchange)"
-                >
-                  ⬇ STEP
-                </button>
-              )}
-            </>
-          );
-        })()}
-        <button className="palette__btn" onClick={saveGraph}>💾 Save</button>
-        <label className="palette__btn">
-          📂 Load
-          <input type="file" accept=".json,application/json" hidden onChange={loadGraph} />
-        </label>
-        <span className="palette__hint">click a node to display it · ⌫ deletes · ⌘Z undo</span>
+            ))
+          ) : (
+            NODE_CATEGORIES.map((cat) => {
+              const open = !collapsed.has(cat.name);
+              return (
+                <div key={cat.name} className="palcat">
+                  <button
+                    className="palcat__hd"
+                    onClick={() =>
+                      setCollapsed((prev) => {
+                        const n = new Set(prev);
+                        n.has(cat.name) ? n.delete(cat.name) : n.add(cat.name);
+                        return n;
+                      })
+                    }
+                  >
+                    {open ? "▾" : "▸"} {cat.name}
+                  </button>
+                  {open &&
+                    cat.types.map((t) => (
+                      <button key={t} className="palette__node" onClick={() => addNode(t)}>
+                        {NODE_SPECS[t].label}
+                      </button>
+                    ))}
+                </div>
+              );
+            })
+          )}
+        </div>
+        <span className="palette__hint">double-click canvas to add · click a node to view · ⌫ deletes</span>
       </div>
-      <Ctx.Provider value={ctx}>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          isValidConnection={isValidConnection}
-          nodeTypes={nodeTypes}
-          deleteKeyCode={["Backspace", "Delete"]}
-          fitView
-          proOptions={{ hideAttribution: true }}
-        >
-          <Background color="#2a2e36" gap={18} />
-          <Controls />
-        </ReactFlow>
-      </Ctx.Provider>
+
+      <div className="editor__canvas" onDoubleClick={openQuickAdd}>
+        <Ctx.Provider value={ctx}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onInit={(inst) => (rf.current = inst)}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            isValidConnection={isValidConnection}
+            nodeTypes={nodeTypes}
+            deleteKeyCode={["Backspace", "Delete"]}
+            zoomOnDoubleClick={false}
+            fitView
+            proOptions={{ hideAttribution: true }}
+          >
+            <Background color="#2a2e36" gap={18} />
+            <Controls />
+            <MiniMap pannable zoomable className="editor__minimap" />
+          </ReactFlow>
+        </Ctx.Provider>
+
+        {quick && (
+          <>
+            <div className="quick__scrim" onClick={() => setQuick(null)} />
+            <div className="quick" style={{ left: quick.sx, top: quick.sy }}>
+              <input
+                className="quick__search"
+                autoFocus
+                placeholder="add node…"
+                value={quick.q}
+                onChange={(e) => setQuick({ ...quick, q: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && quickHits[0]) addFromQuick(quickHits[0].type);
+                  if (e.key === "Escape") setQuick(null);
+                }}
+              />
+              <div className="quick__list">
+                {quickHits.map((s) => (
+                  <button key={s.type} className="quick__item" onClick={() => addFromQuick(s.type)}>
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

@@ -71,32 +71,66 @@ button.link {
 
 .viewport { flex: 1; position: relative; min-width: 0; }
 .viewport canvas { display: block; }
-
-/* mode toggle */
-.modebar {
-  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
-  z-index: 10; display: flex; gap: 0; background: #14171c;
-  border: 1px solid #2a2e36; border-radius: 8px; overflow: hidden;
+.statusbar {
+  position: absolute; left: 12px; bottom: 12px; z-index: 5;
+  background: rgba(20,23,28,0.8); color: #b8bdc6; border: 1px solid #2a2e36;
+  border-radius: 6px; padding: 5px 10px; font-size: 11px; font-variant-numeric: tabular-nums;
+  pointer-events: none; max-width: 60%;
 }
-.seg {
-  background: transparent; color: #8a8f98; border: 0; border-radius: 0;
-  padding: 6px 16px; font-size: 12px; font-weight: 600;
-}
-.seg--on { background: #ff8c42; color: #141414; }
 
-/* node editor */
-.editor { flex: 1.4; display: flex; flex-direction: column; min-width: 0; border-right: 1px solid #2a2e36; }
+/* node editor — palette sidebar + canvas */
+.editor { flex: 1.5; display: flex; flex-direction: row; min-width: 0; border-right: 1px solid #2a2e36; }
 .palette {
-  display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 12px 12px 12px;
-  padding-top: 48px; border-bottom: 1px solid #2a2e36; align-items: center;
+  width: 200px; flex: none; display: flex; flex-direction: column;
+  border-right: 1px solid #2a2e36; background: #14171c;
 }
-.palette__btn {
-  background: #2a2e36; color: #d8dbe0; border: 1px solid #3a3f48;
-  border-radius: 6px; padding: 5px 9px; font-size: 11px; font-weight: 600;
+.palette__top { padding: 8px; border-bottom: 1px solid #2a2e36; display: flex; flex-direction: column; gap: 6px; }
+.palette__search {
+  background: #0e1015; color: #d8dbe0; border: 1px solid #2a2e36;
+  border-radius: 6px; padding: 6px 8px; font-size: 12px; width: 100%;
 }
-.palette__btn:hover { background: #333842; }
-.palette__hint { color: #6a6f78; font-size: 11px; margin-left: auto; }
-.editor > .react-flow { flex: 1; background: #16181d; }
+.palette__actions { display: flex; flex-wrap: wrap; gap: 4px; }
+.palette__actions button, .palette__loadbtn {
+  background: #2a2e36; color: #d8dbe0; border: 1px solid #3a3f48; border-radius: 6px;
+  padding: 4px 7px; font-size: 11px; font-weight: 600; cursor: pointer;
+}
+.palette__actions button:hover, .palette__loadbtn:hover { background: #333842; }
+.palette__actions button:disabled { opacity: 0.4; cursor: default; }
+.palette__list { flex: 1; overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+.palcat { display: flex; flex-direction: column; }
+.palcat__hd {
+  background: none; border: 0; color: #8a8f98; text-align: left; font-size: 11px;
+  font-weight: 700; padding: 8px 4px 3px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.4px;
+}
+.palette__node {
+  background: #1e2127; color: #d8dbe0; border: 1px solid #2a2e36; border-radius: 5px;
+  padding: 5px 8px; font-size: 12px; text-align: left; cursor: pointer;
+}
+.palette__node:hover { background: #2a2e36; border-color: #ff8c42; }
+.palette__hint { color: #6a6f78; font-size: 10px; padding: 6px 8px; border-top: 1px solid #2a2e36; }
+.editor__canvas { flex: 1; position: relative; min-width: 0; background: #16181d; }
+.editor__canvas .react-flow { position: absolute; inset: 0; }
+
+/* quick-add menu (double-click canvas) */
+.quick__scrim { position: fixed; inset: 0; z-index: 40; }
+.quick {
+  position: fixed; z-index: 41; width: 200px; background: #1e2127;
+  border: 1px solid #3a3f48; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  overflow: hidden;
+}
+.quick__search { width: 100%; box-sizing: border-box; background: #0e1015; color: #d8dbe0; border: 0; border-bottom: 1px solid #2a2e36; padding: 8px; font-size: 12px; }
+.quick__list { max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; }
+.quick__item { background: none; border: 0; color: #d8dbe0; text-align: left; padding: 6px 10px; font-size: 12px; cursor: pointer; }
+.quick__item:hover { background: #2a2e36; }
+
+/* dark-theme the React Flow minimap + controls */
+.react-flow__minimap { background: #14171c !important; border: 1px solid #2a2e36; border-radius: 6px; }
+.react-flow__minimap-mask { fill: rgba(0,0,0,0.55); }
+.react-flow__minimap-node { fill: #3a3f48; }
+.react-flow__controls-button {
+  background: #1e2127; border-bottom: 1px solid #2a2e36; fill: #d8dbe0; color: #d8dbe0;
+}
+.react-flow__controls-button:hover { background: #2a2e36; }
 
 .gnode {
   background: #1e2127; border: 1px solid #3a3f48; border-radius: 8px;

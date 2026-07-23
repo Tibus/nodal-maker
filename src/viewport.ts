@@ -105,10 +105,24 @@ export class Viewport {
     this.scene.add(mesh);
     this.mesh = mesh;
 
+    const box = new THREE.Box3().setFromObject(mesh);
     if (reframe || !this.framed) {
-      this.frameCamera(new THREE.Box3().setFromObject(mesh));
+      this.frameCamera(box);
       this.framed = true;
+    } else if (!box.isEmpty()) {
+      // keep the orbit pivot on the model even when we don't re-frame
+      this.controls.target.copy(box.getCenter(new THREE.Vector3()));
     }
+  }
+
+  /** Force the next setGeometry to re-frame the camera (used on first load). */
+  reframeOnNext() {
+    this.framed = false;
+  }
+
+  /** Re-frame the camera on the current model now (Fit control). */
+  fit() {
+    if (this.mesh) this.frameCamera(new THREE.Box3().setFromObject(this.mesh));
   }
 
   /** Aim the camera at the model without moving the model itself. */
