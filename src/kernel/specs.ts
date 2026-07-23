@@ -54,6 +54,18 @@ export function paramPortType(p: ParamSpec): SocketType | null {
   return null;
 }
 
+/** Ordered palette categories (drives the grouped palette + search). */
+export const NODE_CATEGORIES: { name: string; types: string[] }[] = [
+  { name: "Value", types: ["numberValue", "textValue", "math", "mathUnary", "clamp", "remap", "random"] },
+  { name: "2D Primitive", types: ["rect", "circle", "ellipse", "polygon", "star", "slot", "svgInput", "textToSvg"] },
+  { name: "2D Op", types: ["offset2d", "fillet2d", "bevel2d", "boolean2d", "mirror2d", "transform2d", "arrayLinear2d", "arrayRadial2d", "group", "scoreCut"] },
+  { name: "3D Primitive", types: ["box", "cylinder", "sphere", "cone", "torus"] },
+  { name: "Sketch → Solid", types: ["extrude", "revolve", "bossOnCap"] },
+  { name: "3D Op", types: ["transform", "rotate3d", "scale3d", "mirror3d", "fillet", "bevel", "shell", "boolean3d", "arrayLinear3d", "arrayRadial3d"] },
+  { name: "Selector", types: ["edgeSelect", "faceSelect"] },
+  { name: "Mesh", types: ["tessellate", "importSTL", "repair", "boolean", "transformMesh", "convexHull", "minkowski", "decimate", "subdivide"] },
+];
+
 export const NODE_SPECS: Record<string, NodeSpec> = {
   numberValue: {
     type: "numberValue",

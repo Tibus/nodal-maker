@@ -68,7 +68,13 @@ const api = {
   },
   async evalGraph(graph: Graph, outputId: string) {
     await ensureKernels();
-    return evalToPayload(graph, outputId, graphCache);
+    try {
+      return { ok: true as const, ...evalToPayload(graph, outputId, graphCache) };
+    } catch (e) {
+      const nodeId =
+        e && typeof e === "object" && "nodeId" in e ? String((e as { nodeId: unknown }).nodeId) : undefined;
+      return { ok: false as const, error: { nodeId, message: e instanceof Error ? e.message : String(e) } };
+    }
   },
   async exportGraphSTL(graph: Graph, outputId: string) {
     await ensureKernels();

@@ -103,6 +103,15 @@ button.link {
   min-width: 150px; font-size: 12px; color: #d8dbe0; box-shadow: 0 4px 14px rgba(0,0,0,0.35);
 }
 .gnode--out { border-color: #ff8c42; box-shadow: 0 0 0 2px rgba(255,140,66,0.35); }
+.gnode--error { border-color: #e06c75; box-shadow: 0 0 0 2px rgba(224,108,117,0.4); }
+.gnode__value {
+  padding: 3px 10px; font-size: 11px; color: #98c379; font-family: ui-monospace, monospace;
+  border-bottom: 1px solid #2a2e36; font-variant-numeric: tabular-nums;
+}
+.gnode__err {
+  padding: 4px 10px; font-size: 10px; color: #e06c75; line-height: 1.35;
+  border-bottom: 1px solid #2a2e36;
+}
 .gnode__title {
   padding: 7px 10px; font-weight: 700; border-bottom: 1px solid #2a2e36;
   display: flex; justify-content: space-between; align-items: center;

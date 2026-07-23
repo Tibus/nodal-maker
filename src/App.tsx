@@ -53,6 +53,8 @@ export default function App() {
   const [mode, setMode] = useState<Mode>("form");
   const graphTimer = useRef<number | undefined>(undefined);
   const editorApi = useRef<EditorApi | null>(null);
+  const [graphError, setGraphError] = useState<{ nodeId?: string; message: string } | null>(null);
+  const [graphValues, setGraphValues] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (mountRef.current && !viewportRef.current) {
@@ -91,28 +93,31 @@ export default function App() {
       setBusy(true);
       try {
         const res = await kernel.evalGraph(graph, outputId);
+        if (!res.ok) {
+          setGraphError(res.error);
+          setStatus("error: " + res.error.message);
+          return;
+        }
+        setGraphError(null);
+        setGraphValues(res.values ?? {});
         viewportRef.current?.setGeometry(res.mesh);
         setTags(res.mesh.stats.tagCounts);
         setInfo(res.topCapFaceId !== null ? { topCapFaceId: res.topCapFaceId, topCapZ: res.topCapZ } : null);
-        setStatus(
-          `graph · ${res.mesh.stats.faceCount} regions · ${res.mesh.stats.triangleCount} triangles`,
-        );
+        setStatus(`graph · ${res.mesh.stats.faceCount} regions · ${res.mesh.stats.triangleCount} triangles`);
 
-        // if the displayed node is a Transform, offer a 3D translation gizmo
+        // gizmo bound to the displayed Transform node (translate)
         const out = graph.find((n) => n.id === outputId);
         if (out?.type === "transform") {
-          const t: [number, number, number] = [
-            Number(out.params?.tx ?? 0),
-            Number(out.params?.ty ?? 0),
-            Number(out.params?.tz ?? 0),
-          ];
-          viewportRef.current?.showTranslateGizmo(t, ([nx, ny, nz]) => {
-            const api = editorApi.current;
-            const r = (v: number) => Math.round(v * 2) / 2; // snap to the 0.5 step
-            api?.setParam(outputId, "tx", r(nx));
-            api?.setParam(outputId, "ty", r(ny));
-            api?.setParam(outputId, "tz", r(nz));
-          });
+          const r = (v: number) => Math.round(v * 2) / 2;
+          viewportRef.current?.showTranslateGizmo(
+            [Number(out.params?.tx ?? 0), Number(out.params?.ty ?? 0), Number(out.params?.tz ?? 0)],
+            ([nx, ny, nz]) => {
+              const api = editorApi.current;
+              api?.setParam(outputId, "tx", r(nx));
+              api?.setParam(outputId, "ty", r(ny));
+              api?.setParam(outputId, "tz", r(nz));
+            },
+          );
         } else {
           viewportRef.current?.hideGizmo();
         }
@@ -210,6 +215,9 @@ export default function App() {
           onReady={(api) => {
             editorApi.current = api;
           }}
+          errorNodeId={graphError?.nodeId ?? null}
+          errorMessage={graphError?.message ?? null}
+          values={graphValues}
           onExportSTL={async (graph, outputId) => {
             try {
               const bytes = await kernel.exportGraphSTL(graph, outputId);

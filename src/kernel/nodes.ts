@@ -752,7 +752,12 @@ export function evalGraphCached(
       const impl = REGISTRY[node.type];
       if (!impl) throw new Error(`no implementation for node type "${node.type}"`);
       const { inputs, params } = resolveInputs(node.type, rawInputs, node.params ?? {});
-      value = impl(inputs, params);
+      try {
+        value = impl(inputs, params);
+      } catch (e) {
+        // tag the failing node so the editor can highlight it
+        throw Object.assign(e instanceof Error ? e : new Error(String(e)), { nodeId: id });
+      }
       cache.entries.set(key, { value, run: cache.run });
       misses++;
     }

@@ -77,6 +77,8 @@ export interface BuildResult {
   topCapZ: number;
   /** what the displayed node actually produced (drives export UI) */
   outputKind?: "solid" | "mesh" | "sketch2d";
+  /** display strings for number/text node outputs (inline value preview) */
+  values?: Record<string, string>;
 }
 
 export function build(p: Params): BuildResult {
@@ -159,6 +161,15 @@ export function exportMeshSTL(stl: ArrayBuffer, o: MeshImportParams): Uint8Array
 
 export function evalToPayload(graph: Graph, outputId: string, cache?: EvalCache): BuildResult {
   const outputs = cache ? evalGraphCached(graph, cache).outputs : evalGraph(graph).outputs;
+
+  // collect inline value previews for scalar nodes
+  const values: Record<string, string> = {};
+  for (const [id, gv] of Object.entries(outputs)) {
+    if (gv.kind === "number") values[id] = Number.isInteger(gv.value) ? String(gv.value) : gv.value.toFixed(3);
+    else if (gv.kind === "text") values[id] = gv.value.length > 24 ? gv.value.slice(0, 24) + "…" : gv.value;
+    else if (gv.kind === "selection") values[id] = `${gv.target} selection`;
+  }
+
   const v: GraphValue | undefined = outputs[outputId];
   if (!v) throw new Error(`unknown output node "${outputId}"`);
   if (v.kind === "solid") {
@@ -171,16 +182,16 @@ export function evalToPayload(graph: Graph, outputId: string, cache?: EvalCache)
     } catch {
       /* not every solid has a resolvable top cap — fine */
     }
-    return { mesh: meshAndTag(v.solid), topCapFaceId, topCapZ, outputKind: "solid" };
+    return { mesh: meshAndTag(v.solid), topCapFaceId, topCapZ, outputKind: "solid", values };
   }
   if (v.kind === "mesh") {
-    return { mesh: meshToPayload(v.mesh), topCapFaceId: null, topCapZ: 0, outputKind: "mesh" };
+    return { mesh: meshToPayload(v.mesh), topCapFaceId: null, topCapZ: 0, outputKind: "mesh", values };
   }
   if (v.kind === "sketch2d") {
     // preview a 2D profile as a thin plate so it's visible in the viewport;
     // the true (non-faceted) geometry is what `exportGraphSVG` emits.
     const plate = v.drawing.sketchOnPlane("XY").extrude(0.5) as Shape3D;
-    return { mesh: meshAndTag(plate), topCapFaceId: null, topCapZ: 0, outputKind: "sketch2d" };
+    return { mesh: meshAndTag(plate), topCapFaceId: null, topCapZ: 0, outputKind: "sketch2d", values };
   }
   throw new Error(`output node "${outputId}" is a ${v.kind}; connect it to geometry to preview`);
 }

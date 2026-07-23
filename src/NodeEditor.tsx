@@ -47,6 +47,9 @@ interface EditorCtx {
   setOutput: (id: string) => void;
   setParam: (id: string, name: string, value: unknown) => void;
   isLinked: (nodeId: string, port: string) => boolean;
+  errorNodeId: string | null;
+  errorMessage: string | null;
+  valueOf: (nodeId: string) => string | undefined;
 }
 const Ctx = createContext<EditorCtx | null>(null);
 
@@ -79,13 +82,20 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
   const ctx = useContext(Ctx)!;
   const spec = NODE_SPECS[data.nodeType];
   const isOutput = ctx.outputId === id;
+  const isError = ctx.errorNodeId === id;
+  const value = ctx.valueOf(id);
 
   return (
-    <div className={`gnode${isOutput ? " gnode--out" : ""}`} onClick={() => ctx.setOutput(id)}>
+    <div
+      className={`gnode${isOutput ? " gnode--out" : ""}${isError ? " gnode--error" : ""}`}
+      onClick={() => ctx.setOutput(id)}
+    >
       <div className="gnode__title">
         {spec.label}
         {isOutput && <span className="gnode__badge">● view</span>}
       </div>
+      {value !== undefined && <div className="gnode__value">= {value}</div>}
+      {isError && <div className="gnode__err">⚠ {ctx.errorMessage}</div>}
 
       <div className="gnode__body" onClick={(e) => e.stopPropagation()}>
         {/* structural inputs — required, filled ports */}
@@ -334,6 +344,9 @@ export interface NodeEditorProps {
   onChange: (graph: Graph, outputId: string) => void;
   /** hands the parent an imperative handle once mounted */
   onReady?: (api: EditorApi) => void;
+  errorNodeId?: string | null;
+  errorMessage?: string | null;
+  values?: Record<string, string>;
   onExportSTL?: (graph: Graph, outputId: string) => void;
   onExportSVG?: (graph: Graph, outputId: string) => void;
   onExportSTEP?: (graph: Graph, outputId: string) => void;
@@ -389,6 +402,9 @@ export default function NodeEditor({
   initialOutputId,
   onChange,
   onReady,
+  errorNodeId,
+  errorMessage,
+  values,
   onExportSTL,
   onExportSVG,
   onExportSTEP,
@@ -635,8 +651,11 @@ export default function NodeEditor({
       setOutput,
       setParam,
       isLinked: (nodeId, port) => linkedSet.has(`${nodeId} ${port}`),
+      errorNodeId: errorNodeId ?? null,
+      errorMessage: errorMessage ?? null,
+      valueOf: (nodeId) => values?.[nodeId],
     }),
-    [outputId, setOutput, setParam, linkedSet],
+    [outputId, setOutput, setParam, linkedSet, errorNodeId, errorMessage, values],
   );
 
   return (
