@@ -185,9 +185,18 @@ l'impression 3D, que des utilisateurs customisent en changeant des paramètres
   solide source et le passe au builder ; les ports top/bottom lisent la bounding
   box (`zBounds`). revolve → top/bottom/side ; bossOnCap → top/bottom/bossSide/
   topEdges. Scènes `revolved-bowl` + `boss-knob` (20 exemples au total).
-- Reste (petit) : **suivi de sélection à travers un transform** (vrai problème de
-  topological-naming, non trivial — les ports lisent des coords monde, un
-  transform en aval les décale) ; sweep/loft multi-profils ; générateur kerf.
+### Features restantes — TOUTES faites
+- **sweep** (profil le long d'un spine), **loftSections** (loft 2–4 profils),
+  **kerf** (compensation laser ±½). Loft ajouté à la palette au passage.
+- **Suivi de sélection à travers transform/scale/mirror/rotate** : sélections
+  refondues en descripteurs de critères (`Crit`) que `resolveCrit` compose en
+  remontant les transform-family (translate/scale/mirror/rotateZ). L'éditeur
+  ré-expose dynamiquement les ports (`selOutputsMap`). rotate hors-Z / plans non
+  axiaux ne sont pas forwardés (erreur claire) — limite documentée.
+
+Idées futures (non demandées) : DXF avec arcs natifs (au lieu de polylignes),
+générateurs laser avancés (T-slot, boîtes à onglets), contraintes/cotation,
+helix/ressort, sweep avec twist, sélection par boîte/pointeur dans le viewport.
 
 ### Déploiement
 - **En ligne : https://tibus.github.io/nodal-maker/** (GitHub Pages via
