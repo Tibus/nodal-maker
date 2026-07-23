@@ -168,7 +168,21 @@ l'impression 3D, que des utilisateurs customisent en changeant des paramètres
 - **Fix majeur** : `boolean2d` avec un outil **multi-régions** (trous d'array)
   était cassé (replicad cut/fuse) → décomposition en régions, op région par
   région. Ports booléens renommés **base/tool** (`difference = base − tool`).
-- Reste (petit) : nœuds commentaire/cadre ; sélections exposées sur revolve/boss.
+
+### Laser : boîte à encoches + DXF + note (fait)
+- **fingerBox** : patron plat press-fit (5/6 panneaux). Doigts complémentaires
+  garantis par un **nombre impair** d'encoches (deux arêtes mates, traversées
+  depuis des coins opposés, s'emboîtent automatiquement). Helpers
+  `fingerEdge`/`fingerPanel`/`polyDrawing` (dédup des points → pas d'arête nulle
+  qui plante OCCT), `combineDrawings` (régions disjointes sans booléen).
+- **Export DXF** (`exportGraphDXF`, model.ts) : courbes échantillonnées via
+  `Curve2D.value` → LWPOLYLINE (R2000, mm) ; Score/Cut → calques CUT (rouge) +
+  SCORE (bleu). Bouton ⬇DXF quand la sortie est un profil 2D.
+- **Nœud commentaire** (type RF `note`, `isNote()` l'exclut du graphe) :
+  dimensions explicites (RF masque sinon), placé au centre visible, persisté.
+- Scènes ajoutées : `finger-box`, `closed-box` (18 exemples au total).
+- Reste (petit) : sélections exposées sur revolve/boss ; suivi de sélection à
+  travers un transform ; sweep/loft multi-profils ; générateur kerf.
 
 ### Déploiement
 - **En ligne : https://tibus.github.io/nodal-maker/** (GitHub Pages via
