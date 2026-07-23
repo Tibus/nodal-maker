@@ -326,8 +326,8 @@ const REGISTRY: Record<string, NodeImpl> = {
     return { kind: "sketch2d", drawing: drawRectangle(len, w, w / 2) };
   },
   boolean2d: (inputs, params) => {
-    const a = expectSketch(inputs.a, "boolean2d");
-    const b = expectSketch(inputs.b, "boolean2d");
+    const a = expectSketch(inputs.base, "boolean2d");
+    const b = expectSketch(inputs.tool, "boolean2d");
     const op = String(params.op ?? "union");
     const out = op === "difference" ? a.cut(b) : op === "intersection" ? a.intersect(b) : a.fuse(b);
     return { kind: "sketch2d", drawing: out };
@@ -406,8 +406,8 @@ const REGISTRY: Record<string, NodeImpl> = {
 
   /* --- ops 3D --- */
   boolean3d: (inputs, params) => {
-    const a = expectSolid(inputs.a, "boolean3d");
-    const b = expectSolid(inputs.b, "boolean3d");
+    const a = expectSolid(inputs.base, "boolean3d");
+    const b = expectSolid(inputs.tool, "boolean3d");
     const op = String(params.op ?? "union");
     const out = op === "difference" ? a.cut(b) : op === "intersection" ? a.intersect(b) : a.fuse(b);
     return { kind: "solid", solid: out as Shape3D };
@@ -666,8 +666,8 @@ const REGISTRY: Record<string, NodeImpl> = {
    * wired in, tessellate it upstream first. `params.op`: union|difference|intersection.
    */
   boolean: (inputs, params) => {
-    const a = expectMesh(inputs.a, "boolean");
-    const b = expectMesh(inputs.b, "boolean");
+    const a = expectMesh(inputs.base, "boolean");
+    const b = expectMesh(inputs.tool, "boolean");
     const op = (params.op ?? "union") as BooleanOp;
     return { kind: "mesh", mesh: booleanMesh(a, b, op) };
   },

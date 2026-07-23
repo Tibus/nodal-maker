@@ -208,9 +208,10 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
   boolean2d: {
     type: "boolean2d",
     label: "Boolean 2D",
+    // difference = base − tool
     inputs: [
-      { name: "a", type: "sketch2d" },
-      { name: "b", type: "sketch2d" },
+      { name: "base", type: "sketch2d" },
+      { name: "tool", type: "sketch2d" },
     ],
     output: "sketch2d",
     params: [{ name: "op", kind: "select", default: "union", options: ["union", "difference", "intersection"] }],
@@ -330,9 +331,10 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
   boolean3d: {
     type: "boolean3d",
     label: "Boolean 3D",
+    // difference = base − tool
     inputs: [
-      { name: "a", type: "solid" },
-      { name: "b", type: "solid" },
+      { name: "base", type: "solid" },
+      { name: "tool", type: "solid" },
     ],
     output: "solid",
     params: [{ name: "op", kind: "select", default: "union", options: ["union", "difference", "intersection"] }],
@@ -552,9 +554,10 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
   boolean: {
     type: "boolean",
     label: "Boolean",
+    // difference = base − tool
     inputs: [
-      { name: "a", type: "mesh" },
-      { name: "b", type: "mesh" },
+      { name: "base", type: "mesh" },
+      { name: "tool", type: "mesh" },
     ],
     output: "mesh",
     params: [

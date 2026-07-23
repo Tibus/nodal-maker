@@ -132,7 +132,7 @@
       "source": "disc",
       "sourceHandle": "out",
       "target": "drilled",
-      "targetHandle": "a",
+      "targetHandle": "base",
       "style": {
         "stroke": "#ff8c42"
       }
@@ -142,7 +142,7 @@
       "source": "boreDown",
       "sourceHandle": "out",
       "target": "drilled",
-      "targetHandle": "b",
+      "targetHandle": "tool",
       "style": {
         "stroke": "#ff8c42"
       }
@@ -172,7 +172,7 @@
       "source": "drilled",
       "sourceHandle": "out",
       "target": "flange",
-      "targetHandle": "a",
+      "targetHandle": "base",
       "style": {
         "stroke": "#ff8c42"
       }
@@ -182,7 +182,7 @@
       "source": "bolts",
       "sourceHandle": "out",
       "target": "flange",
-      "targetHandle": "b",
+      "targetHandle": "tool",
       "style": {
         "stroke": "#ff8c42"
       }

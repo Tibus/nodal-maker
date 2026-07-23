@@ -63,7 +63,7 @@ const scenes: Scene[] = [
       { id: "slit", type: "slot", params: { length: 38, width: 1.2 } },
       { id: "slitV", type: "transform2d", inputs: { in: "slit" }, params: { tx: -36, ty: 0, rotate: 90, scale: 1 } },
       { id: "slits", type: "arrayLinear2d", inputs: { in: "slitV" }, params: { count: 13, dx: 6, dy: 0 } },
-      { id: "panel", type: "boolean2d", inputs: { a: "sheet", b: "slits" }, params: { op: "difference" } },
+      { id: "panel", type: "boolean2d", inputs: { base: "sheet", tool: "slits" }, params: { op: "difference" } },
     ],
   },
   {
@@ -75,11 +75,11 @@ const scenes: Scene[] = [
       { id: "disc", type: "cylinder", params: { radius: 34, height: 6 } },
       { id: "bore", type: "cylinder", params: { radius: 9, height: 20 } },
       { id: "boreDown", type: "transform", inputs: { in: "bore" }, params: { tx: 0, ty: 0, tz: -5 } },
-      { id: "drilled", type: "boolean3d", inputs: { a: "disc", b: "boreDown" }, params: { op: "difference" } },
+      { id: "drilled", type: "boolean3d", inputs: { base: "disc", tool: "boreDown" }, params: { op: "difference" } },
       { id: "bolt", type: "cylinder", params: { radius: 3, height: 20 } },
       { id: "boltPos", type: "transform", inputs: { in: "bolt" }, params: { tx: 24, ty: 0, tz: -5 } },
       { id: "bolts", type: "arrayRadial3d", inputs: { in: "boltPos" }, params: { count: 6, angle: 360 } },
-      { id: "flange", type: "boolean3d", inputs: { a: "drilled", b: "bolts" }, params: { op: "difference" } },
+      { id: "flange", type: "boolean3d", inputs: { base: "drilled", tool: "bolts" }, params: { op: "difference" } },
     ],
   },
   {
@@ -92,7 +92,7 @@ const scenes: Scene[] = [
       { id: "hole", type: "circle", params: { radius: 5 } },
       { id: "holeOut", type: "transform2d", inputs: { in: "hole" }, params: { tx: 34, ty: 0, rotate: 0, scale: 1 } },
       { id: "ring", type: "arrayRadial2d", inputs: { in: "holeOut" }, params: { count: 10, radius: 0, angle: 360 } },
-      { id: "coaster", type: "boolean2d", inputs: { a: "disc", b: "ring" }, params: { op: "difference" } },
+      { id: "coaster", type: "boolean2d", inputs: { base: "disc", tool: "ring" }, params: { op: "difference" } },
     ],
   },
 ];

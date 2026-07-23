@@ -100,7 +100,7 @@
       "source": "disc",
       "sourceHandle": "out",
       "target": "coaster",
-      "targetHandle": "a",
+      "targetHandle": "base",
       "style": {
         "stroke": "#c678dd"
       }
@@ -110,7 +110,7 @@
       "source": "ring",
       "sourceHandle": "out",
       "target": "coaster",
-      "targetHandle": "b",
+      "targetHandle": "tool",
       "style": {
         "stroke": "#c678dd"
       }

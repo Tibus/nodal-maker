@@ -103,7 +103,7 @@
       "source": "sheet",
       "sourceHandle": "out",
       "target": "panel",
-      "targetHandle": "a",
+      "targetHandle": "base",
       "style": {
         "stroke": "#c678dd"
       }
@@ -113,7 +113,7 @@
       "source": "slits",
       "sourceHandle": "out",
       "target": "panel",
-      "targetHandle": "b",
+      "targetHandle": "tool",
       "style": {
         "stroke": "#c678dd"
       }
