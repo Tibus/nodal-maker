@@ -35,6 +35,13 @@ export interface InstanceDescriptor extends NodeDescriptor {
 
 const PX = "$"; // separator for prefixed inner node ids: `<instanceId>$<innerId>`
 
+/** split an input ref "node" | "node#handle" (local copy to stay dep-free) */
+function splitRef(ref: string): { node: string; handle: string } {
+  const i = ref.indexOf("#");
+  return i < 0 ? { node: ref, handle: "" } : { node: ref.slice(0, i), handle: ref.slice(i + 1) };
+}
+const joinRef = (node: string, handle: string) => (handle ? `${node}#${handle}` : node);
+
 /**
  * Expand every component instance in `descs` into its inner nodes, wiring the
  * instance's outer inputs into the exposed inner ports, applying exposed param
@@ -59,7 +66,10 @@ export function expandDescriptors(
 
     for (const inner of def.nodes) {
       const inputs: Record<string, string> = {};
-      for (const [port, src] of Object.entries(inner.inputs ?? {})) inputs[port] = px(src);
+      for (const [port, src] of Object.entries(inner.inputs ?? {})) {
+        const r = splitRef(src);
+        inputs[port] = joinRef(px(r.node), r.handle); // prefix inner node, keep #handle
+      }
       out.push({ id: px(inner.id), type: inner.type, params: { ...(inner.params ?? {}) }, inputs });
     }
     // exposed param overrides from the instance
@@ -81,8 +91,9 @@ export function expandDescriptors(
   for (const n of out) {
     if (!n.inputs) continue;
     for (const [port, src] of Object.entries(n.inputs)) {
-      const alias = outputAlias.get(src);
-      if (alias) n.inputs[port] = alias;
+      const r = splitRef(src);
+      const alias = outputAlias.get(r.node);
+      if (alias) n.inputs[port] = joinRef(alias, r.handle);
     }
   }
   return out;

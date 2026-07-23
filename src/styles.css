@@ -182,3 +182,6 @@ button.link {
    cue that the link is optional and the node already has a default value */
 .rf-port--opt { background: #1e2127; border-width: 2px; border-style: solid; }
 .gnode__row .react-flow__handle-left { left: -12px; top: 50%; }
+.gnode__row .react-flow__handle-right { right: -12px; top: 50%; }
+.gnode__row--out { justify-content: flex-end; }
+.gnode__portlabel--r { text-align: right; }

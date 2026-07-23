@@ -87,6 +87,7 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
         inputs: def.inputs.map((i) => ({ name: i.name, type: i.type })),
         output: def.outputType,
         params: def.params.map((p) => ({ ...p.spec, name: p.name, label: p.label })),
+        selectionOutputs: [] as { name: string; target: "face" | "edge" }[],
       }
     : NODE_SPECS[data.nodeType];
   const isOutput = ctx.outputId === id;
@@ -156,6 +157,26 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
             </div>
           );
         })}
+
+        {/* exposed selection outputs (cap / sides / edges…) on the right */}
+        {spec.selectionOutputs?.map((so) => {
+          const t: SocketType = "selection";
+          return (
+            <div className="gnode__row gnode__row--out" key={`so-${so.name}`}>
+              <span className="gnode__portlabel gnode__portlabel--r" style={{ color: SOCKET_COLORS[t] }}>
+                {so.name} ▶
+              </span>
+              <Handle
+                id={so.name}
+                type="source"
+                position={Position.Right}
+                className="rf-port rf-port--req"
+                style={{ background: SOCKET_COLORS[t] }}
+                title={`${so.name}: ${so.target} selection`}
+              />
+            </div>
+          );
+        })}
       </div>
 
       <Handle
@@ -163,7 +184,7 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
         type="source"
         position={Position.Right}
         className="rf-port rf-port--req"
-        style={{ background: SOCKET_COLORS[spec.output] }}
+        style={{ background: SOCKET_COLORS[spec.output], top: 22 }}
         title={`out: ${spec.output}`}
       />
     </div>
@@ -372,7 +393,10 @@ function toGraph(nodes: GeoNode[], edges: Edge[]): InstanceDescriptor[] {
   return nodes.map<InstanceDescriptor>((n) => {
     const inputs: Record<string, string> = {};
     for (const e of edges) {
-      if (e.target === n.id && e.targetHandle) inputs[e.targetHandle] = e.source;
+      if (e.target === n.id && e.targetHandle) {
+        // encode a non-default source handle (selection output) as "src#handle"
+        inputs[e.targetHandle] = e.sourceHandle && e.sourceHandle !== "out" ? `${e.source}#${e.sourceHandle}` : e.source;
+      }
     }
     const d: InstanceDescriptor = { id: n.id, type: n.data.nodeType, params: n.data.params, inputs };
     if (n.data.component) d.component = n.data.component;
@@ -435,10 +459,15 @@ export default function NodeEditor({
   const [quick, setQuick] = useState<{ sx: number; sy: number; flow: { x: number; y: number }; q: string } | null>(null);
   const [components, setComponents] = useState<Record<string, ComponentDef>>({});
 
-  // socket type of a node's output / an input handle — component-aware
+  // socket type of a node's output handle (main "out" or a selection output)
   const nodeOutType = useCallback(
-    (n: GeoNode): SocketType | undefined =>
-      n.data.component ? components[n.data.component]?.outputType : NODE_SPECS[n.data.nodeType]?.output,
+    (n: GeoNode, handle: string = "out"): SocketType | undefined => {
+      if (handle !== "out") {
+        const so = NODE_SPECS[n.data.nodeType]?.selectionOutputs?.find((o) => o.name === handle);
+        return so ? "selection" : undefined;
+      }
+      return n.data.component ? components[n.data.component]?.outputType : NODE_SPECS[n.data.nodeType]?.output;
+    },
     [components],
   );
   const nodeInType = useCallback(
@@ -583,7 +612,7 @@ export default function NodeEditor({
       const src = nodes.find((n) => n.id === c.source);
       const tgt = nodes.find((n) => n.id === c.target);
       if (!src || !tgt) return false;
-      const out = nodeOutType(src);
+      const out = nodeOutType(src, c.sourceHandle ?? "out");
       const inp = nodeInType(tgt, c.targetHandle);
       return !!out && !!inp && (out === inp || (out === "solid" && inp === "mesh"));
     },
@@ -614,7 +643,7 @@ export default function NodeEditor({
       const src = nodes.find((n) => n.id === c.source);
       const tgt = nodes.find((n) => n.id === c.target);
       if (!src || !tgt || !c.targetHandle) return;
-      const outType = nodeOutType(src);
+      const outType = nodeOutType(src, c.sourceHandle ?? "out");
       const inType = nodeInType(tgt, c.targetHandle);
       if (!outType || !inType) return;
 

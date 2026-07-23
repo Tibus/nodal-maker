@@ -111,6 +111,93 @@ function resolveInputs(
 }
 
 /* ------------------------------------------------------------------ */
+/* Exposed selection outputs (modifiers name the geometry they create) */
+/*                                                                     */
+/* An edge input ref is "srcId" (main output) or "srcId#handle". When  */
+/* the handle names a selection port, we build a precise criteria-based */
+/* selection from the SOURCE node's type + params — the node that made  */
+/* the geometry knows exactly where its cap / sides / edges are. Much   */
+/* more precise than a standalone Face/Edge Select.                     */
+/* ------------------------------------------------------------------ */
+
+export function parseRef(ref: string): { node: string; handle: string } {
+  const i = ref.indexOf("#");
+  return i < 0 ? { node: ref, handle: "out" } : { node: ref.slice(0, i), handle: ref.slice(i + 1) };
+}
+
+const faceXY = (z: number): GraphValue => ({
+  kind: "selection",
+  target: "face",
+  apply: (f) => (f as FaceFinder).inPlane("XY", z),
+});
+const faceYZ = (x: number): GraphValue => ({
+  kind: "selection",
+  target: "face",
+  apply: (f) => (f as FaceFinder).inPlane("YZ", x),
+});
+const faceXZ = (y: number): GraphValue => ({
+  kind: "selection",
+  target: "face",
+  apply: (f) => (f as FaceFinder).inPlane("XZ", y),
+});
+const faceCyl = (): GraphValue => ({
+  kind: "selection",
+  target: "face",
+  apply: (f) => (f as FaceFinder).ofSurfaceType("CYLINDRE"),
+});
+const edgeDir = (d: [number, number, number]): GraphValue => ({
+  kind: "selection",
+  target: "edge",
+  apply: (e) => (e as EdgeFinder).inDirection(d),
+});
+const edgeXY = (z: number): GraphValue => ({
+  kind: "selection",
+  target: "edge",
+  apply: (e) => (e as EdgeFinder).inPlane("XY", z),
+});
+
+/** selection ports exposed by each modifier: handle → build(params) → selection */
+const SELECTION_PORTS: Record<string, Record<string, (p: Record<string, unknown>) => GraphValue>> = {
+  extrude: {
+    cap: (p) => faceXY(Number(p.height ?? 1)),
+    bottom: () => faceXY(0),
+    sideEdges: () => edgeDir([0, 0, 1]),
+    capEdges: (p) => edgeXY(Number(p.height ?? 1)),
+    bottomEdges: () => edgeXY(0),
+  },
+  box: {
+    top: (p) => faceXY(Number(p.z ?? 30)),
+    bottom: () => faceXY(0),
+    right: (p) => faceYZ(Number(p.x ?? 30) / 2),
+    left: (p) => faceYZ(-Number(p.x ?? 30) / 2),
+    front: (p) => faceXZ(-Number(p.y ?? 30) / 2),
+    back: (p) => faceXZ(Number(p.y ?? 30) / 2),
+    verticalEdges: () => edgeDir([0, 0, 1]),
+    topEdges: (p) => edgeXY(Number(p.z ?? 30)),
+  },
+  cylinder: {
+    cap: (p) => faceXY(Number(p.height ?? 30)),
+    bottom: () => faceXY(0),
+    side: () => faceCyl(),
+    capEdges: (p) => edgeXY(Number(p.height ?? 30)),
+  },
+};
+
+/** Resolve an input ref to its GraphValue, given an evaluator for main outputs. */
+function resolveRef(
+  ref: string,
+  byId: Map<string, NodeDescriptor>,
+  evalNode: (id: string) => GraphValue,
+): GraphValue {
+  const { node, handle } = parseRef(ref);
+  if (handle === "out") return evalNode(node);
+  const src = byId.get(node);
+  const build = src ? SELECTION_PORTS[src.type]?.[handle] : undefined;
+  if (!build) throw new Error(`no selection port "${handle}" on ${src?.type ?? node}`);
+  return build(src!.params ?? {});
+}
+
+/* ------------------------------------------------------------------ */
 /* Node registry                                                       */
 /* ------------------------------------------------------------------ */
 
@@ -629,8 +716,8 @@ export function evalGraph(graph: Graph): { outputs: Record<string, GraphValue>; 
     visiting.add(id);
 
     const rawInputs: Record<string, GraphValue> = {};
-    for (const [port, srcId] of Object.entries(node.inputs ?? {})) {
-      rawInputs[port] = evalNode(srcId);
+    for (const [port, ref] of Object.entries(node.inputs ?? {})) {
+      rawInputs[port] = resolveRef(ref, byId, evalNode);
     }
     const impl = REGISTRY[node.type];
     if (!impl) throw new Error(`no implementation for node type "${node.type}"`);
@@ -720,8 +807,9 @@ export function evalGraphCached(
     const node = byId.get(id);
     if (!node) throw new Error(`unknown node ${id}`);
     const childParts: string[] = [];
-    for (const [port, srcId] of Object.entries(node.inputs ?? {})) {
-      childParts.push(`${port}=${keyOf(srcId)}`);
+    for (const [port, ref] of Object.entries(node.inputs ?? {})) {
+      const { node: srcId, handle } = parseRef(ref);
+      childParts.push(`${port}=${keyOf(srcId)}#${handle}`);
     }
     const key = fnv1a(
       `${node.type}(${hashParams(node.params ?? {})})[${childParts.sort().join(",")}]`,
@@ -746,8 +834,8 @@ export function evalGraphCached(
       hits++;
     } else {
       const rawInputs: Record<string, GraphValue> = {};
-      for (const [port, srcId] of Object.entries(node.inputs ?? {})) {
-        rawInputs[port] = evalNode(srcId);
+      for (const [port, ref] of Object.entries(node.inputs ?? {})) {
+        rawInputs[port] = resolveRef(ref, byId, evalNode);
       }
       const impl = REGISTRY[node.type];
       if (!impl) throw new Error(`no implementation for node type "${node.type}"`);

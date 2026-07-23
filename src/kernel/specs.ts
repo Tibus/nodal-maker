@@ -31,6 +31,8 @@ export interface NodeSpec {
   inputs: PortSpec[];
   output: SocketType;
   params: ParamSpec[];
+  /** named selection outputs the modifier exposes (cap/sides/edges…) */
+  selectionOutputs?: { name: string; target: "face" | "edge" }[];
 }
 
 /** Colour per socket type — shared by the editor handles and edge styling. */
@@ -264,6 +266,16 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
       { name: "y", kind: "number", default: 30, min: 1, max: 300, step: 1 },
       { name: "z", kind: "number", default: 30, min: 1, max: 300, step: 1 },
     ],
+    selectionOutputs: [
+      { name: "top", target: "face" },
+      { name: "bottom", target: "face" },
+      { name: "left", target: "face" },
+      { name: "right", target: "face" },
+      { name: "front", target: "face" },
+      { name: "back", target: "face" },
+      { name: "verticalEdges", target: "edge" },
+      { name: "topEdges", target: "edge" },
+    ],
   },
   cylinder: {
     type: "cylinder",
@@ -273,6 +285,12 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     params: [
       { name: "radius", kind: "number", default: 15, min: 0.5, max: 200, step: 0.5 },
       { name: "height", kind: "number", default: 30, min: 1, max: 300, step: 1 },
+    ],
+    selectionOutputs: [
+      { name: "cap", target: "face" },
+      { name: "bottom", target: "face" },
+      { name: "side", target: "face" },
+      { name: "capEdges", target: "edge" },
     ],
   },
   sphere: {
@@ -414,6 +432,13 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     inputs: [{ name: "in", type: "sketch2d" }],
     output: "solid",
     params: [{ name: "height", kind: "number", default: 10, min: 1, max: 100, step: 1 }],
+    selectionOutputs: [
+      { name: "cap", target: "face" },
+      { name: "bottom", target: "face" },
+      { name: "sideEdges", target: "edge" },
+      { name: "capEdges", target: "edge" },
+      { name: "bottomEdges", target: "edge" },
+    ],
   },
   edgeSelect: {
     type: "edgeSelect",
