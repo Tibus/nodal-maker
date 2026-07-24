@@ -194,9 +194,18 @@ l'impression 3D, que des utilisateurs customisent en changeant des paramètres
   ré-expose dynamiquement les ports (`selOutputsMap`). rotate hors-Z / plans non
   axiaux ne sont pas forwardés (erreur claire) — limite documentée.
 
-Idées futures (non demandées) : DXF avec arcs natifs (au lieu de polylignes),
-générateurs laser avancés (T-slot, boîtes à onglets), contraintes/cotation,
-helix/ressort, sweep avec twist, sélection par boîte/pointeur dans le viewport.
+### UX avancée (fait)
+- **Barre d'historique** (timeline façon Fusion 360) : une puce par nœud dans
+  l'ordre de création (glyphe par type), clic = navigation au niveau d'historique
+  (setOutput → viewport rend jusqu'à ce nœud, recentre le graphe, sélectionne).
+- **Sélection de face par pointeur** : bouton 🎯 Pick face → clic sur une face 3D
+  → raycast → nœud Face Select préconfiguré (atX/atY/atZ + offset précis, ou
+  cylindrical pour une surface courbe). Face surlignée en vert.
+
+Idées futures (non demandées) : DXF avec arcs natifs, générateurs laser avancés
+(T-slot, onglets), contraintes/cotation, helix/ressort, sweep avec twist, pick
+d'ARÊTES dans le viewport (le pick actuel ne gère que les faces), auto-câblage
+du Face Select vers un fillet/shell sélectionné.
 
 ### Déploiement
 - **En ligne : https://tibus.github.io/nodal-maker/** (GitHub Pages via
