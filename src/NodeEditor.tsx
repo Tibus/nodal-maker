@@ -1075,6 +1075,49 @@ export default function NodeEditor({
     return m;
   }, [nodes, edges]);
 
+  // history timeline order = GENERATION order (topological): sources first, each
+  // node after every node it depends on, ending at the final result — not the
+  // raw order nodes were added. Independent branches keep their array order.
+  const timelineOrder = useMemo(() => {
+    const geo = nodes.filter((n) => !isNote(n));
+    const idx = new Map(geo.map((n, i) => [n.id, i]));
+    const ids = new Set(geo.map((n) => n.id));
+    const indeg = new Map(geo.map((n) => [n.id, 0]));
+    const dependents = new Map<string, string[]>(geo.map((n) => [n.id, []]));
+    const counted = new Set<string>(); // dedupe multi-edges between same pair
+    for (const e of edges) {
+      if (!ids.has(e.source) || !ids.has(e.target) || e.source === e.target) continue;
+      const key = `${e.source}->${e.target}`;
+      if (counted.has(key)) continue;
+      counted.add(key);
+      indeg.set(e.target, (indeg.get(e.target) ?? 0) + 1);
+      dependents.get(e.source)!.push(e.target);
+    }
+    const result: GeoNode[] = [];
+    const done = new Set<string>();
+    const byId = new Map(geo.map((n) => [n.id, n]));
+    const bySmallestIdx = (a: string, b: string) => (idx.get(a) ?? 0) - (idx.get(b) ?? 0);
+    const ready = geo.filter((n) => (indeg.get(n.id) ?? 0) === 0).map((n) => n.id);
+    while (result.length < geo.length) {
+      let pick: string | undefined;
+      if (ready.length) {
+        ready.sort(bySmallestIdx);
+        pick = ready.shift();
+      } else {
+        // cycle guard (shouldn't happen in a DAG): take the smallest-index leftover
+        pick = geo.filter((n) => !done.has(n.id)).sort((a, b) => bySmallestIdx(a.id, b.id))[0]?.id;
+      }
+      if (pick == null) break;
+      done.add(pick);
+      result.push(byId.get(pick)!);
+      for (const t of dependents.get(pick)!) {
+        indeg.set(t, (indeg.get(t) ?? 1) - 1);
+        if ((indeg.get(t) ?? 0) === 0 && !done.has(t)) ready.push(t);
+      }
+    }
+    return result;
+  }, [nodes, edges]);
+
   const ctx = useMemo<EditorCtx>(
     () => ({
       outputId,
@@ -1258,9 +1301,8 @@ export default function NodeEditor({
 
         {/* history timeline (Fusion-style): one chip per node in creation order;
             click to view that node — the "history level" — and select it. */}
-        <div className="timeline" title="History — click a step to view it">
-          {nodes
-            .filter((n) => !isNote(n))
+        <div className="timeline" title="Generation order — click a step to view it">
+          {timelineOrder
             .map((n) => {
               const active = n.id === outputId;
               const isComp = !!n.data.component;
