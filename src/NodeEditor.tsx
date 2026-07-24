@@ -71,6 +71,16 @@ const NODE_ICON: Record<string, string> = {
 };
 const nodeIcon = (type: string, isComponent: boolean) => (isComponent ? "⧉" : (NODE_ICON[type] ?? "◆"));
 
+/** A "construction" node produces geometry (solid / sketch2d / mesh); helper
+ * nodes (selection / number / text) only parametrise them and are hidden from
+ * the timeline by default. */
+function isConstructionNode(n: GeoNode, components: Record<string, ComponentDef>): boolean {
+  const out = n.data.component
+    ? components[n.data.component]?.outputType
+    : NODE_SPECS[n.data.nodeType]?.output;
+  return out === "solid" || out === "sketch2d" || out === "mesh";
+}
+
 type SelOut = { name: string; target: "face" | "edge" };
 
 interface EditorCtx {
@@ -538,6 +548,9 @@ export default function NodeEditor({
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [quick, setQuick] = useState<{ sx: number; sy: number; flow: { x: number; y: number }; q: string } | null>(null);
   const [components, setComponents] = useState<Record<string, ComponentDef>>({});
+  // timeline: show only construction steps (geometry) by default, hiding helper
+  // nodes (selections, numbers, text, math) that merely parametrise them.
+  const [showHelpers, setShowHelpers] = useState(false);
 
   // socket type of a node's output handle (main "out" or a selection output)
   const nodeOutType = useCallback(
@@ -1299,10 +1312,19 @@ export default function NodeEditor({
           </>
         )}
 
-        {/* history timeline (Fusion-style): one chip per node in creation order;
-            click to view that node — the "history level" — and select it. */}
+        {/* history timeline (Fusion-style), in GENERATION order. By default only
+            construction steps (geometry) show; the ⚙ toggle reveals helper nodes
+            (selections, values, math) that merely parametrise them. */}
         <div className="timeline" title="Generation order — click a step to view it">
+          <button
+            className={`tl__filter${showHelpers ? " tl__filter--on" : ""}`}
+            title={showHelpers ? "Hide helper nodes (selections, values)" : "Show helper nodes (selections, values)"}
+            onClick={() => setShowHelpers((v) => !v)}
+          >
+            ⚙
+          </button>
           {timelineOrder
+            .filter((n) => showHelpers || isConstructionNode(n, components))
             .map((n) => {
               const active = n.id === outputId;
               const isComp = !!n.data.component;
