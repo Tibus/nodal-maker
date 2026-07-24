@@ -902,7 +902,10 @@ const REGISTRY: Record<string, NodeImpl> = {
     const apply = (f: FaceFinder): FaceFinder => {
       switch (where) {
         case "top":
-        case "bottom": return f.inPlane("XY", offset);
+        case "bottom":
+        case "atZ": return f.inPlane("XY", offset); // precise plane at Z = offset
+        case "atX": return f.inPlane("YZ", offset); // precise plane at X = offset
+        case "atY": return f.inPlane("XZ", offset); // precise plane at Y = offset
         case "horizontal": return f.parallelTo("XY");
         case "vertical-x": return f.parallelTo("YZ");
         case "vertical-y": return f.parallelTo("XZ");

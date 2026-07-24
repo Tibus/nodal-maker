@@ -533,8 +533,8 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     inputs: [],
     output: "selection",
     params: [
-      { name: "where", kind: "select", default: "top", options: ["all", "top", "bottom", "horizontal", "vertical-x", "vertical-y", "planar", "cylindrical"] },
-      { name: "offset", kind: "number", label: "top/bottom Z", default: 0, min: -300, max: 300, step: 0.5 },
+      { name: "where", kind: "select", default: "top", options: ["all", "top", "bottom", "atZ", "atX", "atY", "horizontal", "vertical-x", "vertical-y", "planar", "cylindrical"] },
+      { name: "offset", kind: "number", label: "plane offset", default: 0, min: -300, max: 300, step: 0.5 },
     ],
   },
   fillet: {

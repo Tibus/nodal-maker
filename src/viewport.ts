@@ -22,6 +22,9 @@ export class Viewport {
   private mesh: THREE.Mesh | null = null;
   private materials: THREE.Material[];
   private framed = false;
+  private payload: MeshPayload | null = null;
+  private raycaster = new THREE.Raycaster();
+  private pickHighlight: THREE.Mesh | null = null;
   // 3D translation gizmo (edits a Transform node's tx/ty/tz)
   private gizmo: TransformControls | null = null;
   private gizmoProxy: THREE.Object3D | null = null;
@@ -94,6 +97,8 @@ export class Viewport {
       this.mesh.geometry.dispose();
       this.mesh = null;
     }
+    this.clearPick();
+    this.payload = payload;
 
     const geom = new THREE.BufferGeometry();
     geom.setAttribute("position", new THREE.BufferAttribute(payload.vertices, 3));
@@ -266,6 +271,90 @@ export class Viewport {
     this.gizmoProxy = null;
     this.onTranslate = this.onRotate = this.onScale = null;
     this.controls.enabled = true;
+  }
+
+  /** Remove the picked-face highlight overlay. */
+  clearPick() {
+    if (this.pickHighlight) {
+      this.scene.remove(this.pickHighlight);
+      this.pickHighlight.geometry.dispose();
+      this.pickHighlight = null;
+    }
+  }
+
+  /**
+   * Ray-pick the face under a screen point. Returns a descriptor a Face Select
+   * node can be configured from: which axis-aligned plane the face lies in (or
+   * "curved"/cylindrical) and the plane offset. Also highlights the face.
+   */
+  pickFace(clientX: number, clientY: number): {
+    axis: "X" | "Y" | "Z" | "curved";
+    offset: number;
+    tag: FaceTag;
+    centroid: [number, number, number];
+  } | null {
+    if (!this.mesh || !this.payload) return null;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    this.raycaster.setFromCamera(ndc, this.camera);
+    const hit = this.raycaster.intersectObject(this.mesh, false)[0];
+    if (!hit || hit.faceIndex == null) return null;
+
+    // which draw group (= one B-rep / mesh face) owns the hit triangle?
+    const idx = hit.faceIndex * 3;
+    const group = this.payload.groups.find((g) => idx >= g.start && idx < g.start + g.count);
+    if (!group) return null;
+
+    // average the group's vertex normals + gather its coordinate extents
+    const { vertices, normals, indices } = this.payload;
+    const n = new THREE.Vector3();
+    let cx = 0, cy = 0, cz = 0, count = 0;
+    const min = [Infinity, Infinity, Infinity];
+    const max = [-Infinity, -Infinity, -Infinity];
+    for (let i = group.start; i < group.start + group.count; i++) {
+      const v = indices[i] * 3;
+      n.x += normals[v]; n.y += normals[v + 1]; n.z += normals[v + 2];
+      cx += vertices[v]; cy += vertices[v + 1]; cz += vertices[v + 2];
+      for (let a = 0; a < 3; a++) {
+        min[a] = Math.min(min[a], vertices[v + a]);
+        max[a] = Math.max(max[a], vertices[v + a]);
+      }
+      count++;
+    }
+    if (count === 0) return null;
+    n.normalize();
+    const centroid: [number, number, number] = [cx / count, cy / count, cz / count];
+
+    // dominant axis of the face normal → the plane it lies in, if flat
+    const comp = [Math.abs(n.x), Math.abs(n.y), Math.abs(n.z)];
+    const dom = comp[0] >= comp[1] && comp[0] >= comp[2] ? 0 : comp[1] >= comp[2] ? 1 : 2;
+    const spread = max[dom] - min[dom]; // ~0 for a plane perpendicular to `dom`
+    const diag = Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
+    const flat = comp[dom] > 0.9 && spread < Math.max(0.05, diag * 0.02);
+    const axis = flat ? (["X", "Y", "Z"] as const)[dom] : "curved";
+    const offset = flat ? centroid[dom] : 0;
+
+    // highlight the picked group's triangles
+    this.clearPick();
+    const hgeom = new THREE.BufferGeometry();
+    const pos = new Float32Array(group.count * 3);
+    for (let i = 0; i < group.count; i++) {
+      const v = indices[group.start + i] * 3;
+      pos[i * 3] = vertices[v]; pos[i * 3 + 1] = vertices[v + 1]; pos[i * 3 + 2] = vertices[v + 2];
+    }
+    hgeom.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    const hmesh = new THREE.Mesh(
+      hgeom,
+      new THREE.MeshBasicMaterial({ color: 0x39d98a, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthTest: false }),
+    );
+    hmesh.renderOrder = 999;
+    this.scene.add(hmesh);
+    this.pickHighlight = hmesh;
+
+    return { axis, offset: Math.round(offset * 100) / 100, tag: group.tag, centroid };
   }
 
   private onResize(container: HTMLElement) {

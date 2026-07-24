@@ -41,6 +41,28 @@ export default function App() {
   const [status, setStatus] = useState("initialising kernels…");
   const [graphError, setGraphError] = useState<{ nodeId?: string; message: string } | null>(null);
   const [graphValues, setGraphValues] = useState<Record<string, string>>({});
+  const [pickMode, setPickMode] = useState(false);
+
+  // click a face in the viewport (pick mode) → a preconfigured Face Select node
+  const onViewportClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (!pickMode) return;
+      const pick = viewportRef.current?.pickFace(e.clientX, e.clientY);
+      if (!pick) {
+        setStatus("pick: no face under the cursor");
+        return;
+      }
+      const where = pick.axis === "curved" ? "cylindrical" : `at${pick.axis}`;
+      editorApi.current?.addFaceSelect(where, pick.offset);
+      setStatus(
+        pick.axis === "curved"
+          ? "picked a curved/cylindrical face → Face Select (cylindrical)"
+          : `picked ${pick.tag} face at ${pick.axis}=${pick.offset} → Face Select (at${pick.axis})`,
+      );
+      setPickMode(false);
+    },
+    [pickMode],
+  );
 
   useEffect(() => {
     if (mountRef.current && !viewportRef.current) {
@@ -152,7 +174,14 @@ export default function App() {
           }
         }}
       />
-      <div className="viewport" ref={mountRef}>
+      <div className={`viewport${pickMode ? " viewport--pick" : ""}`} ref={mountRef} onClick={onViewportClick}>
+        <button
+          className={`vp-pick${pickMode ? " vp-pick--on" : ""}`}
+          onClick={(e) => { e.stopPropagation(); setPickMode((v) => !v); }}
+          title="Pick a face in the viewport → creates a Face Select node"
+        >
+          🎯 {pickMode ? "Click a face…" : "Pick face"}
+        </button>
         <div className="statusbar">{status}</div>
       </div>
     </div>

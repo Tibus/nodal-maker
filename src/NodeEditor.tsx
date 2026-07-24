@@ -409,6 +409,8 @@ const nodeTypes = { geo: GeoNodeView, note: NoteView };
 export interface EditorApi {
   /** imperatively set a node param (used by the 3D gizmo to write tx/ty/tz) */
   setParam: (nodeId: string, name: string, value: unknown) => void;
+  /** add a Face Select node preconfigured from a viewport pick */
+  addFaceSelect: (where: string, offset: number) => void;
 }
 
 export interface NodeEditorProps {
@@ -714,9 +716,31 @@ export default function NodeEditor({
 
   const setOutput = useCallback((id: string) => setOutputId(id), []);
 
+  // create a Face Select node from a viewport pick (axis-aligned plane or curved)
+  const addFaceSelect = useCallback(
+    (where: string, offset: number) => {
+      const id = newId("faceSelect");
+      const params: Record<string, unknown> = {};
+      for (const p of NODE_SPECS.faceSelect.params) params[p.name] = p.default;
+      params.where = where;
+      params.offset = offset;
+      setNodes((prev) => {
+        const anchor = prev.find((n) => n.id === outputId) ?? prev[prev.length - 1];
+        const position = anchor
+          ? { x: anchor.position.x + 60, y: anchor.position.y + 160 }
+          : { x: 80, y: 220 };
+        return [
+          ...prev.map((n) => ({ ...n, selected: false })),
+          { id, type: "geo", position, selected: true, data: { nodeType: "faceSelect", params } },
+        ];
+      });
+    },
+    [outputId, setNodes],
+  );
+
   useEffect(() => {
-    onReady?.({ setParam });
-  }, [onReady, setParam]);
+    onReady?.({ setParam, addFaceSelect });
+  }, [onReady, setParam, addFaceSelect]);
 
   const onConnect = useCallback(
     (c: Connection) => {
