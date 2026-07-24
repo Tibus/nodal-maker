@@ -198,14 +198,17 @@ l'impression 3D, que des utilisateurs customisent en changeant des paramètres
 - **Barre d'historique** (timeline façon Fusion 360) : une puce par nœud dans
   l'ordre de création (glyphe par type), clic = navigation au niveau d'historique
   (setOutput → viewport rend jusqu'à ce nœud, recentre le graphe, sélectionne).
-- **Sélection de face par pointeur** : bouton 🎯 Pick face → clic sur une face 3D
-  → raycast → nœud Face Select préconfiguré (atX/atY/atZ + offset précis, ou
-  cylindrical pour une surface courbe). Face surlignée en vert.
+- **Sélection par pointeur (face & arête)** : boutons 🎯 Pick face / 📐 Pick edge.
+  Face → raycast mesh → Face Select (atX/atY/atZ + offset, ou cylindrical).
+  Arête → raycast mesh puis snap à l'arête de feature la plus proche
+  (EdgesGeometry) → Edge Select (vertical/horizontal-x/-y ou atZ). Highlight vert.
+  **Auto-câblage** : le sélecteur se branche seul dans le port libre d'un
+  consommateur (fillet/bevel/shell) affiché OU directement en aval (on pique le
+  corps vif, ça alimente le fillet aval, la vue bascule sur le résultat).
 
 Idées futures (non demandées) : DXF avec arcs natifs, générateurs laser avancés
-(T-slot, onglets), contraintes/cotation, helix/ressort, sweep avec twist, pick
-d'ARÊTES dans le viewport (le pick actuel ne gère que les faces), auto-câblage
-du Face Select vers un fillet/shell sélectionné.
+(T-slot, onglets), contraintes/cotation, helix/ressort, sweep avec twist,
+multi-sélection au pointeur (plusieurs faces/arêtes en un sélecteur).
 
 ### Déploiement
 - **En ligne : https://tibus.github.io/nodal-maker/** (GitHub Pages via
