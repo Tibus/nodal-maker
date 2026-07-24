@@ -24,7 +24,9 @@ export class Viewport {
   private framed = false;
   private payload: MeshPayload | null = null;
   private raycaster = new THREE.Raycaster();
-  private pickHighlight: THREE.Mesh | null = null;
+  private pickHighlight: THREE.Object3D | null = null;
+  private edgesObj: THREE.LineSegments | null = null;
+  private modelDiag = 100;
   // 3D translation gizmo (edits a Transform node's tx/ty/tz)
   private gizmo: TransformControls | null = null;
   private gizmoProxy: THREE.Object3D | null = null;
@@ -114,7 +116,15 @@ export class Viewport {
     this.scene.add(mesh);
     this.mesh = mesh;
 
+    // a feature-edge line set kept off-scene purely as a raycast target for
+    // edge picking (built from the mesh by dihedral angle threshold)
+    if (this.edgesObj) this.edgesObj.geometry.dispose();
+    const eg = new THREE.EdgesGeometry(geom, 18);
+    this.edgesObj = new THREE.LineSegments(eg, new THREE.LineBasicMaterial());
+    this.edgesObj.updateMatrixWorld();
+
     const box = new THREE.Box3().setFromObject(mesh);
+    this.modelDiag = Math.max(box.getSize(new THREE.Vector3()).length(), 1);
     if (reframe || !this.framed) {
       this.frameCamera(box);
       this.framed = true;
@@ -273,11 +283,12 @@ export class Viewport {
     this.controls.enabled = true;
   }
 
-  /** Remove the picked-face highlight overlay. */
+  /** Remove the picked-face/edge highlight overlay. */
   clearPick() {
     if (this.pickHighlight) {
       this.scene.remove(this.pickHighlight);
-      this.pickHighlight.geometry.dispose();
+      const g = (this.pickHighlight as THREE.Mesh).geometry;
+      if (g) g.dispose();
       this.pickHighlight = null;
     }
   }
@@ -355,6 +366,75 @@ export class Viewport {
     this.pickHighlight = hmesh;
 
     return { axis, offset: Math.round(offset * 100) / 100, tag: group.tag, centroid };
+  }
+
+  /**
+   * Ray-pick the feature EDGE nearest a screen point. Returns an Edge Select
+   * descriptor: the axis the edge runs along (→ vertical / horizontal-x/-y), or
+   * if it lies flat in a horizontal plane, `atZ` with that plane's offset.
+   */
+  pickEdge(clientX: number, clientY: number): { where: string; offset: number } | null {
+    if (!this.edgesObj || !this.mesh) return null;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    this.raycaster.setFromCamera(ndc, this.camera);
+    // Raycast the SOLID surface (reliable), then snap to the nearest feature
+    // edge — far more robust than trying to ray-hit a hairline directly.
+    const surf = this.raycaster.intersectObject(this.mesh, false)[0];
+    if (!surf) return null;
+    const p = surf.point;
+
+    const pos = this.edgesObj.geometry.getAttribute("position");
+    const va = new THREE.Vector3();
+    const vb = new THREE.Vector3();
+    const ab = new THREE.Vector3();
+    const ap = new THREE.Vector3();
+    const proj = new THREE.Vector3();
+    let best = Infinity;
+    let s = -1;
+    for (let i = 0; i < pos.count; i += 2) {
+      va.set(pos.getX(i), pos.getY(i), pos.getZ(i));
+      vb.set(pos.getX(i + 1), pos.getY(i + 1), pos.getZ(i + 1));
+      ab.subVectors(vb, va);
+      const len2 = ab.lengthSq() || 1e-9;
+      const t = Math.min(1, Math.max(0, ap.subVectors(p, va).dot(ab) / len2));
+      proj.copy(va).addScaledVector(ab, t);
+      const d = proj.distanceToSquared(p);
+      if (d < best) { best = d; s = i; }
+    }
+    if (s < 0 || Math.sqrt(best) > this.modelDiag * 0.25) return null;
+
+    const a = new THREE.Vector3(pos.getX(s), pos.getY(s), pos.getZ(s));
+    const b = new THREE.Vector3(pos.getX(s + 1), pos.getY(s + 1), pos.getZ(s + 1));
+    const dir = b.clone().sub(a).normalize();
+    const comp = [Math.abs(dir.x), Math.abs(dir.y), Math.abs(dir.z)];
+    const dom = comp[0] >= comp[1] && comp[0] >= comp[2] ? 0 : comp[1] >= comp[2] ? 1 : 2;
+
+    let where: string;
+    let offset = 0;
+    if (comp[dom] > 0.9) {
+      where = dom === 0 ? "horizontal-x" : dom === 1 ? "horizontal-y" : "vertical";
+    } else if (Math.abs(a.z - b.z) < 0.02 * this.modelDiag) {
+      where = "atZ"; // a curved/diagonal edge that stays in one horizontal plane
+      offset = (a.z + b.z) / 2;
+    } else {
+      where = "all";
+    }
+
+    // highlight: a bright tube along the picked edge segment
+    this.clearPick();
+    const marker = new THREE.Mesh(
+      new THREE.TubeGeometry(new THREE.LineCurve3(a, b), 1, Math.max(0.5, this.modelDiag * 0.008), 6, false),
+      new THREE.MeshBasicMaterial({ color: 0x39d98a, depthTest: false }),
+    );
+    marker.renderOrder = 999;
+    this.scene.add(marker);
+    this.pickHighlight = marker;
+
+    return { where, offset: Math.round(offset * 100) / 100 };
   }
 
   private onResize(container: HTMLElement) {

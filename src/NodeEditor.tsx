@@ -409,8 +409,9 @@ const nodeTypes = { geo: GeoNodeView, note: NoteView };
 export interface EditorApi {
   /** imperatively set a node param (used by the 3D gizmo to write tx/ty/tz) */
   setParam: (nodeId: string, name: string, value: unknown) => void;
-  /** add a Face Select node preconfigured from a viewport pick */
+  /** add a Face/Edge Select node preconfigured from a viewport pick */
   addFaceSelect: (where: string, offset: number) => void;
+  addEdgeSelect: (where: string, offset: number) => void;
 }
 
 export interface NodeEditorProps {
@@ -716,31 +717,76 @@ export default function NodeEditor({
 
   const setOutput = useCallback((id: string) => setOutputId(id), []);
 
-  // create a Face Select node from a viewport pick (axis-aligned plane or curved)
-  const addFaceSelect = useCallback(
-    (where: string, offset: number) => {
-      const id = newId("faceSelect");
+  // create a Face/Edge Select node from a viewport pick, and — if the currently
+  // viewed node is a fillet/bevel/shell with an empty selection port of the
+  // matching kind — auto-wire the new selector straight into it.
+  const addSelectFromPick = useCallback(
+    (kind: "face" | "edge", where: string, offset: number) => {
+      const nodeType = kind === "face" ? "faceSelect" : "edgeSelect";
+      const id = newId(nodeType);
       const params: Record<string, unknown> = {};
-      for (const p of NODE_SPECS.faceSelect.params) params[p.name] = p.default;
+      for (const p of NODE_SPECS[nodeType].params) params[p.name] = p.default;
       params.where = where;
       params.offset = offset;
-      setNodes((prev) => {
-        const anchor = prev.find((n) => n.id === outputId) ?? prev[prev.length - 1];
-        const position = anchor
-          ? { x: anchor.position.x + 60, y: anchor.position.y + 160 }
-          : { x: 80, y: 220 };
-        return [
-          ...prev.map((n) => ({ ...n, selected: false })),
-          { id, type: "geo", position, selected: true, data: { nodeType: "faceSelect", params } },
-        ];
-      });
+
+      const CONSUMERS: Record<string, { port: string; need: "face" | "edge" }> = {
+        fillet: { port: "sel", need: "edge" },
+        bevel: { port: "sel", need: "edge" },
+        shell: { port: "faces", need: "face" },
+      };
+      const consumerOf = (n: GeoNode | undefined) =>
+        n && !n.data.component ? CONSUMERS[n.data.nodeType] : undefined;
+      const portFree = (nid: string, port: string) =>
+        !edges.some((e) => e.target === nid && e.targetHandle === port);
+
+      // Auto-wire target: the viewed node if it's a matching consumer with a free
+      // port; otherwise a consumer directly downstream of the viewed node (you
+      // pick edges on the sharp base body and they feed its fillet/shell). In the
+      // latter case, switch the view to the consumer so the result is shown.
+      const viewed = nodes.find((n) => n.id === outputId);
+      let wire: { target: string; port: string } | null = null;
+      let switchView: string | null = null;
+      const vc = consumerOf(viewed);
+      if (viewed && vc && vc.need === kind && portFree(viewed.id, vc.port)) {
+        wire = { target: viewed.id, port: vc.port };
+      } else {
+        for (const n of nodes) {
+          const c = consumerOf(n);
+          if (!c || c.need !== kind || !portFree(n.id, c.port)) continue;
+          const feedsFromViewed = edges.some(
+            (e) => e.target === n.id && e.targetHandle === "in" && e.source === outputId,
+          );
+          if (feedsFromViewed) { wire = { target: n.id, port: c.port }; switchView = n.id; break; }
+        }
+      }
+
+      const anchor = viewed ?? nodes[nodes.length - 1];
+      const position = anchor
+        ? { x: anchor.position.x - 30, y: anchor.position.y + 190 }
+        : { x: 80, y: 220 };
+      setNodes((prev) => [
+        ...prev.map((n) => ({ ...n, selected: false })),
+        { id, type: "geo", position, selected: true, data: { nodeType, params } },
+      ]);
+      if (wire) {
+        setEdges((es) =>
+          addEdge(
+            { source: id, sourceHandle: "out", target: wire.target, targetHandle: wire.port, style: { stroke: SOCKET_COLORS.selection } },
+            es,
+          ),
+        );
+        if (switchView) setOutputId(switchView);
+      }
     },
-    [outputId, setNodes],
+    [nodes, edges, outputId, setNodes, setEdges],
   );
 
+  const addFaceSelect = useCallback((where: string, offset: number) => addSelectFromPick("face", where, offset), [addSelectFromPick]);
+  const addEdgeSelect = useCallback((where: string, offset: number) => addSelectFromPick("edge", where, offset), [addSelectFromPick]);
+
   useEffect(() => {
-    onReady?.({ setParam, addFaceSelect });
-  }, [onReady, setParam, addFaceSelect]);
+    onReady?.({ setParam, addFaceSelect, addEdgeSelect });
+  }, [onReady, setParam, addFaceSelect, addEdgeSelect]);
 
   const onConnect = useCallback(
     (c: Connection) => {

@@ -41,25 +41,29 @@ export default function App() {
   const [status, setStatus] = useState("initialising kernels…");
   const [graphError, setGraphError] = useState<{ nodeId?: string; message: string } | null>(null);
   const [graphValues, setGraphValues] = useState<Record<string, string>>({});
-  const [pickMode, setPickMode] = useState(false);
+  const [pickMode, setPickMode] = useState<"face" | "edge" | null>(null);
 
-  // click a face in the viewport (pick mode) → a preconfigured Face Select node
+  // click in the viewport (pick mode) → a preconfigured Face/Edge Select node
   const onViewportClick = useCallback(
     (e: React.MouseEvent) => {
       if (!pickMode) return;
-      const pick = viewportRef.current?.pickFace(e.clientX, e.clientY);
-      if (!pick) {
-        setStatus("pick: no face under the cursor");
-        return;
+      if (pickMode === "face") {
+        const pick = viewportRef.current?.pickFace(e.clientX, e.clientY);
+        if (!pick) { setStatus("pick: no face under the cursor"); return; }
+        const where = pick.axis === "curved" ? "cylindrical" : `at${pick.axis}`;
+        editorApi.current?.addFaceSelect(where, pick.offset);
+        setStatus(
+          pick.axis === "curved"
+            ? "picked a curved face → Face Select (cylindrical)"
+            : `picked ${pick.tag} face at ${pick.axis}=${pick.offset} → Face Select (at${pick.axis})`,
+        );
+      } else {
+        const pick = viewportRef.current?.pickEdge(e.clientX, e.clientY);
+        if (!pick) { setStatus("pick: no edge near the cursor"); return; }
+        editorApi.current?.addEdgeSelect(pick.where, pick.offset);
+        setStatus(`picked edge → Edge Select (${pick.where}${pick.where === "atZ" ? ` @${pick.offset}` : ""})`);
       }
-      const where = pick.axis === "curved" ? "cylindrical" : `at${pick.axis}`;
-      editorApi.current?.addFaceSelect(where, pick.offset);
-      setStatus(
-        pick.axis === "curved"
-          ? "picked a curved/cylindrical face → Face Select (cylindrical)"
-          : `picked ${pick.tag} face at ${pick.axis}=${pick.offset} → Face Select (at${pick.axis})`,
-      );
-      setPickMode(false);
+      setPickMode(null);
     },
     [pickMode],
   );
@@ -175,13 +179,22 @@ export default function App() {
         }}
       />
       <div className={`viewport${pickMode ? " viewport--pick" : ""}`} ref={mountRef} onClick={onViewportClick}>
-        <button
-          className={`vp-pick${pickMode ? " vp-pick--on" : ""}`}
-          onClick={(e) => { e.stopPropagation(); setPickMode((v) => !v); }}
-          title="Pick a face in the viewport → creates a Face Select node"
-        >
-          🎯 {pickMode ? "Click a face…" : "Pick face"}
-        </button>
+        <div className="vp-picks">
+          <button
+            className={`vp-pick${pickMode === "face" ? " vp-pick--on" : ""}`}
+            onClick={(e) => { e.stopPropagation(); setPickMode((v) => (v === "face" ? null : "face")); }}
+            title="Pick a face in the viewport → creates a Face Select node (auto-wires into the viewed fillet/shell)"
+          >
+            🎯 {pickMode === "face" ? "Click a face…" : "Pick face"}
+          </button>
+          <button
+            className={`vp-pick${pickMode === "edge" ? " vp-pick--on" : ""}`}
+            onClick={(e) => { e.stopPropagation(); setPickMode((v) => (v === "edge" ? null : "edge")); }}
+            title="Pick an edge in the viewport → creates an Edge Select node (auto-wires into the viewed fillet/bevel)"
+          >
+            📐 {pickMode === "edge" ? "Click an edge…" : "Pick edge"}
+          </button>
+        </div>
         <div className="statusbar">{status}</div>
       </div>
     </div>

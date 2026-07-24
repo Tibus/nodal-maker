@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "title": "Viewport picking demo — 📐 Pick edge on the box; it feeds the fillet",
+  "outputId": "block",
+  "nodes": [
+    {
+      "id": "block",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "box",
+        "params": {
+          "x": 44,
+          "y": 44,
+          "z": 22
+        }
+      }
+    },
+    {
+      "id": "round",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "fillet",
+        "params": {
+          "radius": 3
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "block",
+      "sourceHandle": "out",
+      "target": "round",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    }
+  ]
+}

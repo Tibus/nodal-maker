@@ -646,6 +646,18 @@ const scenes: Scene[] = [
     ],
   },
   {
+    name: "pick-fillet-demo",
+    title: "Viewport picking demo — 📐 Pick edge on the box; it feeds the fillet",
+    outputId: "block",
+    expect: "solid",
+    nodes: [
+      { id: "block", type: "box", params: { x: 44, y: 44, z: 22 } },
+      // no `sel` wired → fillets all edges; pick an edge in the viewport to
+      // auto-wire an Edge Select here and restrict it.
+      { id: "round", type: "fillet", inputs: { in: "block" }, params: { radius: 3 } },
+    ],
+  },
+  {
     name: "raised-pad",
     title: "Selection follows transform — a lifted block filleted via move#topEdges",
     outputId: "round",
