@@ -113,6 +113,29 @@ button.link {
 .palette__node:hover { background: #2a2e36; border-color: #ff8c42; }
 .palette__hint { color: #6a6f78; font-size: 10px; padding: 6px 8px; border-top: 1px solid #2a2e36; }
 .editor__canvas { flex: 1; position: relative; min-width: 0; background: #16181d; }
+
+/* history timeline (Fusion-style) — one chip per node, in creation order */
+.timeline {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 6;
+  display: flex; gap: 4px; align-items: center;
+  padding: 6px 8px;
+  background: rgba(18, 20, 26, 0.92); border-top: 1px solid #2a2e36;
+  overflow-x: auto; overflow-y: hidden;
+}
+.timeline::-webkit-scrollbar { height: 7px; }
+.timeline::-webkit-scrollbar-thumb { background: #3a3f48; border-radius: 4px; }
+.tl__item {
+  flex: none; width: 30px; height: 30px; border-radius: 6px;
+  background: #1e2127; border: 1px solid #3a3f48; color: #b8bdc6;
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; padding: 0; font-size: 15px; line-height: 1;
+}
+.tl__item:hover { border-color: #ff8c42; color: #e6e8ec; }
+.tl__item--active {
+  background: #ff8c42; color: #141414; border-color: #ff8c42;
+  box-shadow: 0 0 0 2px rgba(255, 140, 66, 0.35);
+}
+.tl__icon { line-height: 1; }
 .editor__canvas .react-flow { position: absolute; inset: 0; }
 
 /* quick-add menu (double-click canvas) */

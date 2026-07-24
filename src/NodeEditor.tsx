@@ -54,6 +54,23 @@ type GeoNode = Node<GeoData>;
  * kernel. Each re-exposes the selection ports of whatever feeds its `in` port. */
 const FORWARD_SEL = new Set(["transform", "scale3d", "mirror3d", "rotate3d"]);
 
+/** Compact glyph per node type for the history timeline (Fusion-style). */
+const NODE_ICON: Record<string, string> = {
+  numberValue: "#", textValue: "T", math: "∑", mathUnary: "ƒ", clamp: "⊓", remap: "↔", random: "?",
+  rect: "▭", circle: "◯", ellipse: "⬭", polygon: "⬠", star: "★", slot: "▬", gear: "⚙",
+  fingerBox: "⊟", svgInput: "✎", textToSvg: "T",
+  offset2d: "⊙", kerf: "╎", fillet2d: "◜", bevel2d: "◹", boolean2d: "⊕", mirror2d: "⇋",
+  transform2d: "✥", arrayLinear2d: "⋯", arrayRadial2d: "❋", group: "⊞", scoreCut: "✂",
+  box: "◼", cylinder: "⬢", sphere: "●", cone: "▲", torus: "◎",
+  extrude: "⇧", revolve: "↻", loft: "⏛", loftSections: "≣", sweep: "∿", bossOnCap: "⊤",
+  transform: "✥", rotate3d: "⟳", scale3d: "⤢", mirror3d: "⇋", fillet: "◜", bevel: "◹",
+  shell: "◫", boolean3d: "⊖", arrayLinear3d: "⋯", arrayRadial3d: "❋",
+  edgeSelect: "╱", faceSelect: "▱",
+  tessellate: "△", importSTL: "⇩", repair: "✚", boolean: "⊖", transformMesh: "✥",
+  convexHull: "⬡", minkowski: "⊚", decimate: "▽", subdivide: "◈",
+};
+const nodeIcon = (type: string, isComponent: boolean) => (isComponent ? "⧉" : (NODE_ICON[type] ?? "◆"));
+
 type SelOut = { name: string; target: "face" | "edge" };
 
 interface EditorCtx {
@@ -1138,8 +1155,8 @@ export default function NodeEditor({
             proOptions={{ hideAttribution: true }}
           >
             <Background color="#2a2e36" gap={18} />
-            <Controls />
-            <MiniMap pannable zoomable className="editor__minimap" />
+            <Controls position="top-left" />
+            <MiniMap pannable zoomable className="editor__minimap" position="top-right" />
           </ReactFlow>
         </Ctx.Provider>
 
@@ -1168,6 +1185,34 @@ export default function NodeEditor({
             </div>
           </>
         )}
+
+        {/* history timeline (Fusion-style): one chip per node in creation order;
+            click to view that node — the "history level" — and select it. */}
+        <div className="timeline" title="History — click a step to view it">
+          {nodes
+            .filter((n) => !isNote(n))
+            .map((n) => {
+              const active = n.id === outputId;
+              const isComp = !!n.data.component;
+              const label = isComp
+                ? (components[n.data.component!]?.name ?? "Component")
+                : (NODE_SPECS[n.data.nodeType]?.label ?? n.data.nodeType);
+              return (
+                <button
+                  key={n.id}
+                  className={`tl__item${active ? " tl__item--active" : ""}`}
+                  title={label}
+                  onClick={() => {
+                    setOutputId(n.id);
+                    setNodes((ns) => ns.map((x) => ({ ...x, selected: x.id === n.id })));
+                    rf.current?.fitView({ nodes: [{ id: n.id }], duration: 300, maxZoom: 1.2 });
+                  }}
+                >
+                  <span className="tl__icon">{nodeIcon(n.data.nodeType, isComp)}</span>
+                </button>
+              );
+            })}
+        </div>
       </div>
     </div>
   );
