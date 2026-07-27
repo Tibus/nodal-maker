@@ -278,4 +278,11 @@ button.link {
 .gnode__row .react-flow__handle-left { left: -12px; top: 50%; }
 .gnode__row .react-flow__handle-right { right: -12px; top: 50%; }
 .gnode__row--out { justify-content: flex-end; }
+/* selection-outputs accordion */
+.gnode__selgroup { display: flex; flex-direction: column; border-top: 1px solid #2a2e36; margin-top: 4px; padding-top: 4px; }
+.gnode__selhd {
+  background: none; border: 0; color: #8a8f98; text-align: right; font-size: 10px;
+  font-weight: 600; padding: 2px 2px 4px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.3px;
+}
+.gnode__selhd:hover { color: #d19a66; }
 .gnode__portlabel--r { text-align: right; }

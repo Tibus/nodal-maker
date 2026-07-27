@@ -44,7 +44,7 @@ import {
   type BooleanOp,
   type MeshData,
 } from "./manifold";
-import { parseBinarySTL } from "./stl";
+import { parseBinarySTL, writeBinarySTL } from "./stl";
 
 /* ------------------------------------------------------------------ */
 /* Typed values that travel along the graph edges                      */
@@ -556,6 +556,36 @@ function expectMesh(v: GraphValue | undefined, node: string): MeshData {
   if (!v || v.kind !== "mesh")
     throw new Error(`[${node}] expected a mesh input, got ${v?.kind ?? "nothing"}`);
   return v.mesh;
+}
+
+let stlCounter = 0;
+/** Sew a triangle mesh into a B-rep solid (via OCCT's STL reader, like replicad's
+ * importSTL). The result is a FACETED solid — one face per triangle after merging
+ * coplanar ones — so it's heavy for downstream CAD ops; use deliberately (e.g. to
+ * STEP-export a mesh, or feed a mesh into a solid Boolean). */
+function meshToSolidSync(md: MeshData): Shape3D {
+  const oc = getOC() as unknown as {
+    FS: { writeFile: (p: string, d: Uint8Array) => void; unlink: (p: string) => void };
+    StlAPI_Reader: new () => { Read: (shell: unknown, name: string) => boolean };
+    TopoDS_Shell: new () => unknown;
+    ShapeUpgrade_UnifySameDomain_2: new (s: unknown, a: boolean, b: boolean, c: boolean) => { Build: () => void; Shape: () => unknown };
+    BRepBuilderAPI_MakeSolid_1: new () => { Add: (s: unknown) => void; Solid: () => unknown };
+    TopoDS: { Shell_1: (s: unknown) => unknown };
+  };
+  const name = `mesh_${stlCounter++}.stl`;
+  oc.FS.writeFile(`/${name}`, writeBinarySTL(md));
+  try {
+    const reader = new oc.StlAPI_Reader();
+    const shell = new oc.TopoDS_Shell();
+    if (!reader.Read(shell, name)) throw new Error("[meshToSolid] STL read failed");
+    const up = new oc.ShapeUpgrade_UnifySameDomain_2(shell, true, true, false);
+    up.Build();
+    const mk = new oc.BRepBuilderAPI_MakeSolid_1();
+    mk.Add(oc.TopoDS.Shell_1(up.Shape()));
+    return cast(mk.Solid() as Parameters<typeof cast>[0]) as Shape3D;
+  } finally {
+    try { oc.FS.unlink(`/${name}`); } catch { /* already gone */ }
+  }
 }
 
 /** B-rep → mesh: tessellate a solid into a plain triangle payload. */
@@ -1171,6 +1201,12 @@ const REGISTRY: Record<string, NodeImpl> = {
   repair: (inputs) => {
     const mesh = expectMesh(inputs.in, "repair");
     return { kind: "mesh", mesh: repairMesh(mesh).mesh };
+  },
+  /** Sew a mesh into a B-rep solid — deliberate, faceted, and heavy. Use to feed
+   * a mesh (e.g. a Thread) into the solid pipeline or to STEP-export it. */
+  meshToSolid: (inputs) => {
+    const mesh = expectMesh(inputs.in, "meshToSolid");
+    return { kind: "solid", solid: meshToSolidSync(mesh) };
   },
 
   /**

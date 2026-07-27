@@ -283,12 +283,14 @@ export class Viewport {
     this.controls.enabled = true;
   }
 
-  /** Remove the picked-face/edge highlight overlay. */
+  /** Remove the picked-face/edge/border highlight overlay. */
   clearPick() {
     if (this.pickHighlight) {
       this.scene.remove(this.pickHighlight);
-      const g = (this.pickHighlight as THREE.Mesh).geometry;
-      if (g) g.dispose();
+      this.pickHighlight.traverse((o) => {
+        const g = (o as THREE.Mesh).geometry;
+        if (g) g.dispose();
+      });
       this.pickHighlight = null;
     }
   }
@@ -303,16 +305,23 @@ export class Viewport {
    * reusing the pick detection. `border` highlights the flat face whose rim
    * would be taken. Returns true when something is under the cursor. */
   hoverHighlight(mode: "face" | "edge" | "border", clientX: number, clientY: number): boolean {
-    const hit = mode === "edge" ? this.pickEdge(clientX, clientY) : this.pickFace(clientX, clientY);
+    const hit =
+      mode === "edge" ? this.pickEdge(clientX, clientY)
+      : mode === "border" ? this.pickBorder(clientX, clientY)
+      : this.pickFace(clientX, clientY);
     if (!hit) this.clearPick(); // moved off the model → drop the stale highlight
     return hit != null;
   }
 
-  pickFace(clientX: number, clientY: number): {
+  /** Raycast a face and describe it (no highlight). Shared by pickFace/pickBorder. */
+  private detectFace(clientX: number, clientY: number): {
     axis: "X" | "Y" | "Z" | "curved";
     offset: number;
     tag: FaceTag;
     centroid: [number, number, number];
+    group: { start: number; count: number };
+    min: number[];
+    max: number[];
   } | null {
     if (!this.mesh || !this.payload) return null;
     const rect = this.renderer.domElement.getBoundingClientRect();
@@ -324,12 +333,10 @@ export class Viewport {
     const hit = this.raycaster.intersectObject(this.mesh, false)[0];
     if (!hit || hit.faceIndex == null) return null;
 
-    // which draw group (= one B-rep / mesh face) owns the hit triangle?
     const idx = hit.faceIndex * 3;
     const group = this.payload.groups.find((g) => idx >= g.start && idx < g.start + g.count);
     if (!group) return null;
 
-    // average the group's vertex normals + gather its coordinate extents
     const { vertices, normals, indices } = this.payload;
     const n = new THREE.Vector3();
     let cx = 0, cy = 0, cz = 0, count = 0;
@@ -349,21 +356,31 @@ export class Viewport {
     n.normalize();
     const centroid: [number, number, number] = [cx / count, cy / count, cz / count];
 
-    // dominant axis of the face normal → the plane it lies in, if flat
     const comp = [Math.abs(n.x), Math.abs(n.y), Math.abs(n.z)];
     const dom = comp[0] >= comp[1] && comp[0] >= comp[2] ? 0 : comp[1] >= comp[2] ? 1 : 2;
-    const spread = max[dom] - min[dom]; // ~0 for a plane perpendicular to `dom`
+    const spread = max[dom] - min[dom];
     const diag = Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
     const flat = comp[dom] > 0.9 && spread < Math.max(0.05, diag * 0.02);
     const axis = flat ? (["X", "Y", "Z"] as const)[dom] : "curved";
     const offset = flat ? centroid[dom] : 0;
+    return { axis, offset: Math.round(offset * 100) / 100, tag: group.tag, centroid, group, min, max };
+  }
 
-    // highlight the picked group's triangles
+  pickFace(clientX: number, clientY: number): {
+    axis: "X" | "Y" | "Z" | "curved";
+    offset: number;
+    tag: FaceTag;
+    centroid: [number, number, number];
+  } | null {
+    const f = this.detectFace(clientX, clientY);
+    if (!f) return null;
+    const { vertices, indices } = this.payload!;
+    // highlight the picked face's triangles (translucent fill)
     this.clearPick();
     const hgeom = new THREE.BufferGeometry();
-    const pos = new Float32Array(group.count * 3);
-    for (let i = 0; i < group.count; i++) {
-      const v = indices[group.start + i] * 3;
+    const pos = new Float32Array(f.group.count * 3);
+    for (let i = 0; i < f.group.count; i++) {
+      const v = indices[f.group.start + i] * 3;
       pos[i * 3] = vertices[v]; pos[i * 3 + 1] = vertices[v + 1]; pos[i * 3 + 2] = vertices[v + 2];
     }
     hgeom.setAttribute("position", new THREE.BufferAttribute(pos, 3));
@@ -374,8 +391,48 @@ export class Viewport {
     hmesh.renderOrder = 999;
     this.scene.add(hmesh);
     this.pickHighlight = hmesh;
+    return { axis: f.axis, offset: f.offset, tag: f.tag, centroid: f.centroid };
+  }
 
-    return { axis, offset: Math.round(offset * 100) / 100, tag: group.tag, centroid };
+  /**
+   * Pick a flat face and highlight its BORDER — the feature edges lying in the
+   * face's plane, within its extent — rather than the face fill. Returns the
+   * plane (axis + offset) so an Edge Select can target that rim.
+   */
+  pickBorder(clientX: number, clientY: number): { axis: "X" | "Y" | "Z"; offset: number } | null {
+    const f = this.detectFace(clientX, clientY);
+    if (!f || f.axis === "curved" || !this.edgesObj) return null;
+    const ai = f.axis === "X" ? 0 : f.axis === "Y" ? 1 : 2;
+    const pos = this.edgesObj.geometry.getAttribute("position");
+    const epsPlane = Math.max(0.05, this.modelDiag * 0.004);
+    const pad = this.modelDiag * 0.02;
+    const inFace = (x: number, y: number, z: number) => {
+      const p = [x, y, z];
+      for (let a = 0; a < 3; a++) if (a !== ai && (p[a] < f.min[a] - pad || p[a] > f.max[a] + pad)) return false;
+      return Math.abs(p[ai] - f.offset) <= epsPlane;
+    };
+    // collect border segments (both endpoints in the face's plane + extent)
+    const segs: number[] = [];
+    for (let i = 0; i < pos.count; i += 2) {
+      const ax = pos.getX(i), ay = pos.getY(i), az = pos.getZ(i);
+      const bx = pos.getX(i + 1), by = pos.getY(i + 1), bz = pos.getZ(i + 1);
+      if (inFace(ax, ay, az) && inFace(bx, by, bz)) segs.push(ax, ay, az, bx, by, bz);
+    }
+    this.clearPick();
+    if (segs.length === 0) return { axis: f.axis, offset: f.offset }; // plane known even if no edge drawn
+    const r = Math.max(0.4, this.modelDiag * 0.006);
+    const group = new THREE.Group();
+    const mat = new THREE.MeshBasicMaterial({ color: 0x39d98a, depthTest: false });
+    for (let i = 0; i < segs.length; i += 6) {
+      const a = new THREE.Vector3(segs[i], segs[i + 1], segs[i + 2]);
+      const b = new THREE.Vector3(segs[i + 3], segs[i + 4], segs[i + 5]);
+      const tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(a, b), 1, r, 5, false), mat);
+      tube.renderOrder = 999;
+      group.add(tube);
+    }
+    this.scene.add(group);
+    this.pickHighlight = group;
+    return { axis: f.axis, offset: f.offset };
   }
 
   /**

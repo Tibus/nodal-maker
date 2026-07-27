@@ -69,7 +69,7 @@ const NODE_ICON: Record<string, string> = {
   transform: "✥", rotate3d: "⟳", scale3d: "⤢", mirror3d: "⇋", fillet: "◜", bevel: "◹",
   shell: "◫", boolean3d: "⊖", arrayLinear3d: "⋯", arrayRadial3d: "❋",
   edgeSelect: "╱", faceSelect: "▱",
-  tessellate: "△", importSTL: "⇩", repair: "✚", boolean: "⊖", transformMesh: "✥",
+  tessellate: "△", meshToSolid: "◆", importSTL: "⇩", repair: "✚", boolean: "⊖", transformMesh: "✥",
   convexHull: "⬡", minkowski: "⊚", decimate: "▽", subdivide: "◈",
 };
 const nodeIcon = (type: string, isComponent: boolean) => (isComponent ? "⧉" : (NODE_ICON[type] ?? "◆"));
@@ -91,6 +91,8 @@ interface EditorCtx {
   setOutput: (id: string) => void;
   setParam: (id: string, name: string, value: unknown) => void;
   isLinked: (nodeId: string, port: string) => boolean;
+  /** is a source handle (e.g. a selection output) currently wired to something? */
+  isSourceLinked: (nodeId: string, handle: string) => boolean;
   errorNodeId: string | null;
   errorMessage: string | null;
   valueOf: (nodeId: string) => string | undefined;
@@ -118,6 +120,7 @@ function handleType(nodeType: string, handle: string): SocketType | undefined {
 
 function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
   const ctx = useContext(Ctx)!;
+  const [selOpen, setSelOpen] = useState(false); // selection-outputs accordion
   // hover handlers for a port handle → socket-type tooltip
   const tipH = (t: SocketType) => ({
     onMouseEnter: (e: React.MouseEvent) => ctx.setPortTip({ type: t, x: e.clientX, y: e.clientY }),
@@ -205,27 +208,42 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
           );
         })}
 
-        {/* exposed selection outputs (cap / sides / edges…) on the right —
-            forward-nodes re-expose their input's ports so picks track geometry */}
-        {ctx.selOutputs(id).map((so) => {
+        {/* exposed selection outputs (cap / sides / edges…), tucked into a
+            collapsible accordion so they're out of the way until needed.
+            Connected ports stay rendered even when collapsed (keeps the wire). */}
+        {(() => {
           const t: SocketType = "selection";
+          const outs = ctx.selOutputs(id);
+          if (outs.length === 0) return null;
+          const shown = selOpen ? outs : outs.filter((so) => ctx.isSourceLinked(id, so.name));
           return (
-            <div className="gnode__row gnode__row--out" key={`so-${so.name}`}>
-              <span className="gnode__portlabel gnode__portlabel--r" style={{ color: SOCKET_COLORS[t] }}>
-                {so.name} ▶
-              </span>
-              <Handle
-                id={so.name}
-                type="source"
-                position={Position.Right}
-                className="rf-port rf-port--req"
-                style={{ background: SOCKET_COLORS[t] }}
-                title={`${so.name}: ${so.target} selection`}
-                {...tipH(t)}
-              />
+            <div className="gnode__selgroup">
+              <button
+                className="gnode__selhd"
+                onClick={(e) => { e.stopPropagation(); setSelOpen((v) => !v); }}
+                title="Show / hide this node's face & edge selection outputs"
+              >
+                {selOpen ? "▾" : "▸"} selections ({outs.length})
+              </button>
+              {shown.map((so) => (
+                <div className="gnode__row gnode__row--out" key={`so-${so.name}`}>
+                  <span className="gnode__portlabel gnode__portlabel--r" style={{ color: SOCKET_COLORS[t] }}>
+                    {so.name} ▶
+                  </span>
+                  <Handle
+                    id={so.name}
+                    type="source"
+                    position={Position.Right}
+                    className="rf-port rf-port--req"
+                    style={{ background: SOCKET_COLORS[t] }}
+                    title={`${so.name}: ${so.target} selection`}
+                    {...tipH(t)}
+                  />
+                </div>
+              ))}
             </div>
           );
-        })}
+        })()}
       </div>
 
       <Handle
@@ -1080,6 +1098,14 @@ export default function NodeEditor({
     [applyDoc],
   );
 
+  // which (source node, source handle) pairs drive an outgoing wire — lets the
+  // selection-outputs accordion keep connected ports visible when collapsed.
+  const sourceLinkedSet = useMemo(() => {
+    const s = new Set<string>();
+    for (const e of edges) if (e.sourceHandle) s.add(`${e.source} ${e.sourceHandle}`);
+    return s;
+  }, [edges]);
+
   // which (node, port) targets currently have an incoming wire
   const linkedSet = useMemo(() => {
     const s = new Set<string>();
@@ -1162,9 +1188,10 @@ export default function NodeEditor({
       valueOf: (nodeId) => values?.[nodeId],
       componentDef: (defId) => components[defId],
       selOutputs: (nodeId) => selOutputsMap.get(nodeId) ?? [],
+      isSourceLinked: (nodeId, handle) => sourceLinkedSet.has(`${nodeId} ${handle}`),
       setPortTip,
     }),
-    [outputId, setOutput, setParam, linkedSet, errorNodeId, errorMessage, values, components, selOutputsMap],
+    [outputId, setOutput, setParam, linkedSet, sourceLinkedSet, errorNodeId, errorMessage, values, components, selOutputsMap],
   );
 
   const outType = NODE_SPECS[nodes.find((n) => n.id === outputId)?.data.nodeType ?? ""]?.output;

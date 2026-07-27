@@ -84,11 +84,10 @@ export default function App() {
       } else if (pickMode === "border") {
         // border = the edges bounding a picked FACE (its outline loop), i.e. an
         // Edge Select at that face's plane → chamfer/fillet a face's rim.
-        const pick = viewportRef.current?.pickFace(e.clientX, e.clientY);
-        if (!pick) { setStatus("pick: no face under the cursor"); return; }
-        if (pick.axis === "curved") { setStatus("border: pick a FLAT face (its rim lies in a plane)"); return; }
+        const pick = viewportRef.current?.pickBorder(e.clientX, e.clientY);
+        if (!pick) { setStatus("border: pick a FLAT face (its rim lies in a plane)"); return; }
         editorApi.current?.addEdgeSelect(`at${pick.axis}`, pick.offset);
-        setStatus(`picked border of ${pick.tag} face → Edge Select (at${pick.axis} @${pick.offset})`);
+        setStatus(`picked border → Edge Select (at${pick.axis} @${pick.offset})`);
       } else {
         const pick = viewportRef.current?.pickEdge(e.clientX, e.clientY);
         if (!pick) { setStatus("pick: no edge near the cursor"); return; }

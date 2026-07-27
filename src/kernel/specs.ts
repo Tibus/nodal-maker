@@ -124,6 +124,7 @@ export const NODE_DESCRIPTIONS: Record<string, string> = {
   tessellate: "Convert a B-rep solid to a triangle mesh (auto-inserted when needed).",
   importSTL: "Import a binary STL file as a mesh.",
   repair: "Weld a triangle soup into a clean manifold mesh.",
+  meshToSolid: "Sew a mesh into a B-rep solid (faceted, heavy). Use to STEP-export a Thread or feed it into a solid Boolean.",
   boolean: "Robust mesh boolean (union / difference / intersection) via Manifold.",
   transformMesh: "Move, rotate and scale a mesh.",
   convexHull: "The convex hull that wraps a mesh.",
@@ -141,7 +142,7 @@ export const NODE_CATEGORIES: { name: string; types: string[] }[] = [
   { name: "Sketch → Solid", types: ["extrude", "revolve", "loft", "loftSections", "sweep", "bossOnCap"] },
   { name: "3D Op", types: ["transform", "rotate3d", "scale3d", "mirror3d", "fillet", "bevel", "shell", "boolean3d", "arrayLinear3d", "arrayRadial3d"] },
   { name: "Selector", types: ["edgeSelect", "faceSelect"] },
-  { name: "Mesh", types: ["tessellate", "importSTL", "repair", "boolean", "transformMesh", "convexHull", "minkowski", "decimate", "subdivide"] },
+  { name: "Mesh", types: ["tessellate", "meshToSolid", "importSTL", "repair", "boolean", "transformMesh", "convexHull", "minkowski", "decimate", "subdivide"] },
 ];
 
 export const NODE_SPECS: Record<string, NodeSpec> = {
@@ -731,6 +732,15 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     label: "Repair",
     inputs: [{ name: "in", type: "mesh" }],
     output: "mesh",
+    params: [],
+  },
+  meshToSolid: {
+    type: "meshToSolid",
+    label: "Mesh → Solid",
+    // sew a mesh into a B-rep solid (faceted, heavy) — e.g. to STEP-export a
+    // Thread or feed it into a solid Boolean.
+    inputs: [{ name: "in", type: "mesh" }],
+    output: "solid",
     params: [],
   },
   boolean: {
