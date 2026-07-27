@@ -1,24 +1,47 @@
 {
   "version": 1,
-  "title": "Threaded rod (3D print) — M20 × 2.5 ISO V-thread",
+  "title": "Threaded rod (3D print) — Thread modifier on a cylinder, M20 preset",
   "outputId": "rod",
   "nodes": [
     {
-      "id": "rod",
+      "id": "cyl",
       "position": {
         "x": 0,
         "y": 0
       },
       "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 10,
+          "height": 44
+        }
+      }
+    },
+    {
+      "id": "rod",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
         "nodeType": "thread",
         "params": {
-          "diameter": 20,
-          "pitch": 2.5,
-          "length": 40,
+          "standard": "M20",
           "hand": "right"
         }
       }
     }
   ],
-  "edges": []
+  "edges": [
+    {
+      "id": "e0",
+      "source": "cyl",
+      "sourceHandle": "out",
+      "target": "rod",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    }
+  ]
 }

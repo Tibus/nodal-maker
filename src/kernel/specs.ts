@@ -91,7 +91,7 @@ export const NODE_DESCRIPTIONS: Record<string, string> = {
   sphere: "A sphere of the given radius.",
   cone: "A cone from base radius + height.",
   torus: "A torus (donut) from major + minor radii.",
-  thread: "An external ISO V-thread rod. For a nut, subtract it from a block.",
+  thread: "Thread a cylinder (Fusion-style modifier). Pick a standard (M3…M24) or set a custom Ø/pitch; wire a cylinder to inherit its size. Outputs a mesh.",
   importSTEP: "Import a STEP file (what Fusion 360 / SolidWorks export) as an editable B-rep solid.",
   extrude: "Extrude a 2D profile into a solid. Exposes cap / bottom / side edges.",
   revolve: "Revolve a profile around the Z axis into a solid.",
@@ -395,14 +395,17 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
   },
   thread: {
     type: "thread",
-    label: "Thread (rod)",
-    // external ISO V-thread rod. For a nut, subtract this (matching pitch, +0.4mm
-    // diameter clearance) from a block with a Boolean 3D difference.
-    inputs: [],
-    output: "solid",
+    label: "Thread",
+    // Fusion-style thread modifier. Wire a cylinder into `in` to thread it (Ø +
+    // length read from the cylinder); a `standard` preset (M3…M24) fills the
+    // pitch. Standalone (no input) makes a threaded rod. Output is a mesh — a nut
+    // is a block minus this rod via the (fast) mesh Boolean.
+    inputs: [{ name: "in", type: "solid" }],
+    output: "mesh",
     params: [
-      { name: "diameter", kind: "number", label: "Ø major", default: 20, min: 3, max: 120, step: 0.5 },
-      { name: "pitch", kind: "number", default: 2.5, min: 0.4, max: 10, step: 0.05 },
+      { name: "standard", kind: "select", default: "M20", options: ["custom", "M2", "M2.5", "M3", "M4", "M5", "M6", "M8", "M10", "M12", "M14", "M16", "M20", "M24"] },
+      { name: "diameter", kind: "number", label: "Ø major (custom)", default: 20, min: 2, max: 120, step: 0.5 },
+      { name: "pitch", kind: "number", label: "pitch (custom)", default: 2.5, min: 0.3, max: 10, step: 0.05 },
       { name: "length", kind: "number", default: 30, min: 3, max: 300, step: 1 },
       { name: "hand", kind: "select", default: "right", options: ["right", "left"] },
     ],

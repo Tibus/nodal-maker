@@ -108,7 +108,7 @@ const REPS: Record<string, { graph: Graph; out: string }> = {
   sphere: { graph: [{ id: "n", type: "sphere", params: { radius: 18 } }], out: "n" },
   cone: { graph: [{ id: "n", type: "cone", params: { radius: 16, height: 28 } }], out: "n" },
   torus: { graph: [{ id: "n", type: "torus", params: { radius: 20, tube: 7 } }], out: "n" },
-  thread: { graph: [{ id: "n", type: "thread", params: { diameter: 20, pitch: 3, length: 26, hand: "right" } }], out: "n" },
+  thread: { graph: [{ id: "n", type: "thread", params: { standard: "M20", length: 24, hand: "right" } }], out: "n" },
   // sketch → solid
   extrude: { graph: [S("s"), { id: "n", type: "extrude", inputs: { in: "s" }, params: { height: 16 } }], out: "n" },
   revolve: { graph: [{ id: "s", type: "rect", params: { width: 12, height: 26, radius: 0 } }, { id: "p", type: "transform2d", inputs: { in: "s" }, params: { tx: 14, ty: 13, rotate: 0, scale: 1 } }, { id: "n", type: "revolve", inputs: { in: "p" }, params: { angle: 300 } }], out: "n" },

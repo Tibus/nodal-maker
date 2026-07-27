@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "title": "Bolt (3D print) — hex head + M16 threaded shank (mesh union)",
-  "outputId": "bolt",
+  "title": "Nut (3D print) — hex block minus an M16 thread (fast mesh Boolean)",
+  "outputId": "nut",
   "nodes": [
     {
       "id": "hex",
@@ -18,7 +18,7 @@
       }
     },
     {
-      "id": "head",
+      "id": "body",
       "position": {
         "x": 240,
         "y": 0
@@ -26,12 +26,12 @@
       "data": {
         "nodeType": "extrude",
         "params": {
-          "height": 8
+          "height": 13
         }
       }
     },
     {
-      "id": "headM",
+      "id": "bodyM",
       "position": {
         "x": 480,
         "y": 0
@@ -42,7 +42,7 @@
       }
     },
     {
-      "id": "shank",
+      "id": "cut",
       "position": {
         "x": 0,
         "y": 150
@@ -50,14 +50,16 @@
       "data": {
         "nodeType": "thread",
         "params": {
-          "standard": "M16",
-          "length": 40,
+          "standard": "custom",
+          "diameter": 16.5,
+          "pitch": 2,
+          "length": 17,
           "hand": "right"
         }
       }
     },
     {
-      "id": "shankUp",
+      "id": "cutDown",
       "position": {
         "x": 240,
         "y": 150
@@ -67,12 +69,12 @@
         "params": {
           "tx": 0,
           "ty": 0,
-          "tz": 8
+          "tz": -2
         }
       }
     },
     {
-      "id": "bolt",
+      "id": "nut",
       "position": {
         "x": 720,
         "y": 0
@@ -80,7 +82,7 @@
       "data": {
         "nodeType": "boolean",
         "params": {
-          "op": "union"
+          "op": "difference"
         }
       }
     }
@@ -90,7 +92,7 @@
       "id": "e0",
       "source": "hex",
       "sourceHandle": "out",
-      "target": "head",
+      "target": "body",
       "targetHandle": "in",
       "style": {
         "stroke": "#c678dd"
@@ -98,9 +100,9 @@
     },
     {
       "id": "e1",
-      "source": "head",
+      "source": "body",
       "sourceHandle": "out",
-      "target": "headM",
+      "target": "bodyM",
       "targetHandle": "in",
       "style": {
         "stroke": "#ff8c42"
@@ -108,9 +110,9 @@
     },
     {
       "id": "e2",
-      "source": "shank",
+      "source": "cut",
       "sourceHandle": "out",
-      "target": "shankUp",
+      "target": "cutDown",
       "targetHandle": "in",
       "style": {
         "stroke": "#56b6c2"
@@ -118,9 +120,9 @@
     },
     {
       "id": "e3",
-      "source": "headM",
+      "source": "bodyM",
       "sourceHandle": "out",
-      "target": "bolt",
+      "target": "nut",
       "targetHandle": "base",
       "style": {
         "stroke": "#56b6c2"
@@ -128,9 +130,9 @@
     },
     {
       "id": "e4",
-      "source": "shankUp",
+      "source": "cutDown",
       "sourceHandle": "out",
-      "target": "bolt",
+      "target": "nut",
       "targetHandle": "tool",
       "style": {
         "stroke": "#56b6c2"

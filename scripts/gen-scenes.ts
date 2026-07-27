@@ -10,6 +10,7 @@ import { mkdirSync, writeFileSync } from "fs";
 import { setOC } from "replicad";
 import { evalToPayload, type BuildResult } from "../src/kernel/model";
 import { NODE_SPECS, SOCKET_COLORS, type Graph, type NodeDescriptor } from "../src/kernel/nodes";
+import { setManifold } from "../src/kernel/manifold";
 
 const require = createRequire(import.meta.url);
 const wasmPath = require.resolve("replicad-opencascadejs/src/replicad_single.wasm");
@@ -19,6 +20,10 @@ const srcDir = dirname(wasmPath);
 (globalThis as Record<string, unknown>).__filename = `${srcDir}/replicad_single.js`;
 const { default: factory } = await import("replicad-opencascadejs/src/replicad_single.js");
 setOC((await factory({ locateFile: () => wasmPath })) as Parameters<typeof setOC>[0]);
+// Manifold — for mesh-domain scenes (threaded bolt/nut use the mesh Boolean)
+const mfWasm = require.resolve("manifold-3d/manifold.wasm");
+const { default: MFModule } = await import("manifold-3d");
+setManifold(await MFModule({ locateFile: () => mfWasm }));
 
 interface Scene {
   name: string;
@@ -647,24 +652,42 @@ const scenes: Scene[] = [
   },
   {
     name: "threaded-rod",
-    title: "Threaded rod (3D print) — M20 × 2.5 ISO V-thread",
+    title: "Threaded rod (3D print) — Thread modifier on a cylinder, M20 preset",
     outputId: "rod",
-    expect: "solid",
+    expect: "mesh",
     nodes: [
-      { id: "rod", type: "thread", params: { diameter: 20, pitch: 2.5, length: 40, hand: "right" } },
+      { id: "cyl", type: "cylinder", params: { radius: 10, height: 44 } },
+      // Thread modifier: reads Ø + length from the cylinder; M20 fills the pitch
+      { id: "rod", type: "thread", inputs: { in: "cyl" }, params: { standard: "M20", hand: "right" } },
     ],
   },
   {
     name: "threaded-bolt",
-    title: "Bolt (3D print) — hex head + M16 threaded shank",
+    title: "Bolt (3D print) — hex head + M16 threaded shank (mesh union)",
     outputId: "bolt",
-    expect: "solid",
+    expect: "mesh",
     nodes: [
       { id: "hex", type: "polygon", params: { radius: 14, sides: 6 } },
       { id: "head", type: "extrude", inputs: { in: "hex" }, params: { height: 8 } },
-      { id: "shank", type: "thread", params: { diameter: 16, pitch: 2, length: 40, hand: "right" } },
-      { id: "shankUp", type: "transform", inputs: { in: "shank" }, params: { tx: 0, ty: 0, tz: 8 } },
-      { id: "bolt", type: "boolean3d", inputs: { base: "head", tool: "shankUp" }, params: { op: "union" } },
+      { id: "headM", type: "tessellate", inputs: { in: "head" } },
+      { id: "shank", type: "thread", params: { standard: "M16", length: 40, hand: "right" } },
+      { id: "shankUp", type: "transformMesh", inputs: { in: "shank" }, params: { tx: 0, ty: 0, tz: 8 } },
+      { id: "bolt", type: "boolean", inputs: { base: "headM", tool: "shankUp" }, params: { op: "union" } },
+    ],
+  },
+  {
+    name: "threaded-nut",
+    title: "Nut (3D print) — hex block minus an M16 thread (fast mesh Boolean)",
+    outputId: "nut",
+    expect: "mesh",
+    nodes: [
+      { id: "hex", type: "polygon", params: { radius: 14, sides: 6 } },
+      { id: "body", type: "extrude", inputs: { in: "hex" }, params: { height: 13 } },
+      { id: "bodyM", type: "tessellate", inputs: { in: "body" } },
+      // subtract an M16 thread (+0.5 mm clearance) → internal mating thread
+      { id: "cut", type: "thread", params: { standard: "custom", diameter: 16.5, pitch: 2, length: 17, hand: "right" } },
+      { id: "cutDown", type: "transformMesh", inputs: { in: "cut" }, params: { tx: 0, ty: 0, tz: -2 } },
+      { id: "nut", type: "boolean", inputs: { base: "bodyM", tool: "cutDown" }, params: { op: "difference" } },
     ],
   },
   {

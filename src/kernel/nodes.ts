@@ -27,7 +27,6 @@ import {
   makeBaseBox,
   makeCylinder,
   makeSphere,
-  sketchHelix,
   getOC,
   cast,
 } from "replicad";
@@ -452,29 +451,80 @@ function fingerPanel(
   return polyDrawing(pts);
 }
 
+/** ISO metric coarse pitches (mm) keyed by nominal diameter designation. */
+export const THREAD_STANDARDS: Record<string, { diameter: number; pitch: number }> = {
+  M2: { diameter: 2, pitch: 0.4 },
+  "M2.5": { diameter: 2.5, pitch: 0.45 },
+  M3: { diameter: 3, pitch: 0.5 },
+  M4: { diameter: 4, pitch: 0.7 },
+  M5: { diameter: 5, pitch: 0.8 },
+  M6: { diameter: 6, pitch: 1.0 },
+  M8: { diameter: 8, pitch: 1.25 },
+  M10: { diameter: 10, pitch: 1.5 },
+  M12: { diameter: 12, pitch: 1.75 },
+  M14: { diameter: 14, pitch: 2.0 },
+  M16: { diameter: 16, pitch: 2.0 },
+  M20: { diameter: 20, pitch: 2.5 },
+  M24: { diameter: 24, pitch: 3.0 },
+};
+
+/** Trapezoidal ISO thread height field over one pitch: 0 at root, 1 at crest,
+ * crest centred at t=0.5. 60°-ish flanks with root/crest flats. Periodic. */
+function threadProfile(t: number): number {
+  const f = ((t % 1) + 1) % 1;
+  const a = 0.125, b = 0.4375, c = 0.5625, d = 0.875; // root-flat / flank / crest-flat / flank
+  if (f < a || f >= d) return 0;
+  if (f < b) return (f - a) / (b - a);
+  if (f < c) return 1;
+  return 1 - (f - c) / (d - c);
+}
+
 /**
- * External threaded rod (ISO-style V-thread). A helical spine (`sketchHelix`) is
- * swept with a truncated-triangle profile via OCCT's pipe sweep — fast and
- * radius-stable, unlike a raw `genericSweep` which fans the profile outward. The
- * ridge is fused onto a core cylinder. Handedness via `lefthand`.
- * For a nut / internal thread, subtract this rod (matching pitch) with a small
- * diameter clearance using a Boolean 3D difference.
+ * Procedural threaded-rod MESH (ISO-style V-thread). Built directly as a
+ * watertight height-field cylinder — the surface radius spirals between the
+ * minor and major diameter following the thread profile. Pure JS: clean,
+ * perfectly consistent, and fast (no OCCT sweep/boolean). Output is a mesh, so a
+ * nut is just a block minus this rod via the (fast, robust) Manifold boolean.
  */
-function buildThread(diameter: number, pitch: number, length: number, lefthand: boolean): Shape3D {
+function buildThreadMesh(diameter: number, pitch: number, length: number, lefthand: boolean): MeshData {
   const p = Math.max(0.2, pitch);
-  const depth = p * 0.6; // ISO thread height after truncation ≈ 0.61·pitch
-  const rMin = Math.max(0.2, diameter / 2 - depth);
-  const flat = p / 8;
-  // keep the ridge inside [0, length]: sweep a slightly shorter helix, raised ½p
-  const helixH = Math.max(p, length - p);
-  const helix = sketchHelix(p, helixH, rMin, [0, 0, p / 2], [0, 0, 1], lefthand);
-  // profile in the moving frame: local u = radial-outward, v = axial
-  const prof = draw([0, -p / 2]).lineTo([depth, -flat]).lineTo([depth, flat]).lineTo([0, p / 2]).close();
-  const sweeper = helix as unknown as { sweepSketch: (cb: (pl: unknown, o: unknown) => unknown) => Shape3D };
-  const placer = prof as unknown as { sketchOnPlane: (pl: unknown, o: unknown) => unknown };
-  const ridge = sweeper.sweepSketch((pl, o) => placer.sketchOnPlane(pl, o));
-  const core = makeCylinder(rMin + 0.01, length) as Shape3D;
-  return core.fuse(ridge) as Shape3D;
+  const depth = p * 0.613; // ISO truncated thread height ≈ 0.6134·p
+  const rMaj = Math.max(0.3, diameter / 2);
+  const rMin = Math.max(0.15, rMaj - depth);
+  const L = Math.max(p, length);
+  const dir = lefthand ? -1 : 1;
+  const N = Math.min(120, Math.max(40, Math.round(rMaj * 4))); // angular segments
+  const rows = Math.max(6, Math.round((L / p) * 12)); // axial segments (12 / pitch)
+  const dz = L / rows;
+
+  const verts: number[] = [];
+  const idx: number[] = [];
+  // surface grid: (rows+1) axial rings × N angular. Radius follows the thread.
+  for (let j = 0; j <= rows; j++) {
+    const z = j * dz;
+    for (let i = 0; i < N; i++) {
+      const phi = (2 * Math.PI * i) / N;
+      const phase = (z - dir * (p * phi) / (2 * Math.PI)) / p; // helical phase
+      const r = rMin + depth * threadProfile(phase);
+      verts.push(r * Math.cos(phi), r * Math.sin(phi), z);
+    }
+  }
+  const ring = N;
+  const at = (j: number, i: number) => j * ring + (i % N);
+  for (let j = 0; j < rows; j++) {
+    for (let i = 0; i < N; i++) {
+      const a = at(j, i), b = at(j, i + 1), c = at(j + 1, i), d = at(j + 1, i + 1);
+      idx.push(a, b, c, b, d, c); // two tris per quad — outward-facing winding
+    }
+  }
+  // centre vertices for the two flat end caps (wound to match the outward sides)
+  const cBot = verts.length / 3; verts.push(0, 0, 0);
+  const cTop = verts.length / 3; verts.push(0, 0, L);
+  for (let i = 0; i < N; i++) {
+    idx.push(cBot, at(0, i + 1), at(0, i)); // bottom fan (faces -Z)
+    idx.push(cTop, at(rows, i), at(rows, i + 1)); // top fan (faces +Z)
+  }
+  return { vertices: new Float32Array(verts), indices: new Uint32Array(idx) };
 }
 
 let stepCounter = 0;
@@ -745,15 +795,40 @@ const REGISTRY: Record<string, NodeImpl> = {
     kind: "solid",
     solid: makeSphere(Number(params.radius ?? 20)) as Shape3D,
   }),
-  thread: (_inputs, params) => ({
-    kind: "solid",
-    solid: buildThread(
-      Number(params.diameter ?? 20),
-      Number(params.pitch ?? 2.5),
-      Number(params.length ?? 30),
-      String(params.hand ?? "right") === "left",
-    ),
-  }),
+  // Thread MODIFIER (Fusion-style): thread a cylinder. With an input solid/mesh,
+  // the major diameter and length are read from its bounding box; a `standard`
+  // preset (M3…M24) fills the pitch. Output is a mesh (clean helical thread).
+  thread: (inputs, params) => {
+    const std = String(params.standard ?? "custom");
+    const preset = THREAD_STANDARDS[std];
+    let diameter = Number(params.diameter ?? 20);
+    let length = Number(params.length ?? 30);
+    const pitch = preset ? preset.pitch : Number(params.pitch ?? 2.5);
+
+    // modifier mode: size from the incoming cylinder's bounds
+    const src = inputs.in;
+    if (src) {
+      let lo: number[], hi: number[];
+      if (src.kind === "solid") {
+        [lo, hi] = src.solid.boundingBox.bounds;
+      } else if (src.kind === "mesh") {
+        lo = [Infinity, Infinity, Infinity]; hi = [-Infinity, -Infinity, -Infinity];
+        const vs = src.mesh.vertices;
+        for (let i = 0; i < vs.length; i += 3) for (let a = 0; a < 3; a++) {
+          lo[a] = Math.min(lo[a], vs[i + a]); hi[a] = Math.max(hi[a], vs[i + a]);
+        }
+      } else {
+        throw new Error("[thread] input must be a cylinder solid or mesh");
+      }
+      diameter = Math.max(hi[0] - lo[0], hi[1] - lo[1]);
+      length = hi[2] - lo[2];
+    } else if (preset) {
+      diameter = preset.diameter; // standalone + preset → nominal Ø
+    }
+
+    const mesh = buildThreadMesh(diameter, pitch, length, String(params.hand ?? "right") === "left");
+    return { kind: "mesh", mesh };
+  },
   cone: (_inputs, params) => {
     const r = Number(params.radius ?? 15);
     const h = Number(params.height ?? 30);
