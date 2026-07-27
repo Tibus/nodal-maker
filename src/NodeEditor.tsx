@@ -64,7 +64,7 @@ const NODE_ICON: Record<string, string> = {
   fingerBox: "⊟", svgInput: "✎", textToSvg: "T",
   offset2d: "⊙", kerf: "╎", fillet2d: "◜", bevel2d: "◹", boolean2d: "⊕", mirror2d: "⇋",
   transform2d: "✥", arrayLinear2d: "⋯", arrayRadial2d: "❋", group: "⊞", scoreCut: "✂",
-  box: "◼", cylinder: "⬢", sphere: "●", cone: "▲", torus: "◎", thread: "⛊", importSTEP: "⇩",
+  box: "◼", cylinder: "⬢", sphere: "●", cone: "▲", torus: "◎", thread: "⛊", internalThread: "⊙", importSTEP: "⇩",
   extrude: "⇧", revolve: "↻", loft: "⏛", loftSections: "≣", sweep: "∿", bossOnCap: "⊤",
   transform: "✥", rotate3d: "⟳", scale3d: "⤢", mirror3d: "⇋", fillet: "◜", bevel: "◹",
   shell: "◫", boolean3d: "⊖", assemble: "⧉", arrayLinear3d: "⋯", arrayRadial3d: "❋",

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "title": "Nut (3D print) — hex block minus an M16 thread (fast mesh Boolean)",
+  "title": "Nut — hex prism with an internal M16 thread (Internal thread node, mesh)",
   "outputId": "nut",
   "nodes": [
     {
@@ -31,58 +31,17 @@
       }
     },
     {
-      "id": "bodyM",
+      "id": "nut",
       "position": {
         "x": 480,
         "y": 0
       },
       "data": {
-        "nodeType": "tessellate",
-        "params": {}
-      }
-    },
-    {
-      "id": "cut",
-      "position": {
-        "x": 0,
-        "y": 150
-      },
-      "data": {
-        "nodeType": "thread",
+        "nodeType": "internalThread",
         "params": {
-          "standard": "custom",
-          "diameter": 16.5,
-          "pitch": 2,
-          "length": 17,
+          "standard": "M16",
+          "clearance": 0.4,
           "hand": "right"
-        }
-      }
-    },
-    {
-      "id": "cutDown",
-      "position": {
-        "x": 240,
-        "y": 150
-      },
-      "data": {
-        "nodeType": "transformMesh",
-        "params": {
-          "tx": 0,
-          "ty": 0,
-          "tz": -2
-        }
-      }
-    },
-    {
-      "id": "nut",
-      "position": {
-        "x": 720,
-        "y": 0
-      },
-      "data": {
-        "nodeType": "boolean",
-        "params": {
-          "op": "difference"
         }
       }
     }
@@ -102,40 +61,10 @@
       "id": "e1",
       "source": "body",
       "sourceHandle": "out",
-      "target": "bodyM",
+      "target": "nut",
       "targetHandle": "in",
       "style": {
         "stroke": "#ff8c42"
-      }
-    },
-    {
-      "id": "e2",
-      "source": "cut",
-      "sourceHandle": "out",
-      "target": "cutDown",
-      "targetHandle": "in",
-      "style": {
-        "stroke": "#56b6c2"
-      }
-    },
-    {
-      "id": "e3",
-      "source": "bodyM",
-      "sourceHandle": "out",
-      "target": "nut",
-      "targetHandle": "base",
-      "style": {
-        "stroke": "#56b6c2"
-      }
-    },
-    {
-      "id": "e4",
-      "source": "cutDown",
-      "sourceHandle": "out",
-      "target": "nut",
-      "targetHandle": "tool",
-      "style": {
-        "stroke": "#56b6c2"
       }
     }
   ]

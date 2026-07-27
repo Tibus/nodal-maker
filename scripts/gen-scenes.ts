@@ -685,6 +685,18 @@ const scenes: Scene[] = [
     ],
   },
   {
+    name: "threaded-nut",
+    title: "Nut — hex prism with an internal M16 thread (Internal thread node, mesh)",
+    outputId: "nut",
+    expect: "mesh",
+    nodes: [
+      { id: "hex", type: "polygon", params: { radius: 14, sides: 6 } },
+      { id: "body", type: "extrude", inputs: { in: "hex" }, params: { height: 13 } },
+      // cut the mating internal thread via the fast Manifold Boolean
+      { id: "nut", type: "internalThread", inputs: { in: "body" }, params: { standard: "M16", clearance: 0.4, hand: "right" } },
+    ],
+  },
+  {
     name: "pick-fillet-demo",
     title: "Viewport picking demo — 📐 Pick edge on the box; it feeds the fillet",
     outputId: "block",

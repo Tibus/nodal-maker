@@ -472,6 +472,58 @@ export const THREAD_STANDARDS: Record<string, { diameter: number; pitch: number 
   M24: { diameter: 24, pitch: 3.0 },
 };
 
+/** Trapezoidal ISO thread height field over one pitch: 0 at root, 1 at crest.
+ * Periodic. Used to build the watertight MANIFOLD mesh thread tool for nuts. */
+function threadHeightField(t: number): number {
+  const f = ((t % 1) + 1) % 1;
+  const a = 0.125, b = 0.4375, c = 0.5625, d = 0.875;
+  if (f < a || f >= d) return 0;
+  if (f < b) return (f - a) / (b - a);
+  if (f < c) return 1;
+  return 1 - (f - c) / (d - c);
+}
+
+/**
+ * Procedural watertight (2-manifold) mesh of a threaded rod — a height-field
+ * cylinder whose radius spirals between minor and major diameter. Pure JS, fast.
+ * Not for display (the B-rep `thread` node is), but as the TOOL for cutting an
+ * internal thread: the Manifold Boolean is fast/robust where OCCT hangs.
+ */
+function buildThreadMeshTool(diameter: number, pitch: number, length: number, lefthand: boolean): MeshData {
+  const p = Math.max(0.2, pitch);
+  const depth = p * 0.613;
+  const rMaj = Math.max(0.3, diameter / 2);
+  const rMin = Math.max(0.15, rMaj - depth);
+  const L = Math.max(p, length);
+  const dir = lefthand ? -1 : 1;
+  const N = Math.min(160, Math.max(48, Math.round(rMaj * 5)));
+  const rows = Math.max(6, Math.round((L / p) * 16));
+  const dz = L / rows;
+  const verts: number[] = [];
+  const idx: number[] = [];
+  for (let j = 0; j <= rows; j++) {
+    const z = j * dz;
+    for (let i = 0; i < N; i++) {
+      const phi = (2 * Math.PI * i) / N;
+      const r = rMin + depth * threadHeightField((z - dir * (p * phi) / (2 * Math.PI)) / p);
+      verts.push(r * Math.cos(phi), r * Math.sin(phi), z);
+    }
+  }
+  const at = (j: number, i: number) => j * N + (i % N);
+  for (let j = 0; j < rows; j++)
+    for (let i = 0; i < N; i++) {
+      const a = at(j, i), b = at(j, i + 1), c = at(j + 1, i), d = at(j + 1, i + 1);
+      idx.push(a, b, c, b, d, c);
+    }
+  const cBot = verts.length / 3; verts.push(0, 0, 0);
+  const cTop = verts.length / 3; verts.push(0, 0, L);
+  for (let i = 0; i < N; i++) {
+    idx.push(cBot, at(0, i + 1), at(0, i));
+    idx.push(cTop, at(rows, i), at(rows, i + 1));
+  }
+  return { vertices: new Float32Array(verts), indices: new Uint32Array(idx) };
+}
+
 /**
  * Analytic B-rep threaded rod (ISO-style V-thread). The thread ridge is a real
  * helical sweep (OCCT `BRepOffsetAPI_MakePipeShell` with a Frenet frame — its
@@ -857,6 +909,25 @@ const REGISTRY: Record<string, NodeImpl> = {
 
     const solid = buildThreadBRep(diameter, pitch, length, String(params.hand ?? "right") === "left");
     return { kind: "solid", solid };
+  },
+  // Internal thread / NUT: cut a mating thread into a solid body's central bore.
+  // OCCT Booleans on helical faces hang, so we subtract a procedural, watertight
+  // MANIFOLD thread tool via the (fast, robust) Manifold Boolean. Output is a mesh.
+  internalThread: (inputs, params) => {
+    const body = expectSolid(inputs.in, "internalThread");
+    const std = String(params.standard ?? "custom");
+    const preset = THREAD_STANDARDS[std];
+    const diameter = preset ? preset.diameter : Number(params.diameter ?? 16);
+    const pitch = preset ? preset.pitch : Number(params.pitch ?? 2);
+    const clearance = Number(params.clearance ?? 0.4); // hole runs slightly oversize
+    const lefthand = String(params.hand ?? "right") === "left";
+
+    const [lo, hi] = body.boundingBox.bounds;
+    const L = hi[2] - lo[2] + 2 * pitch; // overshoot both ends → clean through-cut
+    const tool = buildThreadMeshTool(diameter + clearance, pitch, L, lefthand);
+    const toolAtBody = transformMesh(tool, { tz: lo[2] - pitch }); // align to the body
+    const nut = booleanMesh(solidToMeshData(body), toolAtBody, "difference");
+    return { kind: "mesh", mesh: nut };
   },
   cone: (_inputs, params) => {
     const r = Number(params.radius ?? 15);

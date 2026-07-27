@@ -102,6 +102,7 @@ export const NODE_DESCRIPTIONS: Record<string, string> = {
   cone: "A cone from base radius + height.",
   torus: "A torus (donut) from major + minor radii.",
   thread: "Thread a cylinder (Fusion-style modifier). Pick a standard (M3…M24) or set a custom Ø/pitch; wire a cylinder to inherit its size. Analytic B-rep — STEP-exportable.",
+  internalThread: "Cut a mating internal thread (nut) into a solid body's bore. Feed a block/hex prism; pick a standard + clearance. Outputs a mesh (fast Manifold Boolean).",
   importSTEP: "Import a STEP file (what Fusion 360 / SolidWorks export) as an editable B-rep solid.",
   extrude: "Extrude a 2D profile into a solid. Exposes cap / bottom / side edges.",
   revolve: "Revolve a profile around the Z axis into a solid.",
@@ -139,7 +140,7 @@ export const NODE_CATEGORIES: { name: string; types: string[] }[] = [
   { name: "Value", types: ["numberValue", "textValue", "math", "mathUnary", "clamp", "remap", "random"] },
   { name: "2D Primitive", types: ["rect", "circle", "ellipse", "polygon", "star", "slot", "gear", "fingerBox", "svgInput", "textToSvg"] },
   { name: "2D Op", types: ["offset2d", "kerf", "fillet2d", "bevel2d", "boolean2d", "mirror2d", "transform2d", "arrayLinear2d", "arrayRadial2d", "group", "scoreCut"] },
-  { name: "3D Primitive", types: ["box", "cylinder", "sphere", "cone", "torus", "thread", "importSTEP"] },
+  { name: "3D Primitive", types: ["box", "cylinder", "sphere", "cone", "torus", "thread", "internalThread", "importSTEP"] },
   { name: "Sketch → Solid", types: ["extrude", "revolve", "loft", "loftSections", "sweep", "bossOnCap"] },
   { name: "3D Op", types: ["transform", "rotate3d", "scale3d", "mirror3d", "fillet", "bevel", "shell", "boolean3d", "assemble", "arrayLinear3d", "arrayRadial3d"] },
   { name: "Selector", types: ["edgeSelect", "faceSelect"] },
@@ -420,6 +421,22 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
       { name: "diameter", kind: "number", label: "Ø major (custom)", default: 20, min: 2, max: 120, step: 0.5 },
       { name: "pitch", kind: "number", label: "pitch (custom)", default: 2.5, min: 0.3, max: 10, step: 0.05 },
       { name: "length", kind: "number", default: 30, min: 3, max: 300, step: 1 },
+      { name: "hand", kind: "select", default: "right", options: ["right", "left"] },
+    ],
+  },
+  internalThread: {
+    type: "internalThread",
+    label: "Internal thread (nut)",
+    // cut a mating internal thread into a solid body (its central bore, along Z).
+    // Uses the fast/robust Manifold Boolean (OCCT Booleans hang on threads), so
+    // output is a mesh. Feed a hex prism / block centred on the axis.
+    inputs: [{ name: "in", type: "solid" }],
+    output: "mesh",
+    params: [
+      { name: "standard", kind: "select", default: "M16", options: ["custom", "M2", "M2.5", "M3", "M4", "M5", "M6", "M8", "M10", "M12", "M14", "M16", "M20", "M24"] },
+      { name: "diameter", kind: "number", label: "Ø nominal (custom)", default: 16, min: 2, max: 120, step: 0.5 },
+      { name: "pitch", kind: "number", label: "pitch (custom)", default: 2, min: 0.3, max: 10, step: 0.05 },
+      { name: "clearance", kind: "number", label: "clearance", default: 0.4, min: 0, max: 2, step: 0.05 },
       { name: "hand", kind: "select", default: "right", options: ["right", "left"] },
     ],
   },
