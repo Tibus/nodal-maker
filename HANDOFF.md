@@ -215,6 +215,12 @@ l'impression 3D, que des utilisateurs customisent en changeant des paramètres
   n'est que la lecture du blob). kind de param "step".
 - **Pick border** (▢) : pique une face plate → Edge Select à son plan (rim),
   auto-câblé au fillet/bevel. Modes atX/atY ajoutés à Edge/Face Select.
+- **Highlight au survol** en mode pick : `viewport.hoverHighlight` (onMouseMove
+  rAF-throttlé) montre en vert ce qu'un clic sélectionnerait.
+- **Tooltip par nœud** (palette) : libellé + image + explication au survol.
+  `NODE_DESCRIPTIONS` (specs) + miniatures générées offline (`npm run thumbs` →
+  `nodeThumbs.generated.ts`) : SVG isométrique ombré (painter's, pur JS) pour
+  solides/mesh, SVG direct pour 2D. Régénérer si on ajoute un nœud géométrique.
 
 Idées futures (non demandées) : DXF avec arcs natifs, générateurs laser avancés
 (T-slot, onglets), contraintes/cotation, ressort/helix libre, sweep avec twist,
