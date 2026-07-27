@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "title": "Threaded rod (3D print) — Thread modifier on a cylinder, M20 preset",
+  "title": "Threaded rod — analytic B-rep Thread modifier on a cylinder, M20 (STEP-exportable)",
   "outputId": "rod",
   "nodes": [
     {

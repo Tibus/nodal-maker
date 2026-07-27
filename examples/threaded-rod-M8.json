@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "title": "Threaded rod M8 — analytic B-rep (fine thread)",
+  "outputId": "rod",
+  "nodes": [
+    {
+      "id": "rod",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "thread",
+        "params": {
+          "standard": "M8",
+          "length": 30,
+          "hand": "right"
+        }
+      }
+    }
+  ],
+  "edges": []
+}

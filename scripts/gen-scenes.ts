@@ -652,9 +652,9 @@ const scenes: Scene[] = [
   },
   {
     name: "threaded-rod",
-    title: "Threaded rod (3D print) — Thread modifier on a cylinder, M20 preset",
+    title: "Threaded rod — analytic B-rep Thread modifier on a cylinder, M20 (STEP-exportable)",
     outputId: "rod",
-    expect: "mesh",
+    expect: "solid",
     nodes: [
       { id: "cyl", type: "cylinder", params: { radius: 10, height: 44 } },
       // Thread modifier: reads Ø + length from the cylinder; M20 fills the pitch
@@ -662,32 +662,12 @@ const scenes: Scene[] = [
     ],
   },
   {
-    name: "threaded-bolt",
-    title: "Bolt (3D print) — hex head + M16 threaded shank (mesh union)",
-    outputId: "bolt",
-    expect: "mesh",
+    name: "threaded-rod-M8",
+    title: "Threaded rod M8 — analytic B-rep (fine thread)",
+    outputId: "rod",
+    expect: "solid",
     nodes: [
-      { id: "hex", type: "polygon", params: { radius: 14, sides: 6 } },
-      { id: "head", type: "extrude", inputs: { in: "hex" }, params: { height: 8 } },
-      { id: "headM", type: "tessellate", inputs: { in: "head" } },
-      { id: "shank", type: "thread", params: { standard: "M16", length: 40, hand: "right" } },
-      { id: "shankUp", type: "transformMesh", inputs: { in: "shank" }, params: { tx: 0, ty: 0, tz: 8 } },
-      { id: "bolt", type: "boolean", inputs: { base: "headM", tool: "shankUp" }, params: { op: "union" } },
-    ],
-  },
-  {
-    name: "threaded-nut",
-    title: "Nut (3D print) — hex block minus an M16 thread (fast mesh Boolean)",
-    outputId: "nut",
-    expect: "mesh",
-    nodes: [
-      { id: "hex", type: "polygon", params: { radius: 14, sides: 6 } },
-      { id: "body", type: "extrude", inputs: { in: "hex" }, params: { height: 13 } },
-      { id: "bodyM", type: "tessellate", inputs: { in: "body" } },
-      // subtract an M16 thread (+0.5 mm clearance) → internal mating thread
-      { id: "cut", type: "thread", params: { standard: "custom", diameter: 16.5, pitch: 2, length: 17, hand: "right" } },
-      { id: "cutDown", type: "transformMesh", inputs: { in: "cut" }, params: { tx: 0, ty: 0, tz: -2 } },
-      { id: "nut", type: "boolean", inputs: { base: "bodyM", tool: "cutDown" }, params: { op: "difference" } },
+      { id: "rod", type: "thread", params: { standard: "M8", length: 30, hand: "right" } },
     ],
   },
   {

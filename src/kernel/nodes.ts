@@ -27,6 +27,10 @@ import {
   makeBaseBox,
   makeCylinder,
   makeSphere,
+  makeHelix,
+  makeLine,
+  assembleWire,
+  makeCompound,
   getOC,
   cast,
 } from "replicad";
@@ -468,63 +472,52 @@ export const THREAD_STANDARDS: Record<string, { diameter: number; pitch: number 
   M24: { diameter: 24, pitch: 3.0 },
 };
 
-/** Trapezoidal ISO thread height field over one pitch: 0 at root, 1 at crest,
- * crest centred at t=0.5. 60°-ish flanks with root/crest flats. Periodic. */
-function threadProfile(t: number): number {
-  const f = ((t % 1) + 1) % 1;
-  const a = 0.125, b = 0.4375, c = 0.5625, d = 0.875; // root-flat / flank / crest-flat / flank
-  if (f < a || f >= d) return 0;
-  if (f < b) return (f - a) / (b - a);
-  if (f < c) return 1;
-  return 1 - (f - c) / (d - c);
-}
-
 /**
- * Procedural threaded-rod MESH (ISO-style V-thread). Built directly as a
- * watertight height-field cylinder — the surface radius spirals between the
- * minor and major diameter following the thread profile. Pure JS: clean,
- * perfectly consistent, and fast (no OCCT sweep/boolean). Output is a mesh, so a
- * nut is just a block minus this rod via the (fast, robust) Manifold boolean.
+ * Analytic B-rep threaded rod (ISO-style V-thread). The thread ridge is a real
+ * helical sweep (OCCT `BRepOffsetAPI_MakePipeShell` with a Frenet frame — its
+ * principal normal is purely radial, so the crest stays at a CONSTANT major
+ * radius) of a truncated-V profile whose inner edge sits exactly on the helix
+ * (off-axis inner edges make the sweep drift). The ridge is combined with a core
+ * cylinder as a COMPOUND — no boolean, because OCCT boolean ops on helical faces
+ * hang in this WASM build. It is a genuine, non-faceted B-rep: it renders
+ * cleanly and exports to STEP. `lefthand` flips the handedness.
  */
-function buildThreadMesh(diameter: number, pitch: number, length: number, lefthand: boolean): MeshData {
+function buildThreadBRep(diameter: number, pitch: number, length: number, lefthand: boolean): Shape3D {
   const p = Math.max(0.2, pitch);
   const depth = p * 0.613; // ISO truncated thread height ≈ 0.6134·p
   const rMaj = Math.max(0.3, diameter / 2);
   const rMin = Math.max(0.15, rMaj - depth);
   const L = Math.max(p, length);
-  const dir = lefthand ? -1 : 1;
-  const N = Math.min(120, Math.max(40, Math.round(rMaj * 4))); // angular segments
-  const rows = Math.max(6, Math.round((L / p) * 12)); // axial segments (12 / pitch)
-  const dz = L / rows;
+  const flat = p / 8;
 
-  const verts: number[] = [];
-  const idx: number[] = [];
-  // surface grid: (rows+1) axial rings × N angular. Radius follows the thread.
-  for (let j = 0; j <= rows; j++) {
-    const z = j * dz;
-    for (let i = 0; i < N; i++) {
-      const phi = (2 * Math.PI * i) / N;
-      const phase = (z - dir * (p * phi) / (2 * Math.PI)) / p; // helical phase
-      const r = rMin + depth * threadProfile(phase);
-      verts.push(r * Math.cos(phi), r * Math.sin(phi), z);
-    }
-  }
-  const ring = N;
-  const at = (j: number, i: number) => j * ring + (i % N);
-  for (let j = 0; j < rows; j++) {
-    for (let i = 0; i < N; i++) {
-      const a = at(j, i), b = at(j, i + 1), c = at(j + 1, i), d = at(j + 1, i + 1);
-      idx.push(a, b, c, b, d, c); // two tris per quad — outward-facing winding
-    }
-  }
-  // centre vertices for the two flat end caps (wound to match the outward sides)
-  const cBot = verts.length / 3; verts.push(0, 0, 0);
-  const cTop = verts.length / 3; verts.push(0, 0, L);
-  for (let i = 0; i < N; i++) {
-    idx.push(cBot, at(0, i + 1), at(0, i)); // bottom fan (faces -Z)
-    idx.push(cTop, at(rows, i), at(rows, i + 1)); // top fan (faces +Z)
-  }
-  return { vertices: new Float32Array(verts), indices: new Uint32Array(idx) };
+  const oc = getOC() as unknown as {
+    BRepOffsetAPI_MakePipeShell: new (spine: unknown) => {
+      SetMode_1: (frenet: boolean) => void;
+      Add_1: (profile: unknown, contact: boolean, correction: boolean) => void;
+      Build: (r: unknown) => void;
+      MakeSolid: () => boolean;
+      Shape: () => unknown;
+    };
+    Message_ProgressRange_1: new () => unknown;
+  };
+  const helix = (makeHelix(p, L, rMin, [0, 0, 0], [0, 0, 1], lefthand) as unknown as { wrapped: unknown }).wrapped;
+  const pt = (r: number, dz: number): [number, number, number] => [r, 0, dz];
+  const profile = (
+    assembleWire([
+      makeLine(pt(rMin, -p / 2), pt(rMaj, -flat)),
+      makeLine(pt(rMaj, -flat), pt(rMaj, flat)),
+      makeLine(pt(rMaj, flat), pt(rMin, p / 2)),
+      makeLine(pt(rMin, p / 2), pt(rMin, -p / 2)),
+    ] as never) as unknown as { wrapped: unknown }
+  ).wrapped;
+  const pipe = new oc.BRepOffsetAPI_MakePipeShell(helix);
+  pipe.SetMode_1(true); // Frenet → radial principal normal → constant crest radius
+  pipe.Add_1(profile, false, false);
+  pipe.Build(new oc.Message_ProgressRange_1());
+  pipe.MakeSolid();
+  const ridge = cast(pipe.Shape() as Parameters<typeof cast>[0]) as Shape3D;
+  const core = makeCylinder(rMin + 0.15, L) as Shape3D; // slightly > ridge inner → hides root overlap
+  return makeCompound([core, ridge]) as Shape3D;
 }
 
 let stepCounter = 0;
@@ -827,7 +820,7 @@ const REGISTRY: Record<string, NodeImpl> = {
   }),
   // Thread MODIFIER (Fusion-style): thread a cylinder. With an input solid/mesh,
   // the major diameter and length are read from its bounding box; a `standard`
-  // preset (M3…M24) fills the pitch. Output is a mesh (clean helical thread).
+  // preset (M3…M24) fills the pitch. Output is an analytic B-rep (STEP-exportable).
   thread: (inputs, params) => {
     const std = String(params.standard ?? "custom");
     const preset = THREAD_STANDARDS[std];
@@ -856,8 +849,8 @@ const REGISTRY: Record<string, NodeImpl> = {
       diameter = preset.diameter; // standalone + preset → nominal Ø
     }
 
-    const mesh = buildThreadMesh(diameter, pitch, length, String(params.hand ?? "right") === "left");
-    return { kind: "mesh", mesh };
+    const solid = buildThreadBRep(diameter, pitch, length, String(params.hand ?? "right") === "left");
+    return { kind: "solid", solid };
   },
   cone: (_inputs, params) => {
     const r = Number(params.radius ?? 15);
