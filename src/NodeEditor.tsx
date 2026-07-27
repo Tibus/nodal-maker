@@ -34,6 +34,7 @@ import {
   NODE_DESCRIPTIONS,
   NODE_THUMBS,
   SOCKET_COLORS,
+  SOCKET_LABELS,
   paramPortType,
   expandDescriptors,
   expandOutputId,
@@ -96,6 +97,8 @@ interface EditorCtx {
   componentDef: (defId: string) => ComponentDef | undefined;
   /** effective selection outputs of a node (own, or forwarded from its input) */
   selOutputs: (nodeId: string) => SelOut[];
+  /** hover a port handle → show/hide the socket-type tooltip */
+  setPortTip: (tip: { type: SocketType; x: number; y: number } | null) => void;
 }
 const Ctx = createContext<EditorCtx | null>(null);
 
@@ -115,6 +118,11 @@ function handleType(nodeType: string, handle: string): SocketType | undefined {
 
 function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
   const ctx = useContext(Ctx)!;
+  // hover handlers for a port handle → socket-type tooltip
+  const tipH = (t: SocketType) => ({
+    onMouseEnter: (e: React.MouseEvent) => ctx.setPortTip({ type: t, x: e.clientX, y: e.clientY }),
+    onMouseLeave: () => ctx.setPortTip(null),
+  });
   // a component instance derives its ports/params from its ComponentDef
   const def = data.component ? ctx.componentDef(data.component) : undefined;
   const spec = def
@@ -156,6 +164,7 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
               className="rf-port rf-port--req"
               style={{ background: SOCKET_COLORS[p.type] }}
               title={`${p.name}: ${p.type} (required)`}
+              {...tipH(p.type)}
             />
             <span className="gnode__portlabel" style={{ color: SOCKET_COLORS[p.type] }}>
               {p.name}
@@ -177,6 +186,7 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
                   className="rf-port rf-port--opt"
                   style={{ borderColor: SOCKET_COLORS[pt] }}
                   title={`${ps.name}: ${pt} (optional — has a default)`}
+                  {...tipH(pt)}
                 />
               )}
               {linked ? (
@@ -211,6 +221,7 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
                 className="rf-port rf-port--req"
                 style={{ background: SOCKET_COLORS[t] }}
                 title={`${so.name}: ${so.target} selection`}
+                {...tipH(t)}
               />
             </div>
           );
@@ -224,6 +235,7 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
         className="rf-port rf-port--req"
         style={{ background: SOCKET_COLORS[spec.output], top: 22 }}
         title={`out: ${spec.output}`}
+        {...tipH(spec.output)}
       />
     </div>
   );
@@ -557,6 +569,8 @@ export default function NodeEditor({
   const [showHelpers, setShowHelpers] = useState(false);
   // palette hover tooltip: which node type + the vertical anchor (screen y)
   const [tip, setTip] = useState<{ type: string; y: number } | null>(null);
+  // port hover tooltip: socket type + cursor position
+  const [portTip, setPortTip] = useState<{ type: SocketType; x: number; y: number } | null>(null);
 
   // socket type of a node's output handle (main "out" or a selection output)
   const nodeOutType = useCallback(
@@ -1148,6 +1162,7 @@ export default function NodeEditor({
       valueOf: (nodeId) => values?.[nodeId],
       componentDef: (defId) => components[defId],
       selOutputs: (nodeId) => selOutputsMap.get(nodeId) ?? [],
+      setPortTip,
     }),
     [outputId, setOutput, setParam, linkedSet, errorNodeId, errorMessage, values, components, selOutputsMap],
   );
@@ -1290,6 +1305,21 @@ export default function NodeEditor({
             <div className="nodetip__img" dangerouslySetInnerHTML={{ __html: NODE_THUMBS[tip.type] }} />
           )}
           <div className="nodetip__desc">{NODE_DESCRIPTIONS[tip.type]}</div>
+        </div>
+      )}
+
+      {/* port hover tooltip: what the socket colour means */}
+      {portTip && (
+        <div
+          className="porttip"
+          style={{
+            left: Math.min(portTip.x + 14, window.innerWidth - 220),
+            top: Math.min(portTip.y + 14, window.innerHeight - 70),
+          }}
+        >
+          <span className="porttip__sw" style={{ background: SOCKET_COLORS[portTip.type] }} />
+          <span className="porttip__name">{SOCKET_LABELS[portTip.type].name}</span>
+          <span className="porttip__desc">{SOCKET_LABELS[portTip.type].desc}</span>
         </div>
       )}
 

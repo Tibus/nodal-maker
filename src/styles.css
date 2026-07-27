@@ -135,6 +135,17 @@ button.link {
 }
 .nodetip__img svg { max-width: 100%; max-height: 100%; display: block; }
 .nodetip__desc { font-size: 11px; line-height: 1.4; color: #b8bdc6; }
+
+/* port hover tooltip: socket colour meaning */
+.porttip {
+  position: fixed; z-index: 55; width: 200px; pointer-events: none;
+  background: #1e2127; border: 1px solid #3a3f48; border-radius: 7px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.55); padding: 8px 10px;
+  display: grid; grid-template-columns: auto 1fr; gap: 3px 7px; align-items: center;
+}
+.porttip__sw { width: 12px; height: 12px; border-radius: 3px; }
+.porttip__name { font-size: 12px; font-weight: 700; color: #e6e8ec; }
+.porttip__desc { grid-column: 1 / 3; font-size: 11px; line-height: 1.4; color: #b8bdc6; }
 .editor__canvas { flex: 1; position: relative; min-width: 0; background: #16181d; }
 
 /* history timeline (Fusion-style) — one chip per node, in creation order */

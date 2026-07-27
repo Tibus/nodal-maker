@@ -45,6 +45,16 @@ export const SOCKET_COLORS: Record<SocketType, string> = {
   selection: "#d19a66", // amber — face/edge selections (criteria)
 };
 
+/** Human name + one-line meaning per socket type — for the port hover tooltip. */
+export const SOCKET_LABELS: Record<SocketType, { name: string; desc: string }> = {
+  sketch2d: { name: "2D profile", desc: "A flat outline (purple). Feeds Extrude, Revolve, Offset, Boolean 2D, SVG/DXF export…" },
+  solid: { name: "Solid (B-rep)", desc: "A CAD solid (orange). Fillet, Shell, Boolean 3D, exposed selections, STEP/STL export." },
+  mesh: { name: "Mesh", desc: "A triangle mesh (cyan). Manifold booleans, repair, hull, STL export." },
+  number: { name: "Number", desc: "A scalar value (green). Drives a parameter port." },
+  text: { name: "Text", desc: "A text string (yellow). E.g. for Text → SVG." },
+  selection: { name: "Selection", desc: "A set of faces or edges (amber). Feeds Fillet, Bevel or Shell." },
+};
+
 /**
  * The socket type a param exposes as an OPTIONAL input port, or null if the
  * param is inline-only (files, enums). Numbers and text can be driven by an
