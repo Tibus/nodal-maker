@@ -31,6 +31,8 @@ import "@xyflow/react/dist/style.css";
 import {
   NODE_SPECS,
   NODE_CATEGORIES,
+  NODE_DESCRIPTIONS,
+  NODE_THUMBS,
   SOCKET_COLORS,
   paramPortType,
   expandDescriptors,
@@ -553,6 +555,8 @@ export default function NodeEditor({
   // timeline: show only construction steps (geometry) by default, hiding helper
   // nodes (selections, numbers, text, math) that merely parametrise them.
   const [showHelpers, setShowHelpers] = useState(false);
+  // palette hover tooltip: which node type + the vertical anchor (screen y)
+  const [tip, setTip] = useState<{ type: string; y: number } | null>(null);
 
   // socket type of a node's output handle (main "out" or a selection output)
   const nodeOutType = useCallback(
@@ -1231,7 +1235,13 @@ export default function NodeEditor({
         <div className="palette__list">
           {search.trim() ? (
             searchHits.map((s) => (
-              <button key={s.type} className="palette__node" onClick={() => addNode(s.type)}>
+              <button
+                key={s.type}
+                className="palette__node"
+                onClick={() => addNode(s.type)}
+                onMouseEnter={(e) => setTip({ type: s.type, y: e.currentTarget.getBoundingClientRect().top })}
+                onMouseLeave={() => setTip(null)}
+              >
                 {s.label}
               </button>
             ))
@@ -1254,7 +1264,13 @@ export default function NodeEditor({
                   </button>
                   {open &&
                     cat.types.map((t) => (
-                      <button key={t} className="palette__node" onClick={() => addNode(t)}>
+                      <button
+                        key={t}
+                        className="palette__node"
+                        onClick={() => addNode(t)}
+                        onMouseEnter={(e) => setTip({ type: t, y: e.currentTarget.getBoundingClientRect().top })}
+                        onMouseLeave={() => setTip(null)}
+                      >
                         {NODE_SPECS[t].label}
                       </button>
                     ))}
@@ -1265,6 +1281,17 @@ export default function NodeEditor({
         </div>
         <span className="palette__hint">double-click canvas to add · click a node to view · ⌫ deletes</span>
       </div>
+
+      {/* hover tooltip: what the node does + a preview image */}
+      {tip && (NODE_DESCRIPTIONS[tip.type] || NODE_THUMBS[tip.type]) && (
+        <div className="nodetip" style={{ top: Math.max(8, Math.min(tip.y, window.innerHeight - 220)) }}>
+          <div className="nodetip__title">{NODE_SPECS[tip.type]?.label ?? tip.type}</div>
+          {NODE_THUMBS[tip.type] && (
+            <div className="nodetip__img" dangerouslySetInnerHTML={{ __html: NODE_THUMBS[tip.type] }} />
+          )}
+          <div className="nodetip__desc">{NODE_DESCRIPTIONS[tip.type]}</div>
+        </div>
+      )}
 
       <div className="editor__canvas" onDoubleClick={openQuickAdd}>
         <Ctx.Provider value={ctx}>

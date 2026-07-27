@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "smoke": "tsx scripts/smoke.ts",
     "smoke:mesh": "tsx scripts/smoke-mesh.ts",
-    "scenes": "tsx scripts/gen-scenes.ts"
+    "scenes": "tsx scripts/gen-scenes.ts",
+    "thumbs": "tsx scripts/gen-node-thumbs.ts"
   },
   "dependencies": {
     "@xyflow/react": "^12.11.2",
