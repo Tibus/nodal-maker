@@ -207,9 +207,12 @@ l'impression 3D, que des utilisateurs customisent en changeant des paramètres
   corps vif, ça alimente le fillet aval, la vue bascule sur le résultat).
 
 ### Filetage / import CAO / bordure (fait)
-- **Thread (rod)** : filetage ISO en V externe. `sketchHelix` + `sweepSketch`
-  (pipe OCCT, rapide/stable) ; crête fusionnée sur un cylindre-âme. Écrou = cut
-  d'un filetage (trop lent en OCCT → possible mais non bundlé).
+- **Thread (modifier façon Fusion)** : `buildThreadMesh` génère un maillage
+  procédural (champ de hauteur hélicoïdal, pur JS) — propre, constant, rapide,
+  watertight 2-manifold (normales sortantes). Entrée cylindre optionnelle (Ø +
+  longueur lus de la bbox) ; presets `standard` M2…M24 (`THREAD_STANDARDS`)
+  remplissent le pas ; sortie **mesh**. Écrou = bloc − tige via booléen Manifold
+  (~57ms). L'ancienne approche sweep OCCT (anneaux moches) a été supprimée.
 - **importSTEP** ("Import STEP / Fusion") : solide B-rep éditable. STEP = ce que
   Fusion 360 exporte. Import synchrone via `getOC`+`cast` (l'async d'`importSTEP`
   n'est que la lecture du blob). kind de param "step".
