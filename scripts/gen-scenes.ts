@@ -686,9 +686,9 @@ const scenes: Scene[] = [
   },
   {
     name: "threaded-nut",
-    title: "Nut — hex prism with an internal M16 thread (Internal thread node, mesh)",
+    title: "Nut — hex prism with an internal M16 thread (analytic B-rep, STEP-exportable)",
     outputId: "nut",
-    expect: "mesh",
+    expect: "solid",
     nodes: [
       { id: "hex", type: "polygon", params: { radius: 14, sides: 6 } },
       { id: "body", type: "extrude", inputs: { in: "hex" }, params: { height: 13 } },

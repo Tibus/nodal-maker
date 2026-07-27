@@ -472,76 +472,19 @@ export const THREAD_STANDARDS: Record<string, { diameter: number; pitch: number 
   M24: { diameter: 24, pitch: 3.0 },
 };
 
-/** Trapezoidal ISO thread height field over one pitch: 0 at root, 1 at crest.
- * Periodic. Used to build the watertight MANIFOLD mesh thread tool for nuts. */
-function threadHeightField(t: number): number {
-  const f = ((t % 1) + 1) % 1;
-  const a = 0.125, b = 0.4375, c = 0.5625, d = 0.875;
-  if (f < a || f >= d) return 0;
-  if (f < b) return (f - a) / (b - a);
-  if (f < c) return 1;
-  return 1 - (f - c) / (d - c);
-}
-
 /**
- * Procedural watertight (2-manifold) mesh of a threaded rod — a height-field
- * cylinder whose radius spirals between minor and major diameter. Pure JS, fast.
- * Not for display (the B-rep `thread` node is), but as the TOOL for cutting an
- * internal thread: the Manifold Boolean is fast/robust where OCCT hangs.
+ * Sweep a truncated-V thread ridge as an analytic B-rep solid, along a helix at
+ * `spineRadius`. `profile` is a closed loop of (radius, dz-from-turn-centre)
+ * points; its edge that sits on `spineRadius` must be present or the OCCT pipe
+ * (Frenet frame → radial principal normal → CONSTANT radius) drifts. Handedness
+ * via `lefthand`. `zBase` places the ridge's start; it spans [zBase, zBase+L].
  */
-function buildThreadMeshTool(diameter: number, pitch: number, length: number, lefthand: boolean): MeshData {
+type RPt = [number, number];
+function sweepHelicalRidge(
+  spineRadius: number, profile: RPt[], pitch: number, length: number, lefthand: boolean, zBase = 0,
+): Shape3D {
   const p = Math.max(0.2, pitch);
-  const depth = p * 0.613;
-  const rMaj = Math.max(0.3, diameter / 2);
-  const rMin = Math.max(0.15, rMaj - depth);
   const L = Math.max(p, length);
-  const dir = lefthand ? -1 : 1;
-  const N = Math.min(160, Math.max(48, Math.round(rMaj * 5)));
-  const rows = Math.max(6, Math.round((L / p) * 16));
-  const dz = L / rows;
-  const verts: number[] = [];
-  const idx: number[] = [];
-  for (let j = 0; j <= rows; j++) {
-    const z = j * dz;
-    for (let i = 0; i < N; i++) {
-      const phi = (2 * Math.PI * i) / N;
-      const r = rMin + depth * threadHeightField((z - dir * (p * phi) / (2 * Math.PI)) / p);
-      verts.push(r * Math.cos(phi), r * Math.sin(phi), z);
-    }
-  }
-  const at = (j: number, i: number) => j * N + (i % N);
-  for (let j = 0; j < rows; j++)
-    for (let i = 0; i < N; i++) {
-      const a = at(j, i), b = at(j, i + 1), c = at(j + 1, i), d = at(j + 1, i + 1);
-      idx.push(a, b, c, b, d, c);
-    }
-  const cBot = verts.length / 3; verts.push(0, 0, 0);
-  const cTop = verts.length / 3; verts.push(0, 0, L);
-  for (let i = 0; i < N; i++) {
-    idx.push(cBot, at(0, i + 1), at(0, i));
-    idx.push(cTop, at(rows, i), at(rows, i + 1));
-  }
-  return { vertices: new Float32Array(verts), indices: new Uint32Array(idx) };
-}
-
-/**
- * Analytic B-rep threaded rod (ISO-style V-thread). The thread ridge is a real
- * helical sweep (OCCT `BRepOffsetAPI_MakePipeShell` with a Frenet frame — its
- * principal normal is purely radial, so the crest stays at a CONSTANT major
- * radius) of a truncated-V profile whose inner edge sits exactly on the helix
- * (off-axis inner edges make the sweep drift). The ridge is combined with a core
- * cylinder as a COMPOUND — no boolean, because OCCT boolean ops on helical faces
- * hang in this WASM build. It is a genuine, non-faceted B-rep: it renders
- * cleanly and exports to STEP. `lefthand` flips the handedness.
- */
-function buildThreadBRep(diameter: number, pitch: number, length: number, lefthand: boolean): Shape3D {
-  const p = Math.max(0.2, pitch);
-  const depth = p * 0.613; // ISO truncated thread height ≈ 0.6134·p
-  const rMaj = Math.max(0.3, diameter / 2);
-  const rMin = Math.max(0.15, rMaj - depth);
-  const L = Math.max(p, length);
-  const flat = p / 8;
-
   const oc = getOC() as unknown as {
     BRepOffsetAPI_MakePipeShell: new (spine: unknown) => {
       SetMode_1: (frenet: boolean) => void;
@@ -552,30 +495,61 @@ function buildThreadBRep(diameter: number, pitch: number, length: number, leftha
     };
     Message_ProgressRange_1: new () => unknown;
   };
-  // Sweep the helix over [z0, z0+hH] with the profile centred on its start, so
-  // the ridge spans exactly [0, L] (no ±½-pitch axial overshoot fin). Helix and
-  // profile share the SAME z0 offset — otherwise the profile falls off the spine
-  // start and the sweep drifts.
-  const z0 = L > 2 * p ? p / 2 : 0;
+  // sweep [z0, z0+hH] with the profile centred on the start → ridge spans exactly
+  // [zBase, zBase+L] (no ±½-pitch axial overshoot). helix & profile share z0.
+  const z0 = zBase + (L > 2 * p ? p / 2 : 0);
   const hH = L > 2 * p ? L - p : L;
-  const helix = (makeHelix(p, hH, rMin, [0, 0, z0], [0, 0, 1], lefthand) as unknown as { wrapped: unknown }).wrapped;
-  const pt = (r: number, dz: number): [number, number, number] => [r, 0, z0 + dz];
-  const profile = (
-    assembleWire([
-      makeLine(pt(rMin, -p / 2), pt(rMaj, -flat)),
-      makeLine(pt(rMaj, -flat), pt(rMaj, flat)),
-      makeLine(pt(rMaj, flat), pt(rMin, p / 2)),
-      makeLine(pt(rMin, p / 2), pt(rMin, -p / 2)),
-    ] as never) as unknown as { wrapped: unknown }
-  ).wrapped;
+  const helix = (makeHelix(p, hH, spineRadius, [0, 0, z0], [0, 0, 1], lefthand) as unknown as { wrapped: unknown }).wrapped;
+  const at = (i: number) => [profile[i][0], 0, z0 + profile[i][1]] as [number, number, number];
+  const edges = profile.map((_, i) => makeLine(at(i), at((i + 1) % profile.length)));
+  const wire = (assembleWire(edges as never) as unknown as { wrapped: unknown }).wrapped;
   const pipe = new oc.BRepOffsetAPI_MakePipeShell(helix);
-  pipe.SetMode_1(true); // Frenet → radial principal normal → constant crest radius
-  pipe.Add_1(profile, false, false);
+  pipe.SetMode_1(true); // Frenet
+  pipe.Add_1(wire, false, false);
   pipe.Build(new oc.Message_ProgressRange_1());
   pipe.MakeSolid();
-  const ridge = cast(pipe.Shape() as Parameters<typeof cast>[0]) as Shape3D;
-  const core = makeCylinder(rMin + 0.15, L) as Shape3D; // slightly > ridge inner → hides root overlap
+  return cast(pipe.Shape() as Parameters<typeof cast>[0]) as Shape3D;
+}
+
+/**
+ * Analytic B-rep threaded ROD (external ISO V-thread). A helical ridge sweep
+ * fused with a core cylinder as a COMPOUND — no boolean, because OCCT boolean
+ * ops on helical faces hang in this WASM build. Genuine non-faceted B-rep:
+ * renders cleanly and exports to STEP.
+ */
+function buildThreadBRep(diameter: number, pitch: number, length: number, lefthand: boolean): Shape3D {
+  const p = Math.max(0.2, pitch);
+  const depth = p * 0.613; // ISO truncated thread height ≈ 0.6134·p
+  const rMaj = Math.max(0.3, diameter / 2);
+  const rMin = Math.max(0.15, rMaj - depth);
+  const flat = p / 8;
+  const profile: RPt[] = [[rMin, -p / 2], [rMaj, -flat], [rMaj, flat], [rMin, p / 2]];
+  const ridge = sweepHelicalRidge(rMin, profile, p, length, lefthand);
+  const core = makeCylinder(rMin + 0.15, Math.max(p, length)) as Shape3D; // hides root overlap
   return makeCompound([core, ridge]) as Shape3D;
+}
+
+/**
+ * Analytic B-rep NUT (internal thread) cut into a solid body. A plain cylindrical
+ * bore is removed with a SIMPLE (non-helical → fast) boolean, then inward-pointing
+ * helical ridges are added as a COMPOUND — so no helical boolean is ever needed.
+ * Genuine B-rep, STEP-exportable. `zBase`/`H` come from the body's bounds.
+ */
+function buildNutBRep(body: Shape3D, diameter: number, pitch: number, clearance: number, lefthand: boolean): Shape3D {
+  const p = Math.max(0.2, pitch);
+  const depth = p * 0.613;
+  const rBore = Math.max(0.5, diameter / 2); // internal root = nominal major radius
+  const rCrest = Math.max(0.3, rBore - depth + clearance); // teeth tips, toward the axis
+  const rOuter = rBore + 0.15; // ridge root overlaps the surrounding material
+  const flat = p / 8;
+  const [lo, hi] = body.boundingBox.bounds;
+  const H = hi[2] - lo[2];
+
+  const bore = (makeCylinder(rBore, H + 4) as Shape3D).clone().translate(0, 0, lo[2] - 2) as Shape3D;
+  const bodyWithHole = body.cut(bore) as Shape3D; // simple boolean — no helix, fast
+  const profile: RPt[] = [[rOuter, -p / 2], [rCrest, -flat], [rCrest, flat], [rOuter, p / 2]];
+  const ridge = sweepHelicalRidge(rOuter, profile, p, H, lefthand, lo[2]);
+  return makeCompound([bodyWithHole, ridge]) as Shape3D;
 }
 
 let stepCounter = 0;
@@ -910,24 +884,17 @@ const REGISTRY: Record<string, NodeImpl> = {
     const solid = buildThreadBRep(diameter, pitch, length, String(params.hand ?? "right") === "left");
     return { kind: "solid", solid };
   },
-  // Internal thread / NUT: cut a mating thread into a solid body's central bore.
-  // OCCT Booleans on helical faces hang, so we subtract a procedural, watertight
-  // MANIFOLD thread tool via the (fast, robust) Manifold Boolean. Output is a mesh.
+  // Internal thread / NUT: a central bore (SIMPLE, fast boolean) with inward
+  // helical ridges added as a compound — analytic B-rep, no helical boolean.
   internalThread: (inputs, params) => {
     const body = expectSolid(inputs.in, "internalThread");
     const std = String(params.standard ?? "custom");
     const preset = THREAD_STANDARDS[std];
     const diameter = preset ? preset.diameter : Number(params.diameter ?? 16);
     const pitch = preset ? preset.pitch : Number(params.pitch ?? 2);
-    const clearance = Number(params.clearance ?? 0.4); // hole runs slightly oversize
+    const clearance = Number(params.clearance ?? 0.4);
     const lefthand = String(params.hand ?? "right") === "left";
-
-    const [lo, hi] = body.boundingBox.bounds;
-    const L = hi[2] - lo[2] + 2 * pitch; // overshoot both ends → clean through-cut
-    const tool = buildThreadMeshTool(diameter + clearance, pitch, L, lefthand);
-    const toolAtBody = transformMesh(tool, { tz: lo[2] - pitch }); // align to the body
-    const nut = booleanMesh(solidToMeshData(body), toolAtBody, "difference");
-    return { kind: "mesh", mesh: nut };
+    return { kind: "solid", solid: buildNutBRep(body, diameter, pitch, clearance, lefthand) };
   },
   cone: (_inputs, params) => {
     const r = Number(params.radius ?? 15);

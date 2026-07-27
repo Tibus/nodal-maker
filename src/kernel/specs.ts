@@ -102,7 +102,7 @@ export const NODE_DESCRIPTIONS: Record<string, string> = {
   cone: "A cone from base radius + height.",
   torus: "A torus (donut) from major + minor radii.",
   thread: "Thread a cylinder (Fusion-style modifier). Pick a standard (M3…M24) or set a custom Ø/pitch; wire a cylinder to inherit its size. Analytic B-rep — STEP-exportable.",
-  internalThread: "Cut a mating internal thread (nut) into a solid body's bore. Feed a block/hex prism; pick a standard + clearance. Outputs a mesh (fast Manifold Boolean).",
+  internalThread: "Cut a mating internal thread (nut) into a solid body's bore. Feed a block/hex prism; pick a standard + clearance. Analytic B-rep — STEP-exportable.",
   importSTEP: "Import a STEP file (what Fusion 360 / SolidWorks export) as an editable B-rep solid.",
   extrude: "Extrude a 2D profile into a solid. Exposes cap / bottom / side edges.",
   revolve: "Revolve a profile around the Z axis into a solid.",
@@ -428,10 +428,10 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     type: "internalThread",
     label: "Internal thread (nut)",
     // cut a mating internal thread into a solid body (its central bore, along Z).
-    // Uses the fast/robust Manifold Boolean (OCCT Booleans hang on threads), so
-    // output is a mesh. Feed a hex prism / block centred on the axis.
+    // Bore = simple boolean; inward helical ridges added as a compound → analytic
+    // B-rep, no helical boolean. Feed a hex prism / block centred on the axis.
     inputs: [{ name: "in", type: "solid" }],
-    output: "mesh",
+    output: "solid",
     params: [
       { name: "standard", kind: "select", default: "M16", options: ["custom", "M2", "M2.5", "M3", "M4", "M5", "M6", "M8", "M10", "M12", "M14", "M16", "M20", "M24"] },
       { name: "diameter", kind: "number", label: "Ø nominal (custom)", default: 16, min: 2, max: 120, step: 0.5 },
