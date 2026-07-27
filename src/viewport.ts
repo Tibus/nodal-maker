@@ -298,6 +298,16 @@ export class Viewport {
    * node can be configured from: which axis-aligned plane the face lies in (or
    * "curved"/cylindrical) and the plane offset. Also highlights the face.
    */
+  /**
+   * Hover preview for pick modes: highlights exactly what a click would select,
+   * reusing the pick detection. `border` highlights the flat face whose rim
+   * would be taken. Returns true when something is under the cursor. */
+  hoverHighlight(mode: "face" | "edge" | "border", clientX: number, clientY: number): boolean {
+    const hit = mode === "edge" ? this.pickEdge(clientX, clientY) : this.pickFace(clientX, clientY);
+    if (!hit) this.clearPick(); // moved off the model → drop the stale highlight
+    return hit != null;
+  }
+
   pickFace(clientX: number, clientY: number): {
     axis: "X" | "Y" | "Z" | "curved";
     offset: number;

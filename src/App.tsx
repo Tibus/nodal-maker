@@ -42,6 +42,30 @@ export default function App() {
   const [graphError, setGraphError] = useState<{ nodeId?: string; message: string } | null>(null);
   const [graphValues, setGraphValues] = useState<Record<string, string>>({});
   const [pickMode, setPickMode] = useState<"face" | "edge" | "border" | null>(null);
+  const hoverRAF = useRef<number | undefined>(undefined);
+  const lastHover = useRef<{ x: number; y: number } | null>(null);
+
+  // live hover highlight while a pick mode is active — shows exactly what a
+  // click would select. rAF-throttled so mousemove stays cheap.
+  const onViewportMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (!pickMode) return;
+      lastHover.current = { x: e.clientX, y: e.clientY };
+      if (hoverRAF.current != null) return;
+      hoverRAF.current = requestAnimationFrame(() => {
+        hoverRAF.current = undefined;
+        const p = lastHover.current;
+        if (p && pickMode) viewportRef.current?.hoverHighlight(pickMode, p.x, p.y);
+      });
+    },
+    [pickMode],
+  );
+
+  // clear the highlight when leaving the viewport or exiting pick mode
+  const clearHover = useCallback(() => viewportRef.current?.clearPick(), []);
+  useEffect(() => {
+    if (!pickMode) viewportRef.current?.clearPick();
+  }, [pickMode]);
 
   // click in the viewport (pick mode) → a preconfigured Face/Edge Select node
   const onViewportClick = useCallback(
@@ -186,7 +210,13 @@ export default function App() {
           }
         }}
       />
-      <div className={`viewport${pickMode ? " viewport--pick" : ""}`} ref={mountRef} onClick={onViewportClick}>
+      <div
+        className={`viewport${pickMode ? " viewport--pick" : ""}`}
+        ref={mountRef}
+        onClick={onViewportClick}
+        onMouseMove={onViewportMove}
+        onMouseLeave={clearHover}
+      >
         <div className="vp-picks">
           <button
             className={`vp-pick${pickMode === "face" ? " vp-pick--on" : ""}`}
