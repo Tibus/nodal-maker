@@ -206,9 +206,20 @@ l'impression 3D, que des utilisateurs customisent en changeant des paramètres
   consommateur (fillet/bevel/shell) affiché OU directement en aval (on pique le
   corps vif, ça alimente le fillet aval, la vue bascule sur le résultat).
 
+### Filetage / import CAO / bordure (fait)
+- **Thread (rod)** : filetage ISO en V externe. `sketchHelix` + `sweepSketch`
+  (pipe OCCT, rapide/stable) ; crête fusionnée sur un cylindre-âme. Écrou = cut
+  d'un filetage (trop lent en OCCT → possible mais non bundlé).
+- **importSTEP** ("Import STEP / Fusion") : solide B-rep éditable. STEP = ce que
+  Fusion 360 exporte. Import synchrone via `getOC`+`cast` (l'async d'`importSTEP`
+  n'est que la lecture du blob). kind de param "step".
+- **Pick border** (▢) : pique une face plate → Edge Select à son plan (rim),
+  auto-câblé au fillet/bevel. Modes atX/atY ajoutés à Edge/Face Select.
+
 Idées futures (non demandées) : DXF avec arcs natifs, générateurs laser avancés
-(T-slot, onglets), contraintes/cotation, helix/ressort, sweep avec twist,
-multi-sélection au pointeur (plusieurs faces/arêtes en un sélecteur).
+(T-slot, onglets), contraintes/cotation, ressort/helix libre, sweep avec twist,
+multi-sélection au pointeur, filetage interne rapide (sans booléen hélicoïdal),
+import STEP multi-corps → plusieurs solides.
 
 ### Déploiement
 - **En ligne : https://tibus.github.io/nodal-maker/** (GitHub Pages via
