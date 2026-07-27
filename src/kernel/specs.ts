@@ -16,7 +16,7 @@ export interface PortSpec {
 
 export interface ParamSpec {
   name: string;
-  kind: "number" | "text" | "select" | "stl" | "font";
+  kind: "number" | "text" | "select" | "stl" | "step" | "font";
   label?: string;
   default?: unknown;
   min?: number;
@@ -61,7 +61,7 @@ export const NODE_CATEGORIES: { name: string; types: string[] }[] = [
   { name: "Value", types: ["numberValue", "textValue", "math", "mathUnary", "clamp", "remap", "random"] },
   { name: "2D Primitive", types: ["rect", "circle", "ellipse", "polygon", "star", "slot", "gear", "fingerBox", "svgInput", "textToSvg"] },
   { name: "2D Op", types: ["offset2d", "kerf", "fillet2d", "bevel2d", "boolean2d", "mirror2d", "transform2d", "arrayLinear2d", "arrayRadial2d", "group", "scoreCut"] },
-  { name: "3D Primitive", types: ["box", "cylinder", "sphere", "cone", "torus"] },
+  { name: "3D Primitive", types: ["box", "cylinder", "sphere", "cone", "torus", "thread", "importSTEP"] },
   { name: "Sketch → Solid", types: ["extrude", "revolve", "loft", "loftSections", "sweep", "bossOnCap"] },
   { name: "3D Op", types: ["transform", "rotate3d", "scale3d", "mirror3d", "fillet", "bevel", "shell", "boolean3d", "arrayLinear3d", "arrayRadial3d"] },
   { name: "Selector", types: ["edgeSelect", "faceSelect"] },
@@ -327,6 +327,20 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     output: "solid",
     params: [{ name: "radius", kind: "number", default: 20, min: 0.5, max: 200, step: 0.5 }],
   },
+  thread: {
+    type: "thread",
+    label: "Thread (rod)",
+    // external ISO V-thread rod. For a nut, subtract this (matching pitch, +0.4mm
+    // diameter clearance) from a block with a Boolean 3D difference.
+    inputs: [],
+    output: "solid",
+    params: [
+      { name: "diameter", kind: "number", label: "Ø major", default: 20, min: 3, max: 120, step: 0.5 },
+      { name: "pitch", kind: "number", default: 2.5, min: 0.4, max: 10, step: 0.05 },
+      { name: "length", kind: "number", default: 30, min: 3, max: 300, step: 1 },
+      { name: "hand", kind: "select", default: "right", options: ["right", "left"] },
+    ],
+  },
   cone: {
     type: "cone",
     label: "Cone 3D",
@@ -523,8 +537,8 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     inputs: [],
     output: "selection",
     params: [
-      { name: "where", kind: "select", default: "vertical", options: ["all", "vertical", "horizontal-x", "horizontal-y", "atZ"] },
-      { name: "offset", kind: "number", label: "atZ offset", default: 0, min: -300, max: 300, step: 0.5 },
+      { name: "where", kind: "select", default: "vertical", options: ["all", "vertical", "horizontal-x", "horizontal-y", "atZ", "atX", "atY"] },
+      { name: "offset", kind: "number", label: "plane offset", default: 0, min: -300, max: 300, step: 0.5 },
     ],
   },
   faceSelect: {
@@ -624,6 +638,14 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     inputs: [],
     output: "mesh",
     params: [{ name: "stl", kind: "stl", label: "file" }],
+  },
+  importSTEP: {
+    type: "importSTEP",
+    label: "Import STEP / Fusion",
+    // STEP is the neutral CAD format Fusion 360, SolidWorks, etc. export.
+    inputs: [],
+    output: "solid",
+    params: [{ name: "step", kind: "step", label: "file (.step/.stp)" }],
   },
   repair: {
     type: "repair",

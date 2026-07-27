@@ -27,6 +27,9 @@ import {
   makeBaseBox,
   makeCylinder,
   makeSphere,
+  sketchHelix,
+  getOC,
+  cast,
 } from "replicad";
 import * as opentype from "opentype.js";
 import { svgPathToDrawing } from "./svgPath";
@@ -449,6 +452,56 @@ function fingerPanel(
   return polyDrawing(pts);
 }
 
+/**
+ * External threaded rod (ISO-style V-thread). A helical spine (`sketchHelix`) is
+ * swept with a truncated-triangle profile via OCCT's pipe sweep — fast and
+ * radius-stable, unlike a raw `genericSweep` which fans the profile outward. The
+ * ridge is fused onto a core cylinder. Handedness via `lefthand`.
+ * For a nut / internal thread, subtract this rod (matching pitch) with a small
+ * diameter clearance using a Boolean 3D difference.
+ */
+function buildThread(diameter: number, pitch: number, length: number, lefthand: boolean): Shape3D {
+  const p = Math.max(0.2, pitch);
+  const depth = p * 0.6; // ISO thread height after truncation ≈ 0.61·pitch
+  const rMin = Math.max(0.2, diameter / 2 - depth);
+  const flat = p / 8;
+  // keep the ridge inside [0, length]: sweep a slightly shorter helix, raised ½p
+  const helixH = Math.max(p, length - p);
+  const helix = sketchHelix(p, helixH, rMin, [0, 0, p / 2], [0, 0, 1], lefthand);
+  // profile in the moving frame: local u = radial-outward, v = axial
+  const prof = draw([0, -p / 2]).lineTo([depth, -flat]).lineTo([depth, flat]).lineTo([0, p / 2]).close();
+  const sweeper = helix as unknown as { sweepSketch: (cb: (pl: unknown, o: unknown) => unknown) => Shape3D };
+  const placer = prof as unknown as { sketchOnPlane: (pl: unknown, o: unknown) => unknown };
+  const ridge = sweeper.sweepSketch((pl, o) => placer.sketchOnPlane(pl, o));
+  const core = makeCylinder(rMin + 0.01, length) as Shape3D;
+  return core.fuse(ridge) as Shape3D;
+}
+
+let stepCounter = 0;
+/** Synchronous STEP import from an ArrayBuffer (the async part of replicad's
+ * `importSTEP` is only reading the Blob, which we already have as a buffer). */
+function importSTEPSync(buf: ArrayBuffer): Shape3D {
+  const oc = getOC() as unknown as {
+    FS: { writeFile: (p: string, d: Uint8Array) => void; unlink: (p: string) => void };
+    STEPControl_Reader_1: new () => {
+      ReadFile: (name: string) => boolean;
+      TransferRoots: (r: unknown) => void;
+      OneShape: () => unknown;
+    };
+    Message_ProgressRange_1: new () => unknown;
+  };
+  const fileName = `import_${stepCounter++}.step`;
+  oc.FS.writeFile(`/${fileName}`, new Uint8Array(buf));
+  const reader = new oc.STEPControl_Reader_1();
+  try {
+    if (!reader.ReadFile(fileName)) throw new Error("[importSTEP] failed to read STEP file");
+    reader.TransferRoots(new oc.Message_ProgressRange_1());
+    return cast(reader.OneShape() as Parameters<typeof cast>[0]) as Shape3D;
+  } finally {
+    try { oc.FS.unlink(`/${fileName}`); } catch { /* already gone */ }
+  }
+}
+
 function expectMesh(v: GraphValue | undefined, node: string): MeshData {
   if (!v || v.kind !== "mesh")
     throw new Error(`[${node}] expected a mesh input, got ${v?.kind ?? "nothing"}`);
@@ -692,6 +745,15 @@ const REGISTRY: Record<string, NodeImpl> = {
     kind: "solid",
     solid: makeSphere(Number(params.radius ?? 20)) as Shape3D,
   }),
+  thread: (_inputs, params) => ({
+    kind: "solid",
+    solid: buildThread(
+      Number(params.diameter ?? 20),
+      Number(params.pitch ?? 2.5),
+      Number(params.length ?? 30),
+      String(params.hand ?? "right") === "left",
+    ),
+  }),
   cone: (_inputs, params) => {
     const r = Number(params.radius ?? 15);
     const h = Number(params.height ?? 30);
@@ -891,6 +953,8 @@ const REGISTRY: Record<string, NodeImpl> = {
         case "horizontal-x": return e.inDirection([1, 0, 0]);
         case "horizontal-y": return e.inDirection([0, 1, 0]);
         case "atZ": return e.inPlane("XY", offset);
+        case "atX": return e.inPlane("YZ", offset);
+        case "atY": return e.inPlane("XZ", offset);
         default: return e;
       }
     };
@@ -1015,6 +1079,17 @@ const REGISTRY: Record<string, NodeImpl> = {
       buf = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
     else throw new Error("[importSTL] params.stl must be an ArrayBuffer or Uint8Array");
     return { kind: "mesh", mesh: parseBinarySTL(buf) };
+  },
+  /** Import a STEP file (also what Fusion 360 / SolidWorks export) as a B-rep
+   * solid — editable, unlike an STL mesh. */
+  importSTEP: (_inputs, params) => {
+    const raw = params.step;
+    let buf: ArrayBuffer;
+    if (raw instanceof ArrayBuffer) buf = raw;
+    else if (raw instanceof Uint8Array)
+      buf = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
+    else throw new Error("[importSTEP] params.step must be an ArrayBuffer (choose a .step/.stp file)");
+    return { kind: "solid", solid: importSTEPSync(buf) };
   },
 
   /** Weld a triangle soup into a clean manifold mesh (STL repair). */

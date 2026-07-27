@@ -61,7 +61,7 @@ const NODE_ICON: Record<string, string> = {
   fingerBox: "⊟", svgInput: "✎", textToSvg: "T",
   offset2d: "⊙", kerf: "╎", fillet2d: "◜", bevel2d: "◹", boolean2d: "⊕", mirror2d: "⇋",
   transform2d: "✥", arrayLinear2d: "⋯", arrayRadial2d: "❋", group: "⊞", scoreCut: "✂",
-  box: "◼", cylinder: "⬢", sphere: "●", cone: "▲", torus: "◎",
+  box: "◼", cylinder: "⬢", sphere: "●", cone: "▲", torus: "◎", thread: "⛊", importSTEP: "⇩",
   extrude: "⇧", revolve: "↻", loft: "⏛", loftSections: "≣", sweep: "∿", bossOnCap: "⊤",
   transform: "✥", rotate3d: "⟳", scale3d: "⤢", mirror3d: "⇋", fillet: "◜", bevel: "◹",
   shell: "◫", boolean3d: "⊖", arrayLinear3d: "⋯", arrayRadial3d: "❋",
@@ -269,16 +269,18 @@ function ParamField({
   if (spec.kind === "font") {
     return <FontField label={label} value={value} onChange={onChange} />;
   }
-  if (spec.kind === "stl") {
+  if (spec.kind === "stl" || spec.kind === "step") {
     const loaded = value instanceof ArrayBuffer;
+    const accept = spec.kind === "stl" ? ".stl,model/stl" : ".step,.stp,application/step,model/step";
+    const hint = spec.kind === "stl" ? "choose .stl" : "choose .step";
     return (
       <label className="pf pf--file">
         <span>{label}</span>
         <span className="pf__filebtn">
-          {loaded ? "✓ loaded" : "choose .stl"}
+          {loaded ? "✓ loaded" : hint}
           <input
             type="file"
-            accept=".stl,model/stl"
+            accept={accept}
             hidden
             onChange={async (e) => {
               const f = e.target.files?.[0];

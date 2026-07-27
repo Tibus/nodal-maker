@@ -646,6 +646,28 @@ const scenes: Scene[] = [
     ],
   },
   {
+    name: "threaded-rod",
+    title: "Threaded rod (3D print) — M20 × 2.5 ISO V-thread",
+    outputId: "rod",
+    expect: "solid",
+    nodes: [
+      { id: "rod", type: "thread", params: { diameter: 20, pitch: 2.5, length: 40, hand: "right" } },
+    ],
+  },
+  {
+    name: "threaded-bolt",
+    title: "Bolt (3D print) — hex head + M16 threaded shank",
+    outputId: "bolt",
+    expect: "solid",
+    nodes: [
+      { id: "hex", type: "polygon", params: { radius: 14, sides: 6 } },
+      { id: "head", type: "extrude", inputs: { in: "hex" }, params: { height: 8 } },
+      { id: "shank", type: "thread", params: { diameter: 16, pitch: 2, length: 40, hand: "right" } },
+      { id: "shankUp", type: "transform", inputs: { in: "shank" }, params: { tx: 0, ty: 0, tz: 8 } },
+      { id: "bolt", type: "boolean3d", inputs: { base: "head", tool: "shankUp" }, params: { op: "union" } },
+    ],
+  },
+  {
     name: "pick-fillet-demo",
     title: "Viewport picking demo — 📐 Pick edge on the box; it feeds the fillet",
     outputId: "block",

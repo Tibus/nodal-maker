@@ -1,0 +1,120 @@
+{
+  "version": 1,
+  "title": "Bolt (3D print) — hex head + M16 threaded shank",
+  "outputId": "bolt",
+  "nodes": [
+    {
+      "id": "hex",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "polygon",
+        "params": {
+          "radius": 14,
+          "sides": 6
+        }
+      }
+    },
+    {
+      "id": "head",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "extrude",
+        "params": {
+          "height": 8
+        }
+      }
+    },
+    {
+      "id": "shank",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "thread",
+        "params": {
+          "diameter": 16,
+          "pitch": 2,
+          "length": 40,
+          "hand": "right"
+        }
+      }
+    },
+    {
+      "id": "shankUp",
+      "position": {
+        "x": 240,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 0,
+          "ty": 0,
+          "tz": 8
+        }
+      }
+    },
+    {
+      "id": "bolt",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "union"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "hex",
+      "sourceHandle": "out",
+      "target": "head",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "shank",
+      "sourceHandle": "out",
+      "target": "shankUp",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "head",
+      "sourceHandle": "out",
+      "target": "bolt",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "shankUp",
+      "sourceHandle": "out",
+      "target": "bolt",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "title": "Threaded rod (3D print) — M20 × 2.5 ISO V-thread",
+  "outputId": "rod",
+  "nodes": [
+    {
+      "id": "rod",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "thread",
+        "params": {
+          "diameter": 20,
+          "pitch": 2.5,
+          "length": 40,
+          "hand": "right"
+        }
+      }
+    }
+  ],
+  "edges": []
+}

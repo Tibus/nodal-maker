@@ -41,7 +41,7 @@ export default function App() {
   const [status, setStatus] = useState("initialising kernels…");
   const [graphError, setGraphError] = useState<{ nodeId?: string; message: string } | null>(null);
   const [graphValues, setGraphValues] = useState<Record<string, string>>({});
-  const [pickMode, setPickMode] = useState<"face" | "edge" | null>(null);
+  const [pickMode, setPickMode] = useState<"face" | "edge" | "border" | null>(null);
 
   // click in the viewport (pick mode) → a preconfigured Face/Edge Select node
   const onViewportClick = useCallback(
@@ -57,6 +57,14 @@ export default function App() {
             ? "picked a curved face → Face Select (cylindrical)"
             : `picked ${pick.tag} face at ${pick.axis}=${pick.offset} → Face Select (at${pick.axis})`,
         );
+      } else if (pickMode === "border") {
+        // border = the edges bounding a picked FACE (its outline loop), i.e. an
+        // Edge Select at that face's plane → chamfer/fillet a face's rim.
+        const pick = viewportRef.current?.pickFace(e.clientX, e.clientY);
+        if (!pick) { setStatus("pick: no face under the cursor"); return; }
+        if (pick.axis === "curved") { setStatus("border: pick a FLAT face (its rim lies in a plane)"); return; }
+        editorApi.current?.addEdgeSelect(`at${pick.axis}`, pick.offset);
+        setStatus(`picked border of ${pick.tag} face → Edge Select (at${pick.axis} @${pick.offset})`);
       } else {
         const pick = viewportRef.current?.pickEdge(e.clientX, e.clientY);
         if (!pick) { setStatus("pick: no edge near the cursor"); return; }
@@ -193,6 +201,13 @@ export default function App() {
             title="Pick an edge in the viewport → creates an Edge Select node (auto-wires into the viewed fillet/bevel)"
           >
             📐 {pickMode === "edge" ? "Click an edge…" : "Pick edge"}
+          </button>
+          <button
+            className={`vp-pick${pickMode === "border" ? " vp-pick--on" : ""}`}
+            onClick={(e) => { e.stopPropagation(); setPickMode((v) => (v === "border" ? null : "border")); }}
+            title="Pick a flat face → selects its border (rim) edges as an Edge Select (auto-wires into a fillet/bevel)"
+          >
+            ▢ {pickMode === "border" ? "Click a face…" : "Pick border"}
           </button>
         </div>
         <div className="statusbar">{status}</div>
