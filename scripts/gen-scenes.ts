@@ -671,6 +671,20 @@ const scenes: Scene[] = [
     ],
   },
   {
+    name: "threaded-bolt",
+    title: "Bolt — hex head + M16 thread, assembled (Assemble = compound, no Boolean)",
+    outputId: "bolt",
+    expect: "solid",
+    nodes: [
+      { id: "hex", type: "polygon", params: { radius: 14, sides: 6 } },
+      { id: "head", type: "extrude", inputs: { in: "hex" }, params: { height: 8 } },
+      { id: "shank", type: "thread", params: { standard: "M16", length: 36, hand: "right" } },
+      { id: "shankUp", type: "transform", inputs: { in: "shank" }, params: { tx: 0, ty: 0, tz: 8 } },
+      // Assemble avoids a Boolean union (which hangs on the helical thread)
+      { id: "bolt", type: "assemble", inputs: { a: "head", b: "shankUp" } },
+    ],
+  },
+  {
     name: "pick-fillet-demo",
     title: "Viewport picking demo — 📐 Pick edge on the box; it feeds the fillet",
     outputId: "block",

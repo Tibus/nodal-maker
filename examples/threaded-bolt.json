@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "title": "Bolt (3D print) — hex head + M16 threaded shank (mesh union)",
+  "title": "Bolt — hex head + M16 thread, assembled (Assemble = compound, no Boolean)",
   "outputId": "bolt",
   "nodes": [
     {
@@ -31,17 +31,6 @@
       }
     },
     {
-      "id": "headM",
-      "position": {
-        "x": 480,
-        "y": 0
-      },
-      "data": {
-        "nodeType": "tessellate",
-        "params": {}
-      }
-    },
-    {
       "id": "shank",
       "position": {
         "x": 0,
@@ -51,7 +40,7 @@
         "nodeType": "thread",
         "params": {
           "standard": "M16",
-          "length": 40,
+          "length": 36,
           "hand": "right"
         }
       }
@@ -63,7 +52,7 @@
         "y": 150
       },
       "data": {
-        "nodeType": "transformMesh",
+        "nodeType": "transform",
         "params": {
           "tx": 0,
           "ty": 0,
@@ -74,14 +63,12 @@
     {
       "id": "bolt",
       "position": {
-        "x": 720,
+        "x": 480,
         "y": 0
       },
       "data": {
-        "nodeType": "boolean",
-        "params": {
-          "op": "union"
-        }
+        "nodeType": "assemble",
+        "params": {}
       }
     }
   ],
@@ -98,9 +85,9 @@
     },
     {
       "id": "e1",
-      "source": "head",
+      "source": "shank",
       "sourceHandle": "out",
-      "target": "headM",
+      "target": "shankUp",
       "targetHandle": "in",
       "style": {
         "stroke": "#ff8c42"
@@ -108,32 +95,22 @@
     },
     {
       "id": "e2",
-      "source": "shank",
+      "source": "head",
       "sourceHandle": "out",
-      "target": "shankUp",
-      "targetHandle": "in",
+      "target": "bolt",
+      "targetHandle": "a",
       "style": {
-        "stroke": "#56b6c2"
+        "stroke": "#ff8c42"
       }
     },
     {
       "id": "e3",
-      "source": "headM",
-      "sourceHandle": "out",
-      "target": "bolt",
-      "targetHandle": "base",
-      "style": {
-        "stroke": "#56b6c2"
-      }
-    },
-    {
-      "id": "e4",
       "source": "shankUp",
       "sourceHandle": "out",
       "target": "bolt",
-      "targetHandle": "tool",
+      "targetHandle": "b",
       "style": {
-        "stroke": "#56b6c2"
+        "stroke": "#ff8c42"
       }
     }
   ]

@@ -117,6 +117,7 @@ export const NODE_DESCRIPTIONS: Record<string, string> = {
   bevel: "Chamfer edges of a solid. Feed a selection to target specific edges.",
   shell: "Hollow a solid, opening the selected face(s).",
   boolean3d: "Combine two solids: union, difference (base − tool) or intersection.",
+  assemble: "Assemble up to 4 solids into one compound (no Boolean). Use for a bolt (head + thread) where a real union would hang on the thread.",
   arrayLinear3d: "Repeat a solid in a line.",
   arrayRadial3d: "Repeat a solid around the Z axis.",
   edgeSelect: "Select edges by criteria (vertical, horizontal, or in a plane) for fillet/bevel.",
@@ -140,7 +141,7 @@ export const NODE_CATEGORIES: { name: string; types: string[] }[] = [
   { name: "2D Op", types: ["offset2d", "kerf", "fillet2d", "bevel2d", "boolean2d", "mirror2d", "transform2d", "arrayLinear2d", "arrayRadial2d", "group", "scoreCut"] },
   { name: "3D Primitive", types: ["box", "cylinder", "sphere", "cone", "torus", "thread", "importSTEP"] },
   { name: "Sketch → Solid", types: ["extrude", "revolve", "loft", "loftSections", "sweep", "bossOnCap"] },
-  { name: "3D Op", types: ["transform", "rotate3d", "scale3d", "mirror3d", "fillet", "bevel", "shell", "boolean3d", "arrayLinear3d", "arrayRadial3d"] },
+  { name: "3D Op", types: ["transform", "rotate3d", "scale3d", "mirror3d", "fillet", "bevel", "shell", "boolean3d", "assemble", "arrayLinear3d", "arrayRadial3d"] },
   { name: "Selector", types: ["edgeSelect", "faceSelect"] },
   { name: "Mesh", types: ["tessellate", "meshToSolid", "importSTL", "repair", "boolean", "transformMesh", "convexHull", "minkowski", "decimate", "subdivide"] },
 ];
@@ -498,6 +499,20 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     ],
     output: "solid",
     params: [{ name: "op", kind: "select", default: "union", options: ["union", "difference", "intersection"] }],
+  },
+  assemble: {
+    type: "assemble",
+    label: "Assemble",
+    // combine up to 4 solids into one compound (no boolean) — e.g. bolt = head +
+    // thread, where a real Boolean would hang on the helical faces.
+    inputs: [
+      { name: "a", type: "solid" },
+      { name: "b", type: "solid" },
+      { name: "c", type: "solid" },
+      { name: "d", type: "solid" },
+    ],
+    output: "solid",
+    params: [],
   },
   mirror3d: {
     type: "mirror3d",

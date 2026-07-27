@@ -67,7 +67,7 @@ const NODE_ICON: Record<string, string> = {
   box: "◼", cylinder: "⬢", sphere: "●", cone: "▲", torus: "◎", thread: "⛊", importSTEP: "⇩",
   extrude: "⇧", revolve: "↻", loft: "⏛", loftSections: "≣", sweep: "∿", bossOnCap: "⊤",
   transform: "✥", rotate3d: "⟳", scale3d: "⤢", mirror3d: "⇋", fillet: "◜", bevel: "◹",
-  shell: "◫", boolean3d: "⊖", arrayLinear3d: "⋯", arrayRadial3d: "❋",
+  shell: "◫", boolean3d: "⊖", assemble: "⧉", arrayLinear3d: "⋯", arrayRadial3d: "❋",
   edgeSelect: "╱", faceSelect: "▱",
   tessellate: "△", meshToSolid: "◆", importSTL: "⇩", repair: "✚", boolean: "⊖", transformMesh: "✥",
   convexHull: "⬡", minkowski: "⊚", decimate: "▽", subdivide: "◈",

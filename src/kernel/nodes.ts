@@ -500,8 +500,14 @@ function buildThreadBRep(diameter: number, pitch: number, length: number, leftha
     };
     Message_ProgressRange_1: new () => unknown;
   };
-  const helix = (makeHelix(p, L, rMin, [0, 0, 0], [0, 0, 1], lefthand) as unknown as { wrapped: unknown }).wrapped;
-  const pt = (r: number, dz: number): [number, number, number] => [r, 0, dz];
+  // Sweep the helix over [z0, z0+hH] with the profile centred on its start, so
+  // the ridge spans exactly [0, L] (no ±½-pitch axial overshoot fin). Helix and
+  // profile share the SAME z0 offset — otherwise the profile falls off the spine
+  // start and the sweep drifts.
+  const z0 = L > 2 * p ? p / 2 : 0;
+  const hH = L > 2 * p ? L - p : L;
+  const helix = (makeHelix(p, hH, rMin, [0, 0, z0], [0, 0, 1], lefthand) as unknown as { wrapped: unknown }).wrapped;
+  const pt = (r: number, dz: number): [number, number, number] => [r, 0, z0 + dz];
   const profile = (
     assembleWire([
       makeLine(pt(rMin, -p / 2), pt(rMaj, -flat)),
@@ -918,6 +924,18 @@ const REGISTRY: Record<string, NodeImpl> = {
     const op = String(params.op ?? "union");
     const out = op === "difference" ? a.cut(b) : op === "intersection" ? a.intersect(b) : a.fuse(b);
     return { kind: "solid", solid: out as Shape3D };
+  },
+  /** Assemble up to four solids into one COMPOUND — no boolean, so it works with
+   * bodies that OCCT booleans choke on (e.g. a Thread). Great for a bolt = head +
+   * thread. The bodies keep their own faces (B-rep) and STEP-export as one part. */
+  assemble: (inputs) => {
+    const parts = ["a", "b", "c", "d"]
+      .map((k) => inputs[k])
+      .filter((v): v is Extract<GraphValue, { kind: "solid" }> => !!v && v.kind === "solid")
+      .map((v) => v.solid);
+    if (parts.length === 0) throw new Error("[assemble] connect at least one solid");
+    if (parts.length === 1) return { kind: "solid", solid: parts[0] };
+    return { kind: "solid", solid: makeCompound(parts) as Shape3D };
   },
   mirror3d: (inputs, params) => {
     const solid = expectSolid(inputs.in, "mirror3d");
