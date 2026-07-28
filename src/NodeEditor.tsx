@@ -629,6 +629,8 @@ export default function NodeEditor({
   // (not in the viewed node's own build chain) render translucent alongside the
   // opaque viewed node, so several B-reps can be seen together (bolt + nut).
   // `hidden` holds the nodes the user explicitly turned off.
+  // 2D sketch editor overlay: which Sketch node is being edited (null = closed)
+  const [editingSketchId, setEditingSketchId] = useState<string | null>(null);
   const [hidden, setHidden] = useState<Set<string>>(() => new Set());
   const toggleVisible = useCallback((id: string) => {
     setHidden((prev) => {
@@ -810,6 +812,8 @@ export default function NodeEditor({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // the sketch editor overlay owns the keyboard while it's open
+      if (editingSketchId) return;
       const t = e.target as HTMLElement | null;
       if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
       const mod = e.metaKey || e.ctrlKey;
@@ -829,7 +833,7 @@ export default function NodeEditor({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [undo, redo, copySelection, pasteClipboard, duplicateSelection]);
+  }, [undo, redo, copySelection, pasteClipboard, duplicateSelection, editingSketchId]);
 
   const isValidConnection = useCallback(
     (c: Connection | Edge) => {
@@ -859,8 +863,6 @@ export default function NodeEditor({
 
   const setOutput = useCallback((id: string) => setOutputId(id), []);
 
-  // 2D sketch editor overlay: which Sketch node is being edited (null = closed)
-  const [editingSketchId, setEditingSketchId] = useState<string | null>(null);
   const editSketch = useCallback((id: string) => setEditingSketchId(id), []);
   /**
    * Commit an edited sketch back onto its node: store the doc and refresh the
@@ -1488,7 +1490,7 @@ export default function NodeEditor({
             onConnect={onConnect}
             isValidConnection={isValidConnection}
             nodeTypes={nodeTypes}
-            deleteKeyCode={["Backspace", "Delete"]}
+            deleteKeyCode={editingSketchId ? null : ["Backspace", "Delete"]}
             zoomOnDoubleClick={false}
             fitView
             proOptions={{ hideAttribution: true }}
