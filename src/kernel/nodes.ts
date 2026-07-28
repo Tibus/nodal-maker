@@ -58,7 +58,9 @@ import { buildDrawing } from "../sketch/build";
 /* ------------------------------------------------------------------ */
 
 export type GraphValue =
-  | { kind: "sketch2d"; drawing: Drawing }
+  // `plane` (optional) records which base plane a Sketch was drawn on, so the
+  // 3D preview and Extrude/Revolve place it there instead of always on XY.
+  | { kind: "sketch2d"; drawing: Drawing; plane?: "XY" | "XZ" | "YZ" }
   | { kind: "solid"; solid: Shape3D }
   | { kind: "mesh"; mesh: MeshData }
   | { kind: "number"; value: number }
@@ -334,6 +336,11 @@ function expectSketch(v: GraphValue | undefined, node: string): Drawing {
   if (!v || v.kind !== "sketch2d")
     throw new Error(`[${node}] expected a sketch2d input, got ${v?.kind ?? "nothing"}`);
   return v.drawing;
+}
+
+/** The base plane a sketch2d input was drawn on (defaults to XY). */
+function sketchPlane(v: GraphValue | undefined): "XY" | "XZ" | "YZ" {
+  return v && v.kind === "sketch2d" && v.plane ? v.plane : "XY";
 }
 
 function expectSolid(v: GraphValue | undefined, node: string): Shape3D {
@@ -702,7 +709,7 @@ const REGISTRY: Record<string, NodeImpl> = {
     const solved = cloneDoc(doc);
     if (params.plane && solved.plane !== params.plane) solved.plane = params.plane as SketchDoc["plane"];
     solveSketch(solved, { overrides });
-    return { kind: "sketch2d", drawing: buildDrawing(solved) };
+    return { kind: "sketch2d", drawing: buildDrawing(solved), plane: solved.plane };
   },
   rect: (_inputs, params) => ({
     kind: "sketch2d",
@@ -1113,7 +1120,8 @@ const REGISTRY: Record<string, NodeImpl> = {
   extrude: (inputs, params) => {
     const dr = expectSketch(inputs.in, "extrude");
     const h = Number(params.height ?? 1);
-    const solid = dr.sketchOnPlane("XY").extrude(h) as Shape3D;
+    const plane = sketchPlane(inputs.in);
+    const solid = dr.sketchOnPlane(plane).extrude(h) as Shape3D;
     return { kind: "solid", solid };
   },
 

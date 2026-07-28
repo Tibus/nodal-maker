@@ -169,7 +169,7 @@ function payloadForValue(v: GraphValue): MeshPayload | null {
   if (v.kind === "solid") return meshAndTag(v.solid);
   if (v.kind === "mesh") return meshToPayload(v.mesh);
   if (v.kind === "sketch2d") {
-    const plate = v.drawing.sketchOnPlane("XY").extrude(0.5) as Shape3D;
+    const plate = v.drawing.sketchOnPlane(v.plane ?? "XY").extrude(0.5) as Shape3D;
     return meshAndTag(plate);
   }
   return null;
@@ -227,9 +227,10 @@ export function evalToPayload(
     return { mesh: meshToPayload(v.mesh), topCapFaceId: null, topCapZ: 0, outputKind: "mesh", values, extras };
   }
   if (v.kind === "sketch2d") {
-    // preview a 2D profile as a thin plate so it's visible in the viewport;
-    // the true (non-faceted) geometry is what `exportGraphSVG` emits.
-    const plate = v.drawing.sketchOnPlane("XY").extrude(0.5) as Shape3D;
+    // preview a 2D profile as a thin plate so it's visible in the viewport,
+    // placed on the sketch's own base plane; the true (non-faceted) geometry
+    // is what `exportGraphSVG` emits.
+    const plate = v.drawing.sketchOnPlane(v.plane ?? "XY").extrude(0.5) as Shape3D;
     return { mesh: meshAndTag(plate), topCapFaceId: null, topCapZ: 0, outputKind: "sketch2d", values, extras };
   }
   throw new Error(`output node "${outputId}" is a ${v.kind}; connect it to geometry to preview`);
