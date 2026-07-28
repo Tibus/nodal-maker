@@ -101,9 +101,9 @@ interface EditorCtx {
   selOutputs: (nodeId: string) => SelOut[];
   /** hover a port handle → show/hide the socket-type tooltip */
   setPortTip: (tip: { type: SocketType; x: number; y: number } | null) => void;
-  /** is this node pinned-visible (shown alongside the output)? */
-  isPinned: (nodeId: string) => boolean;
-  togglePin: (nodeId: string) => void;
+  /** is this node's body shown (default true; false once the user hides it)? */
+  isVisible: (nodeId: string) => boolean;
+  toggleVisible: (nodeId: string) => void;
 }
 const Ctx = createContext<EditorCtx | null>(null);
 
@@ -156,18 +156,18 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
         {spec.label}
         {isOutput && <span className="gnode__badge">● view</span>}
         <button
-          className={`gnode__eye${ctx.isPinned(id) ? " gnode__eye--on" : ""}`}
+          className={`gnode__eye${ctx.isVisible(id) ? " gnode__eye--on" : ""}`}
           title={
-            ctx.isPinned(id)
-              ? "Pinned visible — shown alongside the viewed node (click to hide)"
-              : "Keep this body visible alongside the viewed node (for assembly)"
+            ctx.isVisible(id)
+              ? "Visible — shown (translucent) alongside the viewed node (click to hide)"
+              : "Hidden — click to show this body alongside the viewed node"
           }
           onClick={(e) => {
             e.stopPropagation();
-            ctx.togglePin(id);
+            ctx.toggleVisible(id);
           }}
         >
-          {ctx.isPinned(id) ? "👁" : "◌"}
+          {ctx.isVisible(id) ? "👁" : "🚫"}
         </button>
       </div>
       {value !== undefined && <div className="gnode__value">= {value}</div>}
@@ -594,11 +594,13 @@ export default function NodeEditor({
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
   const [outputId, setOutputId] = useState(initialOutputId);
 
-  // pinned-visible nodes: shown in the viewport alongside the current output so
-  // several B-reps can be seen together (e.g. to assemble a bolt + nut).
-  const [pinned, setPinned] = useState<Set<string>>(() => new Set());
-  const togglePin = useCallback((id: string) => {
-    setPinned((prev) => {
+  // Visibility is opt-OUT: every body is shown by default. Independent bodies
+  // (not in the viewed node's own build chain) render translucent alongside the
+  // opaque viewed node, so several B-reps can be seen together (bolt + nut).
+  // `hidden` holds the nodes the user explicitly turned off.
+  const [hidden, setHidden] = useState<Set<string>>(() => new Set());
+  const toggleVisible = useCallback((id: string) => {
+    setHidden((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -671,11 +673,35 @@ export default function NodeEditor({
     // expand component instances into a flat graph for the evaluator
     const flat = expandDescriptors(descs, components);
     const flatOut = expandOutputId(validOut, descs, components);
-    // pinned bodies: map each pinned editor node to its flat output id, drop the
-    // main output (already rendered) and any stale ids (deleted nodes)
-    const flatPins = [...pinned]
-      .filter((id) => id !== validOut && nodes.some((n) => n.id === id && !isNote(n)))
-      .map((id) => expandOutputId(id, descs, components));
+
+    // the viewed node's own build chain (its ancestors + descendants). These are
+    // stages of the *same* body, so we don't draw them on top of the output —
+    // only independent bodies show translucent alongside it.
+    const lineage = new Set<string>([validOut]);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const e of edges) {
+        if (lineage.has(e.target) && !lineage.has(e.source)) { lineage.add(e.source); grew = true; }
+        if (lineage.has(e.source) && !lineage.has(e.target)) { lineage.add(e.target); grew = true; }
+      }
+    }
+    // extra bodies: only *terminal* nodes (no outgoing edge) render as separate
+    // bodies — an intermediate stage is already represented by its downstream
+    // result, so drawing it too would stack duplicates. Also drop the output,
+    // its lineage, hidden nodes, and stale/note nodes.
+    const hasOutgoing = new Set(edges.map((e) => e.source));
+    const flatPins = nodes
+      .filter(
+        (n) =>
+          !isNote(n) &&
+          n.id !== validOut &&
+          !hidden.has(n.id) &&
+          !lineage.has(n.id) &&
+          !hasOutgoing.has(n.id),
+      )
+      .map((n) => expandOutputId(n.id, descs, components))
+      .filter((fid) => fid !== flatOut);
     const sig = graphSignature(flat, flatOut) + "|pins:" + flatPins.slice().sort().join(",");
     if (sig !== lastSig.current) {
       const isFirst = lastSig.current === "";
@@ -690,7 +716,7 @@ export default function NodeEditor({
       onChange(flat, flatOut, flatPins);
     }
     prevSnap.current = { nodes, edges, outputId: validOut };
-  }, [nodes, edges, outputId, onChange, components, pinned]);
+  }, [nodes, edges, outputId, onChange, components, hidden]);
 
   const undo = useCallback(() => {
     const snap = undoStack.current.pop();
@@ -1224,10 +1250,10 @@ export default function NodeEditor({
       selOutputs: (nodeId) => selOutputsMap.get(nodeId) ?? [],
       isSourceLinked: (nodeId, handle) => sourceLinkedSet.has(`${nodeId} ${handle}`),
       setPortTip,
-      isPinned: (nodeId) => pinned.has(nodeId),
-      togglePin,
+      isVisible: (nodeId) => !hidden.has(nodeId),
+      toggleVisible,
     }),
-    [outputId, setOutput, setParam, linkedSet, sourceLinkedSet, errorNodeId, errorMessage, values, components, selOutputsMap, pinned, togglePin],
+    [outputId, setOutput, setParam, linkedSet, sourceLinkedSet, errorNodeId, errorMessage, values, components, selOutputsMap, hidden, toggleVisible],
   );
 
   const outType = NODE_SPECS[nodes.find((n) => n.id === outputId)?.data.nodeType ?? ""]?.output;
