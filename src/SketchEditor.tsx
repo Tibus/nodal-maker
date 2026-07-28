@@ -55,6 +55,8 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
   // rapid clicks don't fight React batching
   const chain = useRef<Id[]>([]);
   const dragRef = useRef<Id | null>(null);
+  const dragSnap = useRef<SketchDoc | null>(null);
+  const dragMoved = useRef(false);
 
   // ---- doc mutation (synchronous, returns whatever `mutate` returns) -------
   const applyDoc = useCallback(<T,>(mutate: (d: SketchDoc) => T, opts?: { pin?: { id: Id; x: number; y: number }[]; pull?: { id: Id; x: number; y: number }[] }): T => {
@@ -64,6 +66,29 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
     docRef.current = d;
     setDocState(d);
     return ret;
+  }, []);
+
+  // undo / redo: snapshots of the doc taken before each discrete edit
+  const histPast = useRef<SketchDoc[]>([]);
+  const histFuture = useRef<SketchDoc[]>([]);
+  const snapshot = useCallback(() => {
+    histPast.current.push(cloneDoc(docRef.current));
+    if (histPast.current.length > 100) histPast.current.shift();
+    histFuture.current = [];
+  }, []);
+  const undo = useCallback(() => {
+    const prev = histPast.current.pop();
+    if (!prev) return;
+    histFuture.current.push(cloneDoc(docRef.current));
+    docRef.current = prev;
+    setDocState(prev);
+  }, []);
+  const redo = useCallback(() => {
+    const next = histFuture.current.pop();
+    if (!next) return;
+    histPast.current.push(cloneDoc(docRef.current));
+    docRef.current = next;
+    setDocState(next);
   }, []);
 
   // ---- transforms ---------------------------------------------------------
@@ -173,6 +198,7 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
     }
 
     const { w, onPoint } = snapWorld(sp);
+    snapshot(); // each drawing click is an undoable step
     if (tool === "line") {
       const closing = onPoint && chain.current.length > 0 && onPoint === chain.current[0];
       const id = applyDoc((d) => {
@@ -260,7 +286,12 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
     }
     if (tool === "select" && e.button === 0) {
       const pid = nearestPoint(svgPoint(e));
-      if (pid) { dragRef.current = pid; setSel({ points: new Set([pid]), entities: new Set() }); }
+      if (pid) {
+        dragRef.current = pid;
+        dragSnap.current = cloneDoc(docRef.current); // committed to history on first move
+        dragMoved.current = false;
+        setSel({ points: new Set([pid]), entities: new Set() });
+      }
     }
   };
   const onMouseMove = (e: React.MouseEvent) => {
@@ -272,6 +303,13 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
     setCursor(toW(sp));
     if (dragRef.current) {
       const id = dragRef.current;
+      // commit the pre-drag snapshot to history once, on the first move
+      if (!dragMoved.current && dragSnap.current) {
+        histPast.current.push(dragSnap.current);
+        if (histPast.current.length > 100) histPast.current.shift();
+        histFuture.current = [];
+        dragMoved.current = true;
+      }
       const snap = snapWorld(sp, new Set([id]));
       // soft pull only: constraints stay satisfied, only free DOF follow the
       // cursor (don't set the position directly — that would defeat the pull)
@@ -296,6 +334,7 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
 
   const addConstraint = (kind: string) => {
     const { pts, ents } = selArr;
+    snapshot();
     applyDoc((d) => {
       const push = (c: Record<string, unknown>) => d.constraints.push({ id: nextId(d, "c"), kind, ...c } as unknown as Constraint);
       const isLine = (id: Id) => d.entities.find((x) => x.id === id)?.kind === "line";
@@ -313,6 +352,7 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
 
   const addDimension = () => {
     const { pts, ents } = selArr;
+    snapshot();
     applyDoc((d) => {
       const P = (id: Id) => d.points.find((q) => q.id === id)!;
       const mk = (kind: DimConstraint["kind"], extra: Record<string, unknown>, value: number) =>
@@ -337,9 +377,10 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
 
   const setDimValue = (id: Id, value: number) => applyDoc((d) => { const c = d.constraints.find((x) => x.id === id); if (c && isDim(c)) c.value = value; });
   const setDimName = (id: Id, name: string) => applyDoc((d) => { const c = d.constraints.find((x) => x.id === id); if (c && isDim(c)) c.name = name; });
-  const removeConstraint = (id: Id) => applyDoc((d) => { d.constraints = d.constraints.filter((c) => c.id !== id); });
+  const removeConstraint = (id: Id) => { snapshot(); applyDoc((d) => { d.constraints = d.constraints.filter((c) => c.id !== id); }); };
 
   const deleteSelection = useCallback(() => {
+    snapshot();
     applyDoc((d) => {
       for (const e of [...sel.entities]) docDeleteEntity(d, e);
       for (const p of [...sel.points]) if (!d.entities.some((e) => entityRefs(e).includes(p))) d.points = d.points.filter((q) => q.id !== p);
@@ -352,6 +393,7 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
       if (e.key === "Escape") { if (chain.current.length || tool !== "select") { finishChain(); } else onCancel(); }
       else if (e.key === "Enter") { if (tool === "spline") finishTool(); else onCommit(commitDoc(docRef.current)); }
       else if (e.key === "Delete" || e.key === "Backspace") deleteSelection();
@@ -366,7 +408,7 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tool, deleteSelection, finishTool, onCancel, onCommit, fit, size]);
+  }, [tool, deleteSelection, finishTool, onCancel, onCommit, fit, size, undo, redo]);
 
   // ---- render -------------------------------------------------------------
   const dims = dimensions(doc);
@@ -385,6 +427,10 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
           ))}
         </div>
         <div className="ske__cons">
+          <button className="ske__con" onClick={undo} title="Undo (⌘Z)">↶</button>
+          <button className="ske__con" onClick={redo} title="Redo (⇧⌘Z)">↷</button>
+        </div>
+        <div className="ske__cons">
           {CONSTRAINTS.map((c) => (
             <button key={c.k} className="ske__con" onClick={() => addConstraint(c.k)} title={c.t}>{c.g}</button>
           ))}
@@ -392,7 +438,7 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
         </div>
         <div className="ske__spacer" />
         <label className="ske__plane">plane
-          <select value={doc.plane} onChange={(e) => applyDoc((d) => { d.plane = e.target.value as SketchDoc["plane"]; })}>
+          <select value={doc.plane} onChange={(e) => { snapshot(); applyDoc((d) => { d.plane = e.target.value as SketchDoc["plane"]; }); }}>
             <option>XY</option><option>XZ</option><option>YZ</option>
           </select>
         </label>
