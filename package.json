@@ -9,6 +9,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "smoke": "tsx scripts/smoke.ts",
+    "smoke:sketch": "tsx scripts/smoke-sketch.ts && tsx scripts/smoke-sketch2.ts",
     "smoke:mesh": "tsx scripts/smoke-mesh.ts",
     "scenes": "tsx scripts/gen-scenes.ts",
     "thumbs": "tsx scripts/gen-node-thumbs.ts"
