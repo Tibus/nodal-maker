@@ -42,6 +42,7 @@ export default function App() {
   const [graphError, setGraphError] = useState<{ nodeId?: string; message: string } | null>(null);
   const [graphValues, setGraphValues] = useState<Record<string, string>>({});
   const [pickMode, setPickMode] = useState<"face" | "edge" | "border" | null>(null);
+  const [viewMode, setViewMode] = useState<"shaded" | "edges" | "wireframe">("shaded");
   const hoverRAF = useRef<number | undefined>(undefined);
   const lastHover = useRef<{ x: number; y: number } | null>(null);
 
@@ -106,11 +107,11 @@ export default function App() {
     }
   }, []);
 
-  const onGraphChange = useCallback((graph: Graph, outputId: string) => {
+  const onGraphChange = useCallback((graph: Graph, outputId: string, pinnedIds: string[]) => {
     window.clearTimeout(graphTimer.current);
     graphTimer.current = window.setTimeout(async () => {
       try {
-        const res = await kernel.evalGraph(graph, outputId);
+        const res = await kernel.evalGraph(graph, outputId, pinnedIds);
         if (!res.ok) {
           setGraphError(res.error);
           setStatus("⚠ " + res.error.message);
@@ -119,6 +120,7 @@ export default function App() {
         setGraphError(null);
         setGraphValues(res.values ?? {});
         viewportRef.current?.setGeometry(res.mesh);
+        viewportRef.current?.setExtraBodies(res.extras ?? []);
         setStatus(`${res.mesh.stats.faceCount} regions · ${res.mesh.stats.triangleCount} triangles`);
 
         // gizmo bound to the displayed transform-family node
@@ -237,6 +239,19 @@ export default function App() {
             title="Pick a flat face → selects its border (rim) edges as an Edge Select (auto-wires into a fillet/bevel)"
           >
             ▢ {pickMode === "border" ? "Click a face…" : "Pick border"}
+          </button>
+          <button
+            className="vp-pick vp-pick--view"
+            onClick={(e) => {
+              e.stopPropagation();
+              const next =
+                viewMode === "shaded" ? "edges" : viewMode === "edges" ? "wireframe" : "shaded";
+              setViewMode(next);
+              viewportRef.current?.setViewMode(next);
+            }}
+            title="Cycle display: shaded → shaded + B-rep edges → wireframe (construction edges only)"
+          >
+            {viewMode === "shaded" ? "◧ Shaded" : viewMode === "edges" ? "◫ Edges" : "△ Wireframe"}
           </button>
         </div>
         <div className="statusbar">{status}</div>

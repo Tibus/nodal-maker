@@ -79,6 +79,11 @@ export interface BuildResult {
   outputKind?: "solid" | "mesh" | "sketch2d";
   /** display strings for number/text node outputs (inline value preview) */
   values?: Record<string, string>;
+  /**
+   * Additional bodies to show alongside the main one (pinned-visible nodes),
+   * so several B-reps can be seen together for assembly. Non-pickable.
+   */
+  extras?: { id: string; mesh: MeshPayload }[];
 }
 
 export function build(p: Params): BuildResult {
@@ -159,7 +164,23 @@ export function exportMeshSTL(stl: ArrayBuffer, o: MeshImportParams): Uint8Array
 /* renderable payload whatever the output socket type is.               */
 /* ------------------------------------------------------------------ */
 
-export function evalToPayload(graph: Graph, outputId: string, cache?: EvalCache): BuildResult {
+/** Turn any renderable graph value into a mesh payload (null for scalars/selections). */
+function payloadForValue(v: GraphValue): MeshPayload | null {
+  if (v.kind === "solid") return meshAndTag(v.solid);
+  if (v.kind === "mesh") return meshToPayload(v.mesh);
+  if (v.kind === "sketch2d") {
+    const plate = v.drawing.sketchOnPlane("XY").extrude(0.5) as Shape3D;
+    return meshAndTag(plate);
+  }
+  return null;
+}
+
+export function evalToPayload(
+  graph: Graph,
+  outputId: string,
+  cache?: EvalCache,
+  extraIds?: string[],
+): BuildResult {
   const outputs = cache ? evalGraphCached(graph, cache).outputs : evalGraph(graph).outputs;
 
   // collect inline value previews for scalar nodes
@@ -168,6 +189,24 @@ export function evalToPayload(graph: Graph, outputId: string, cache?: EvalCache)
     if (gv.kind === "number") values[id] = Number.isInteger(gv.value) ? String(gv.value) : gv.value.toFixed(3);
     else if (gv.kind === "text") values[id] = gv.value.length > 24 ? gv.value.slice(0, 24) + "…" : gv.value;
     else if (gv.kind === "selection") values[id] = `${gv.target} selection`;
+  }
+
+  // extra pinned bodies to show alongside the main output (skip the main id)
+  let extras: { id: string; mesh: MeshPayload }[] | undefined;
+  if (extraIds?.length) {
+    extras = [];
+    for (const id of extraIds) {
+      if (id === outputId) continue;
+      const ev = outputs[id];
+      if (!ev) continue;
+      try {
+        const m = payloadForValue(ev);
+        if (m) extras.push({ id, mesh: m });
+      } catch {
+        /* a pinned node may have failed to build — just skip it */
+      }
+    }
+    if (!extras.length) extras = undefined;
   }
 
   const v: GraphValue | undefined = outputs[outputId];
@@ -182,16 +221,16 @@ export function evalToPayload(graph: Graph, outputId: string, cache?: EvalCache)
     } catch {
       /* not every solid has a resolvable top cap — fine */
     }
-    return { mesh: meshAndTag(v.solid), topCapFaceId, topCapZ, outputKind: "solid", values };
+    return { mesh: meshAndTag(v.solid), topCapFaceId, topCapZ, outputKind: "solid", values, extras };
   }
   if (v.kind === "mesh") {
-    return { mesh: meshToPayload(v.mesh), topCapFaceId: null, topCapZ: 0, outputKind: "mesh", values };
+    return { mesh: meshToPayload(v.mesh), topCapFaceId: null, topCapZ: 0, outputKind: "mesh", values, extras };
   }
   if (v.kind === "sketch2d") {
     // preview a 2D profile as a thin plate so it's visible in the viewport;
     // the true (non-faceted) geometry is what `exportGraphSVG` emits.
     const plate = v.drawing.sketchOnPlane("XY").extrude(0.5) as Shape3D;
-    return { mesh: meshAndTag(plate), topCapFaceId: null, topCapZ: 0, outputKind: "sketch2d", values };
+    return { mesh: meshAndTag(plate), topCapFaceId: null, topCapZ: 0, outputKind: "sketch2d", values, extras };
   }
   throw new Error(`output node "${outputId}" is a ${v.kind}; connect it to geometry to preview`);
 }

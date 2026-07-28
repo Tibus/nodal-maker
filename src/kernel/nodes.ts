@@ -1489,6 +1489,9 @@ export interface MeshPayload {
   normals: Float32Array;
   /** contiguous triangle-index ranges grouped by B-rep face + our semantic tag */
   groups: { start: number; count: number; faceId: number; tag: FaceTag }[];
+  /** the real B-rep construction edges as line segments (for a Fusion-style
+   * wireframe) — absent for mesh-domain payloads (which have no B-rep edges). */
+  edges?: Float32Array;
   stats: {
     faceCount: number;
     triangleCount: number;
@@ -1513,6 +1516,14 @@ export function meshAndTag(solid: Shape3D): MeshPayload {
   const indices = new Uint32Array(raw.triangles);
   const normals = new Float32Array(raw.normals);
 
+  // the real B-rep edges (line segments) for a Fusion-style wireframe
+  let edges: Float32Array | undefined;
+  try {
+    const me = (solid as unknown as { meshEdges: (o: unknown) => { lines: number[] } })
+      .meshEdges({ tolerance: 0.05, angularTolerance: 0.3 });
+    if (me?.lines?.length) edges = new Float32Array(me.lines);
+  } catch { /* some shapes (compounds) may not expose edges — skip */ }
+
   const faceGroups =
     raw.faceGroups ?? [{ start: 0, count: raw.triangles.length, faceId: 0 }];
 
@@ -1528,6 +1539,7 @@ export function meshAndTag(solid: Shape3D): MeshPayload {
     indices,
     normals,
     groups,
+    edges,
     stats: {
       faceCount: faceGroups.length,
       triangleCount: indices.length / 3,

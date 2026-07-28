@@ -101,6 +101,9 @@ interface EditorCtx {
   selOutputs: (nodeId: string) => SelOut[];
   /** hover a port handle → show/hide the socket-type tooltip */
   setPortTip: (tip: { type: SocketType; x: number; y: number } | null) => void;
+  /** is this node pinned-visible (shown alongside the output)? */
+  isPinned: (nodeId: string) => boolean;
+  togglePin: (nodeId: string) => void;
 }
 const Ctx = createContext<EditorCtx | null>(null);
 
@@ -152,6 +155,20 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
       <div className="gnode__title">
         {spec.label}
         {isOutput && <span className="gnode__badge">● view</span>}
+        <button
+          className={`gnode__eye${ctx.isPinned(id) ? " gnode__eye--on" : ""}`}
+          title={
+            ctx.isPinned(id)
+              ? "Pinned visible — shown alongside the viewed node (click to hide)"
+              : "Keep this body visible alongside the viewed node (for assembly)"
+          }
+          onClick={(e) => {
+            e.stopPropagation();
+            ctx.togglePin(id);
+          }}
+        >
+          {ctx.isPinned(id) ? "👁" : "◌"}
+        </button>
       </div>
       {value !== undefined && <div className="gnode__value">= {value}</div>}
       {isError && <div className="gnode__err">⚠ {ctx.errorMessage}</div>}
@@ -462,7 +479,7 @@ export interface NodeEditorProps {
   initialNodes: GeoNode[];
   initialEdges: Edge[];
   initialOutputId: string;
-  onChange: (graph: Graph, outputId: string) => void;
+  onChange: (graph: Graph, outputId: string, pinnedIds: string[]) => void;
   /** hands the parent an imperative handle once mounted */
   onReady?: (api: EditorApi) => void;
   errorNodeId?: string | null;
@@ -577,6 +594,18 @@ export default function NodeEditor({
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
   const [outputId, setOutputId] = useState(initialOutputId);
 
+  // pinned-visible nodes: shown in the viewport alongside the current output so
+  // several B-reps can be seen together (e.g. to assemble a bolt + nut).
+  const [pinned, setPinned] = useState<Set<string>>(() => new Set());
+  const togglePin = useCallback((id: string) => {
+    setPinned((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
   const rf = useRef<ReactFlowInstance<GeoNode, Edge> | null>(null);
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -642,7 +671,12 @@ export default function NodeEditor({
     // expand component instances into a flat graph for the evaluator
     const flat = expandDescriptors(descs, components);
     const flatOut = expandOutputId(validOut, descs, components);
-    const sig = graphSignature(flat, flatOut);
+    // pinned bodies: map each pinned editor node to its flat output id, drop the
+    // main output (already rendered) and any stale ids (deleted nodes)
+    const flatPins = [...pinned]
+      .filter((id) => id !== validOut && nodes.some((n) => n.id === id && !isNote(n)))
+      .map((id) => expandOutputId(id, descs, components));
+    const sig = graphSignature(flat, flatOut) + "|pins:" + flatPins.slice().sort().join(",");
     if (sig !== lastSig.current) {
       const isFirst = lastSig.current === "";
       if (!applying.current && !isFirst) {
@@ -653,10 +687,10 @@ export default function NodeEditor({
       }
       applying.current = false;
       lastSig.current = sig;
-      onChange(flat, flatOut);
+      onChange(flat, flatOut, flatPins);
     }
     prevSnap.current = { nodes, edges, outputId: validOut };
-  }, [nodes, edges, outputId, onChange, components]);
+  }, [nodes, edges, outputId, onChange, components, pinned]);
 
   const undo = useCallback(() => {
     const snap = undoStack.current.pop();
@@ -1190,8 +1224,10 @@ export default function NodeEditor({
       selOutputs: (nodeId) => selOutputsMap.get(nodeId) ?? [],
       isSourceLinked: (nodeId, handle) => sourceLinkedSet.has(`${nodeId} ${handle}`),
       setPortTip,
+      isPinned: (nodeId) => pinned.has(nodeId),
+      togglePin,
     }),
-    [outputId, setOutput, setParam, linkedSet, sourceLinkedSet, errorNodeId, errorMessage, values, components, selOutputsMap],
+    [outputId, setOutput, setParam, linkedSet, sourceLinkedSet, errorNodeId, errorMessage, values, components, selOutputsMap, pinned, togglePin],
   );
 
   const outType = NODE_SPECS[nodes.find((n) => n.id === outputId)?.data.nodeType ?? ""]?.output;

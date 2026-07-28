@@ -27,6 +27,11 @@ export class Viewport {
   private pickHighlight: THREE.Object3D | null = null;
   private edgesObj: THREE.LineSegments | null = null;
   private modelDiag = 100;
+  // Fusion-style display: shaded / shaded+edges / wireframe (edges only)
+  private viewMode: "shaded" | "edges" | "wireframe" = "shaded";
+  private brepEdges: THREE.LineSegments | null = null;
+  // pinned-visible extra bodies (for assembling several B-reps) — non-pickable
+  private extraGroup: THREE.Group | null = null;
   // 3D translation gizmo (edits a Transform node's tx/ty/tz)
   private gizmo: TransformControls | null = null;
   private gizmoProxy: THREE.Object3D | null = null;
@@ -123,6 +128,29 @@ export class Viewport {
     this.edgesObj = new THREE.LineSegments(eg, new THREE.LineBasicMaterial());
     this.edgesObj.updateMatrixWorld();
 
+    // Fusion-style construction wireframe: prefer the real B-rep edges shipped
+    // in the payload; for mesh-domain payloads (no B-rep) fall back to the
+    // dihedral feature edges so wireframe mode still shows something sensible.
+    if (this.brepEdges) {
+      this.scene.remove(this.brepEdges);
+      this.brepEdges.geometry.dispose();
+      this.brepEdges = null;
+    }
+    let lineGeom: THREE.BufferGeometry;
+    if (payload.edges && payload.edges.length) {
+      lineGeom = new THREE.BufferGeometry();
+      lineGeom.setAttribute("position", new THREE.BufferAttribute(payload.edges, 3));
+    } else {
+      lineGeom = eg.clone();
+    }
+    this.brepEdges = new THREE.LineSegments(
+      lineGeom,
+      new THREE.LineBasicMaterial({ color: 0x101418 }),
+    );
+    this.brepEdges.renderOrder = 1;
+    this.scene.add(this.brepEdges);
+    this.applyViewMode();
+
     const box = new THREE.Box3().setFromObject(mesh);
     this.modelDiag = Math.max(box.getSize(new THREE.Vector3()).length(), 1);
     if (reframe || !this.framed) {
@@ -132,6 +160,94 @@ export class Viewport {
       // keep the orbit pivot on the model even when we don't re-frame
       this.controls.target.copy(box.getCenter(new THREE.Vector3()));
     }
+  }
+
+  /**
+   * Cycle/choose the display mode:
+   *  - "shaded":    solid faces only
+   *  - "edges":     solid faces + construction edges overlaid (default Fusion look)
+   *  - "wireframe": construction edges only, faces hidden
+   */
+  setViewMode(mode: "shaded" | "edges" | "wireframe") {
+    this.viewMode = mode;
+    this.applyViewMode();
+  }
+
+  getViewMode(): "shaded" | "edges" | "wireframe" {
+    return this.viewMode;
+  }
+
+  private applyViewMode() {
+    if (this.mesh) this.mesh.visible = this.viewMode !== "wireframe";
+    if (this.brepEdges) {
+      this.brepEdges.visible = this.viewMode !== "shaded";
+      // dark edges read well over the shaded solid; over the dark empty
+      // background (wireframe) they need to be light instead
+      (this.brepEdges.material as THREE.LineBasicMaterial).color.setHex(
+        this.viewMode === "wireframe" ? 0xcfd6de : 0x101418,
+      );
+    }
+    if (this.extraGroup) {
+      for (const o of this.extraGroup.children) {
+        if (o instanceof THREE.Mesh) o.visible = this.viewMode !== "wireframe";
+        else if (o instanceof THREE.LineSegments) {
+          o.visible = this.viewMode !== "shaded";
+          (o.material as THREE.LineBasicMaterial).color.setHex(
+            this.viewMode === "wireframe" ? 0x8fa0b3 : 0x24333f,
+          );
+        }
+      }
+    }
+  }
+
+  /**
+   * Render pinned-visible extra bodies alongside the main model. They are drawn
+   * with a distinct translucent material and their B-rep edges, but are NOT
+   * raycast targets (picking always acts on the main output). Pass [] to clear.
+   */
+  setExtraBodies(bodies: { id: string; mesh: MeshPayload }[]) {
+    if (this.extraGroup) {
+      this.scene.remove(this.extraGroup);
+      this.extraGroup.traverse((o) => {
+        if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) o.geometry.dispose();
+      });
+      this.extraGroup = null;
+    }
+    if (!bodies.length) return;
+
+    const group = new THREE.Group();
+    const faceMat = new THREE.MeshStandardMaterial({
+      color: 0x6b8fb5,
+      metalness: 0.1,
+      roughness: 0.75,
+      transparent: true,
+      opacity: 0.55,
+      side: THREE.DoubleSide,
+    });
+    for (const b of bodies) {
+      const p = b.mesh;
+      const geom = new THREE.BufferGeometry();
+      geom.setAttribute("position", new THREE.BufferAttribute(p.vertices, 3));
+      geom.setAttribute("normal", new THREE.BufferAttribute(p.normals, 3));
+      geom.setIndex(new THREE.BufferAttribute(p.indices, 1));
+      const bodyMesh = new THREE.Mesh(geom, faceMat);
+      bodyMesh.visible = this.viewMode !== "wireframe";
+      group.add(bodyMesh);
+
+      let lineGeom: THREE.BufferGeometry | null = null;
+      if (p.edges && p.edges.length) {
+        lineGeom = new THREE.BufferGeometry();
+        lineGeom.setAttribute("position", new THREE.BufferAttribute(p.edges, 3));
+      } else {
+        lineGeom = new THREE.EdgesGeometry(geom, 18);
+      }
+      const lines = new THREE.LineSegments(lineGeom, new THREE.LineBasicMaterial({ color: 0x24333f }));
+      lines.visible = this.viewMode !== "shaded";
+      group.add(lines);
+    }
+    this.scene.add(group);
+    this.extraGroup = group;
+    this.applyViewMode();
   }
 
   /** Force the next setGeometry to re-frame the camera (used on first load). */
