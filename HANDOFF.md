@@ -310,3 +310,61 @@ npm install
 npm run smoke   # preuve géométrie headless
 npm run dev     # PoC interactif
 ```
+[37m## Sketcher 2D contraint (Fusion-style) — `src/sketch/` + `SketchEditor.tsx`[39;49;00m[37m[39;49;00m
+[37m[39;49;00m
+Ajout[37m [39;49;00md[33m'[39;49;00m[33mun **éditeur d[39;49;00m[33m'[39;49;00mesquisse[37m [39;49;00mparamétrique[37m [39;49;00mà[37m [39;49;00mcontraintes**,[37m [39;49;00mfaçon[37m [39;49;00mFusion[37m [39;49;00m[34m360.[39;49;00m[37m[39;49;00m
+[37m[39;49;00m
+[37m### Architecture (cœur framework-free, partagé kernel ⇄ UI)[39;49;00m[37m[39;49;00m
+[37m[39;49;00m
+-[37m [39;49;00m**`src/sketch/model.ts`**[37m [39;49;00m—[37m [39;49;00m`SketchDoc`[37m [39;49;00m:[37m [39;49;00m`points`[37m [39;49;00m(x,y,[37m [39;49;00m`fixed?`),[37m [39;49;00m`entities`[37m[39;49;00m
+[37m  [39;49;00m(`line | circle | arc | spline`,[37m [39;49;00mchacun[37m [39;49;00m`construction?`),[37m [39;49;00m`constraints`[37m[39;49;00m
+[37m  [39;49;00m(géométriques[37m [39;49;00m+[37m [39;49;00mcotes[37m [39;49;00mdrivantes[37m [39;49;00mnommées).[37m [39;49;00mHelpers[37m [39;49;00m:[37m [39;49;00m`mergePoints`[37m [39;49;00m(weld[37m [39;49;00mpar[37m[39;49;00m
+[37m  [39;49;00mpartage[37m [39;49;00md[33m'[39;49;00m[33mid = snapping), `deleteEntity`, `dimensions`, `cloneDoc`.[39;49;00m
+[33m- **`src/sketch/solver.ts`** — **Levenberg-Marquardt**, Jacobienne numérique,[39;49;00m
+[33m  résolution linéaire dense. Contraintes : coincident, horizontal/vertical,[39;49;00m
+[33m  parallel, perpendicular, equal, tangent, pointOn, midpoint, symmetric,[39;49;00m
+[33m  concentric (via merge), fixed + cotes distance/distanceX/distanceY/radius/[39;49;00m
+[33m  angle. **Régularisation faible** (W_REG) → stable en sous-contraint.[39;49;00m
+[33m  `overrides` = valeurs de cotes injectées par les params du nœud. `pull` =[39;49;00m
+[33m  drag mou (W_PULL < poids contrainte) → un croquis entièrement contraint reste[39;49;00m
+[33m  **rigide**, seuls les DOF libres suivent le curseur. ~0.06 ms/solve.[39;49;00m
+[33m- **`src/sketch/geometry.ts`** — tessellation en polylignes (rendu 2D/3D),[39;49;00m
+[33m  `traceLoops` (boucles fermées, construction exclue), `bbox`.[39;49;00m
+[33m- **`src/sketch/build.ts`** (seul module qui touche replicad) — doc résolu →[39;49;00m
+[33m  `Drawing` (trous via cut/fuse selon containment).[39;49;00m
+[33m- **`src/sketch/presets.ts`** — `starterRect()` (rectangle contraint de départ).[39;49;00m
+[33m[39;49;00m
+[33m### Intégration graphe[39;49;00m
+[33m[39;49;00m
+[33m- Nœud **`sketch`** (`nodes.ts`) : params `plane` + `doc` (kind `sketch`, édité[39;49;00m
+[33m  via l[39;49;00m[33m'[39;49;00moverlay)[37m [39;49;00m+[37m [39;49;00m**une[37m [39;49;00mcote[37m [39;49;00mdrivante[37m [39;49;00m=[37m [39;49;00mun[37m [39;49;00mparam[37m [39;49;00méditable**[37m [39;49;00m(rendu[37m [39;49;00mdynamique[37m[39;49;00m
+[37m  [39;49;00mdans[37m [39;49;00m`GeoNodeView`).[37m [39;49;00mEval[37m [39;49;00m:[37m [39;49;00mlit[37m [39;49;00mle[37m [39;49;00mdoc,[37m [39;49;00mapplique[37m [39;49;00mles[37m [39;49;00moverrides[37m [39;49;00mde[37m [39;49;00mcotes,[37m[39;49;00m
+[37m  [39;49;00m`solve`,[37m [39;49;00m`buildDrawing`.[37m [39;49;00mOutput[37m [39;49;00m`sketch2d`[37m [39;49;00m(avec[37m [39;49;00m`plane`)[37m [39;49;00m→[37m [39;49;00mExtrude/Revolve.[37m[39;49;00m
+-[37m [39;49;00m**Cotes[37m [39;49;00m⇄[37m [39;49;00mparams[37m [39;49;00mdu[37m [39;49;00mnœud**[37m [39;49;00m:[37m [39;49;00mchanger[37m [39;49;00mune[37m [39;49;00mvaleur[37m [39;49;00m(champ[37m [39;49;00mdu[37m [39;49;00mnœud)[37m [39;49;00mre-résout[37m [39;49;00met[37m[39;49;00m
+[37m  [39;49;00mmet[37m [39;49;00mà[37m [39;49;00mjour[37m [39;49;00mla[37m [39;49;00m3D[37m [39;49;00m**live**.[37m [39;49;00m`commitSketch`[37m [39;49;00m(éditeur[37m [39;49;00mautoritaire[37m [39;49;00mà[37m [39;49;00mla[37m [39;49;00msortie)[37m[39;49;00m
+[37m  [39;49;00mmirroir[37m [39;49;00mdoc→params[37m [39;49;00m;[37m [39;49;00mouverture[37m [39;49;00m:[37m [39;49;00msync[37m [39;49;00mparams→doc.[37m[39;49;00m
+-[37m [39;49;00m**Plan[37m [39;49;00mhonoré**[37m [39;49;00m:[37m [39;49;00m`sketch2d.plane`[37m [39;49;00m→[37m [39;49;00m`sketchOnPlane(plane)`[37m [39;49;00mdans[37m [39;49;00mextrude[37m [39;49;00m+[37m[39;49;00m
+[37m  [39;49;00mpreview[37m [39;49;00m(une[37m [39;49;00mesquisse[37m [39;49;00mXZ/YZ[37m [39;49;00mapparaît[37m [39;49;00mverticale).[37m [39;49;00m⚠[37m [39;49;00mles[37m [39;49;00mcrits[37m [39;49;00mde[37m [39;49;00msélection[37m[39;49;00m
+[37m  [39;49;00md[33m'[39;49;00m[33mextrude restent en XY (limite connue pour un extrude non-XY).[39;49;00m
+[33m[39;49;00m
+[33m### Éditeur (`SketchEditor.tsx`, overlay plein écran)[39;49;00m
+[33m[39;49;00m
+[33m- Interaction via **`docRef` synchrone + `applyDoc()`** (mutate → solve →[39;49;00m
+[33m  setState) : les handlers relisent les ids créés. Refs de chaîne pour les[39;49;00m
+[33m  outils multi-clics.[39;49;00m
+[33m- Outils : select/drag, line (auto H/V près des axes), rect, circle, arc[39;49;00m
+[33m  3-points, spline (Catmull-Rom). Snapping points (weld) + grille adaptative.[39;49;00m
+[33m- Contraintes sur sélection (barre d[39;49;00m[33m'[39;49;00micônes),[37m [39;49;00mcotes[37m [39;49;00m→[37m [39;49;00mpanneau[37m [39;49;00méditable.[37m[39;49;00m
+-[37m [39;49;00m**[34mUndo[39;49;00m/redo**[37m [39;49;00m(⌘Z[37m [39;49;00m/[37m [39;49;00m⇧⌘Z)[37m [39;49;00m:[37m [39;49;00msnapshots[37m [39;49;00mpré-édition,[37m [39;49;00mune[37m [39;49;00mseule[37m [39;49;00mpar[37m [39;49;00mdrag.[37m[39;49;00m
+-[37m [39;49;00m**Construction**[37m [39;49;00m(touche[37m [39;49;00mX[37m [39;49;00m/[37m [39;49;00m⋯)[37m [39;49;00m:[37m [39;49;00mentités[37m [39;49;00mde[37m [39;49;00mréférence[37m [39;49;00mdashed,[37m [39;49;00mexclues[37m [39;49;00mdu[37m[39;49;00m
+[37m  [39;49;00mprofil.[37m[39;49;00m
+-[37m [39;49;00mPan/zoom[37m [39;49;00mmolette,[37m [39;49;00mglyphes[37m [39;49;00mde[37m [39;49;00mcontraintes,[37m [39;49;00mlabels[37m [39;49;00mde[37m [39;49;00mcotes,[37m [39;49;00maxes.[37m[39;49;00m
+-[37m [39;49;00m⚠[37m [39;49;00m**Clavier**[37m [39;49;00m:[37m [39;49;00mquand[37m [39;49;00ml[33m'[39;49;00m[33moverlay est ouvert, `NodeEditor` ignore ses[39;49;00m
+[33m  raccourcis et React Flow désactive Delete (sinon ⌘Z fermait l[39;49;00m[33m'[39;49;00méditeur).[37m[39;49;00m
+[37m[39;49;00m
+[37m### Reste à faire (idées)[39;49;00m[37m[39;49;00m
+[37m[39;49;00m
+-[37m [39;49;00mSélection[37m [39;49;00md[33m'[39;49;00m[33mentité un peu plus tolérante encore ; witness/arrow lines sur les[39;49;00m
+[33m  cotes ; trim/extend/offset dans l[39;49;00m[33m'[39;49;00mesquisse[37m [39;49;00m;[37m [39;49;00m[36mpolygon[39;49;00m/slot[37m [39;49;00mtools[37m [39;49;00m;[37m [39;49;00mafficher[37m[39;49;00m
+[37m  [39;49;00ml[33m'[39;49;00m[33mesquisse comme **line-work** sur le plan en 3D (plutôt qu[39;49;00m[33m'[39;49;00mune[37m [39;49;00mplaque[37m [39;49;00m[34m0.5[39;49;00mmm)[37m [39;49;00m;[37m[39;49;00m
+[37m  [39;49;00mcrits[37m [39;49;00mde[37m [39;49;00msélection[37m [39;49;00mcorrects[37m [39;49;00mpour[37m [39;49;00mextrude[37m [39;49;00mnon-XY[37m [39;49;00m;[37m [39;49;00mrevolve[37m [39;49;00mhonorant[37m [39;49;00mle[37m [39;49;00mplan.[37m[39;49;00m
