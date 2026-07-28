@@ -345,6 +345,16 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
         case "fixed": for (const p of pts) { const pp = d.points.find((q) => q.id === p); if (pp) pp.fixed = !pp.fixed; } break;
         case "symmetric": if (pts.length === 2 && ents.length === 1) push({ a: pts[0], b: pts[1], line: ents[0] }); break;
         case "pointOn": if (pts.length === 1 && ents.length === 1) push({ p: pts[0], ent: ents[0] }); break;
+        case "midpoint": if (pts.length === 1 && ents.length === 1) push({ p: pts[0], line: ents[0] }); break;
+        case "concentric": {
+          // merge the centres of two circles/arcs (their coincidence IS the constraint)
+          if (ents.length === 2) {
+            const centre = (id: Id) => { const e = d.entities.find((x) => x.id === id); return e && (e.kind === "circle" || e.kind === "arc") ? e.c : null; };
+            const ca = centre(ents[0]), cb = centre(ents[1]);
+            if (ca && cb) mergePoints(d, ca, cb);
+          }
+          break;
+        }
       }
     });
     setSel({ points: new Set(), entities: new Set() });
@@ -607,7 +617,9 @@ const CONSTRAINTS = [
   { k: "perpendicular", g: "⊥", t: "Perpendicular (2 lines)" },
   { k: "equal", g: "=", t: "Equal length / radius (2 entities)" },
   { k: "tangent", g: "◜", t: "Tangent (line+circle or 2 circles)" },
+  { k: "concentric", g: "◎", t: "Concentric (2 circles/arcs share a centre)" },
   { k: "pointOn", g: "⌖", t: "Point on entity (1 point + 1 entity)" },
+  { k: "midpoint", g: "⊢", t: "Midpoint (point at the middle of a line)" },
   { k: "symmetric", g: "⋈", t: "Symmetric (2 points about a line)" },
   { k: "fixed", g: "▪", t: "Fix / unfix point" },
 ];

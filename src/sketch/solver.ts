@@ -167,6 +167,15 @@ export function solve(doc: SketchDoc, opts: SolveOptions = {}): SolveResult {
           r.push(tangentResidual(v, ea, eb, P, R));
           break;
         }
+        case "midpoint": {
+          const e = entById.get(c.line)!;
+          if (e.kind === "line") {
+            const [a, b] = [P(v, e.p1), P(v, e.p2)];
+            const p = P(v, c.p);
+            r.push(p[0] - (a[0] + b[0]) / 2, p[1] - (a[1] + b[1]) / 2);
+          }
+          break;
+        }
         case "symmetric": {
           const [a, b] = [P(v, c.a), P(v, c.b)];
           const e = entById.get(c.line)!;

@@ -47,6 +47,7 @@ export type GeoConstraint =
   | { id: Id; kind: "equal"; a: Id; b: Id }
   | { id: Id; kind: "tangent"; a: Id; b: Id }
   | { id: Id; kind: "pointOn"; p: Id; ent: Id }
+  | { id: Id; kind: "midpoint"; p: Id; line: Id }
   | { id: Id; kind: "symmetric"; a: Id; b: Id; line: Id }
   | { id: Id; kind: "fixed"; p: Id };
 
