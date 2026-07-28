@@ -554,30 +554,80 @@ function PreviewSeg({ tool, from, cursor, toS }: { tool: Tool; from: Vec2; curso
   return <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} className="ske__preview" />;
 }
 
-function DimLabel({ dim, doc, toS }: { dim: DimConstraint; doc: SketchDoc; toS: (w: Vec2) => Vec2 }) {
-  const P = (id: Id) => doc.points.find((q) => q.id === id);
-  let pos: Vec2 | null = null, text = "";
-  if (dim.kind === "radius") {
-    const e = doc.entities.find((x) => x.id === dim.ent);
-    if (e?.kind === "circle") { const c = P(e.c)!; pos = [c.x + e.r * 0.7, c.y + e.r * 0.7]; }
-    else if (e?.kind === "arc") { const c = P(e.c)!, p1 = P(e.p1)!; pos = [(c.x + p1.x) / 2, (c.y + p1.y) / 2]; }
-    text = `${dim.name}=R${round(dim.value)}`;
-  } else if (dim.kind === "angle") {
-    const a = doc.entities.find((x) => x.id === dim.a);
-    if (a?.kind === "line") { const p = P(a.p1)!, q = P(a.p2)!; pos = [(p.x + q.x) / 2, (p.y + q.y) / 2]; }
-    text = `${dim.name}=${round(dim.value)}°`;
-  } else {
-    const a = P(dim.a), b = P(dim.b);
-    if (a && b) { pos = [(a.x + b.x) / 2, (a.y + b.y) / 2]; text = `${dim.name}=${round(dim.value)}`; }
-  }
-  if (!pos) return null;
-  const s = toS(pos);
+const DIM_OFFSET = 26; // px the dimension line sits off the measured geometry
+
+function labelBox(s: Vec2, text: string) {
   return (
     <g className="ske__dimlabel">
-      <rect x={s[0] - 2} y={s[1] - 9} width={text.length * 6.4 + 8} height={15} rx={2} />
-      <text x={s[0] + 2} y={s[1] + 2.5}>{text}</text>
+      <rect x={s[0] - text.length * 3.2 - 3} y={s[1] - 8} width={text.length * 6.4 + 6} height={15} rx={2} />
+      <text x={s[0]} y={s[1] + 2.5} textAnchor="middle">{text}</text>
     </g>
   );
+}
+function arrow(at: Vec2, dir: Vec2) {
+  // small arrowhead pointing along `dir` (unit) at screen point `at`
+  const n: Vec2 = [-dir[1], dir[0]];
+  const L = 7, W = 2.6;
+  const p1: Vec2 = [at[0] - dir[0] * L + n[0] * W, at[1] - dir[1] * L + n[1] * W];
+  const p2: Vec2 = [at[0] - dir[0] * L - n[0] * W, at[1] - dir[1] * L - n[1] * W];
+  return <path d={`M${at[0]},${at[1]} L${p1[0]},${p1[1]} L${p2[0]},${p2[1]} Z`} className="ske__dimarrow" />;
+}
+
+function DimLabel({ dim, doc, toS }: { dim: DimConstraint; doc: SketchDoc; toS: (w: Vec2) => Vec2 }) {
+  const P = (id: Id) => doc.points.find((q) => q.id === id);
+
+  // linear dimensions: witness lines + offset dimension line + arrows + label
+  if (dim.kind === "distance" || dim.kind === "distanceX" || dim.kind === "distanceY") {
+    const a = P(dim.a), b = P(dim.b);
+    if (!a || !b) return null;
+    const sa = toS([a.x, a.y]), sb = toS([b.x, b.y]);
+    const dx = sb[0] - sa[0], dy = sb[1] - sa[1];
+    const len = Math.hypot(dx, dy) || 1;
+    const d: Vec2 = [dx / len, dy / len];
+    const n: Vec2 = [-d[1], d[0]]; // perpendicular offset direction
+    const da: Vec2 = [sa[0] + n[0] * DIM_OFFSET, sa[1] + n[1] * DIM_OFFSET];
+    const db: Vec2 = [sb[0] + n[0] * DIM_OFFSET, sb[1] + n[1] * DIM_OFFSET];
+    const mid: Vec2 = [(da[0] + db[0]) / 2, (da[1] + db[1]) / 2];
+    const text = `${dim.name} ${round(dim.value)}`;
+    return (
+      <g>
+        <line x1={sa[0]} y1={sa[1]} x2={da[0]} y2={da[1]} className="ske__witness" />
+        <line x1={sb[0]} y1={sb[1]} x2={db[0]} y2={db[1]} className="ske__witness" />
+        <line x1={da[0]} y1={da[1]} x2={db[0]} y2={db[1]} className="ske__dimline" />
+        {arrow(da, [-d[0], -d[1]])}
+        {arrow(db, d)}
+        {labelBox(mid, text)}
+      </g>
+    );
+  }
+
+  // radius: leader from centre outward
+  if (dim.kind === "radius") {
+    const e = doc.entities.find((x) => x.id === dim.ent);
+    let c: Vec2 | null = null, r = 0;
+    if (e?.kind === "circle") { const cp = P(e.c)!; c = [cp.x, cp.y]; r = e.r; }
+    else if (e?.kind === "arc") { const cp = P(e.c)!, p1 = P(e.p1)!; c = [cp.x, cp.y]; r = Math.hypot(cp.x - p1.x, cp.y - p1.y); }
+    if (!c) return null;
+    const sc = toS(c);
+    const dir: Vec2 = [0.7071, -0.7071];
+    const edge = toS([c[0] + dir[0] * r, c[1] + dir[1] * r]);
+    return (
+      <g>
+        <line x1={sc[0]} y1={sc[1]} x2={edge[0]} y2={edge[1]} className="ske__dimline" />
+        {labelBox([edge[0] + 22, edge[1] - 8], `${dim.name} R${round(dim.value)}`)}
+      </g>
+    );
+  }
+
+  // angle: label near the first line's midpoint
+  if (dim.kind === "angle") {
+    const a = doc.entities.find((x) => x.id === dim.a);
+    if (a?.kind !== "line") return null;
+    const p = P(a.p1)!, q = P(a.p2)!;
+    const s = toS([(p.x + q.x) / 2, (p.y + q.y) / 2]);
+    return labelBox(s, `${dim.name} ${round(dim.value)}°`);
+  }
+  return null;
 }
 
 function ConstraintGlyphs({ doc, toS, onRemove }: { doc: SketchDoc; toS: (w: Vec2) => Vec2; onRemove: (id: Id) => void }) {

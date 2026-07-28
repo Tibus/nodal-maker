@@ -351,8 +351,11 @@ button.link {
 .ske__pt.start { stroke: #39d98a; stroke-width: 2; }
 .ske__snapring { fill: none; stroke: #39d98a; stroke-width: 1.5; }
 .ske__glyph { fill: #d19a66; font-size: 12px; font-weight: 700; cursor: pointer; user-select: none; }
-.ske__dimlabel rect { fill: rgba(20,26,34,0.85); stroke: #3a6a3a; }
+.ske__dimlabel rect { fill: rgba(20,26,34,0.9); stroke: #3a6a3a; }
 .ske__dimlabel text { fill: #9fe0a0; font-size: 11px; font-weight: 600; }
+.ske__witness { stroke: #5a6b57; stroke-width: 1; }
+.ske__dimline { stroke: #6f9a6a; stroke-width: 1; }
+.ske__dimarrow { fill: #6f9a6a; }
 
 .ske__panel {
   flex: 0 0 250px; background: #171b21; border-left: 1px solid #262b33;
