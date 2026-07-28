@@ -379,6 +379,15 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
   const setDimName = (id: Id, name: string) => applyDoc((d) => { const c = d.constraints.find((x) => x.id === id); if (c && isDim(c)) c.name = name; });
   const removeConstraint = (id: Id) => { snapshot(); applyDoc((d) => { d.constraints = d.constraints.filter((c) => c.id !== id); }); };
 
+  /** flip construction (reference) flag on the selected entities */
+  const toggleConstruction = () => {
+    if (!sel.entities.size) return;
+    snapshot();
+    applyDoc((d) => {
+      for (const e of d.entities) if (sel.entities.has(e.id)) e.construction = !e.construction;
+    });
+  };
+
   const deleteSelection = useCallback(() => {
     snapshot();
     applyDoc((d) => {
@@ -403,6 +412,7 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
       else if (e.key === "a") setTool("arc");
       else if (e.key === "s") setTool("spline");
       else if (e.key === "v") setTool("select");
+      else if (e.key === "x") toggleConstruction();
       else if (e.key === "f") fit(size.w, size.h);
     };
     window.addEventListener("keydown", onKey);
@@ -429,6 +439,7 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
         <div className="ske__cons">
           <button className="ske__con" onClick={undo} title="Undo (⌘Z)">↶</button>
           <button className="ske__con" onClick={redo} title="Redo (⇧⌘Z)">↷</button>
+          <button className="ske__con" onClick={toggleConstruction} title="Toggle construction / reference geometry on the selection (X)">⋯</button>
         </div>
         <div className="ske__cons">
           {CONSTRAINTS.map((c) => (
@@ -458,7 +469,7 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
 
           {tess.map((t) => {
             const d = t.pts.map(toS).map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
-            return <path key={t.id} d={d} className={`ske__ent${sel.entities.has(t.id) ? " sel" : ""}`} fill="none" />;
+            return <path key={t.id} d={d} className={`ske__ent${t.construction ? " constr" : ""}${sel.entities.has(t.id) ? " sel" : ""}`} fill="none" />;
           })}
 
           {cursor && chainTail && (

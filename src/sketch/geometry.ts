@@ -74,9 +74,9 @@ export function sampleEntity(d: SketchDoc, e: Entity, pm = pmap(d)): Vec2[] {
 }
 
 /** All entities as polylines — for rendering the whole sketch. */
-export function tessellate(d: SketchDoc): { id: Id; kind: Entity["kind"]; pts: Vec2[] }[] {
+export function tessellate(d: SketchDoc): { id: Id; kind: Entity["kind"]; construction: boolean; pts: Vec2[] }[] {
   const pm = pmap(d);
-  return d.entities.map((e) => ({ id: e.id, kind: e.kind, pts: sampleEntity(d, e, pm) }));
+  return d.entities.map((e) => ({ id: e.id, kind: e.kind, construction: !!e.construction, pts: sampleEntity(d, e, pm) }));
 }
 
 /* -------------------------------------------------------------------------- */
@@ -101,19 +101,18 @@ export function traceLoops(d: SketchDoc): Loop[] {
   const pm = pmap(d);
   const loops: Loop[] = [];
 
-  // circles are self-contained loops
+  // real (non-construction) circles are self-contained loops
   for (const e of d.entities) {
-    if (e.kind === "circle") {
-      const c = pm.get(e.c)!;
+    if (e.kind === "circle" && !e.construction) {
       loops.push({ edges: [], area: Math.PI * e.r * e.r, circle: e });
-      void c;
     }
   }
 
-  // edges that have two endpoints (line/arc/spline)
+  // edges that have two endpoints (line/arc/spline), construction excluded
   type Edge = { entity: Entity; a: Id; b: Id };
   const edges: Edge[] = [];
   for (const e of d.entities) {
+    if (e.construction) continue;
     if (e.kind === "line") edges.push({ entity: e, a: e.p1, b: e.p2 });
     else if (e.kind === "arc") edges.push({ entity: e, a: e.p1, b: e.p2 });
     else if (e.kind === "spline" && e.pts.length >= 2) edges.push({ entity: e, a: e.pts[0], b: e.pts[e.pts.length - 1] });

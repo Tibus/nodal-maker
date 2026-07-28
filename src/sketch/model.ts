@@ -21,17 +21,19 @@ export interface SPoint {
   fixed?: boolean;
 }
 
+// `construction: true` marks reference geometry — drawn dashed, used for
+// constraints/symmetry but excluded from the closed profile fed to Extrude.
 export type Entity =
-  | { id: Id; kind: "line"; p1: Id; p2: Id }
+  | { id: Id; kind: "line"; p1: Id; p2: Id; construction?: boolean }
   /** circle: centre point + a radius DOF */
-  | { id: Id; kind: "circle"; c: Id; r: number }
+  | { id: Id; kind: "circle"; c: Id; r: number; construction?: boolean }
   /**
    * arc: centre + two endpoints. The radius is implied by |c-p1|; an internal
    * consistency residual keeps |c-p2| equal to it. `ccw` picks the sweep side.
    */
-  | { id: Id; kind: "arc"; c: Id; p1: Id; p2: Id; ccw: boolean }
+  | { id: Id; kind: "arc"; c: Id; p1: Id; p2: Id; ccw: boolean; construction?: boolean }
   /** spline: a smooth curve through its control points (open chain) */
-  | { id: Id; kind: "spline"; pts: Id[] };
+  | { id: Id; kind: "spline"; pts: Id[]; construction?: boolean };
 
 export type EntityKind = Entity["kind"];
 

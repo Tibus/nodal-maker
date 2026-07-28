@@ -342,6 +342,7 @@ button.link {
 .ske__axis { stroke: #37414f; stroke-width: 1; stroke-dasharray: 3 4; }
 .ske__ent { stroke: #ccd3dd; stroke-width: 1.8; }
 .ske__ent.sel { stroke: #4f9bff; stroke-width: 2.6; }
+.ske__ent.constr { stroke: #d19a66; stroke-width: 1.2; stroke-dasharray: 6 4; }
 .ske__preview { stroke: #4f9bff; stroke-width: 1.5; stroke-dasharray: 4 4; }
 .ske__pt { fill: #dfe4ea; stroke: #12161b; stroke-width: 1; }
 .ske__pt.fixed { fill: #ff8c42; }
