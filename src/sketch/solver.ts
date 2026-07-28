@@ -21,8 +21,14 @@ import { isDim } from "./model";
 export interface SolveOptions {
   /** dimension name → driving value (from the Sketch node's params) */
   overrides?: Record<string, number>;
-  /** points held at a fixed position for this solve (live drag) */
+  /** points held HARD at a fixed position for this solve */
   pin?: { id: Id; x: number; y: number }[];
+  /**
+   * points SOFTLY pulled toward a position (live drag): the real constraints
+   * still win, so a fully-constrained sketch stays rigid while free DOF follow
+   * the cursor.
+   */
+  pull?: { id: Id; x: number; y: number }[];
   maxIter?: number;
   tol?: number;
 }
@@ -36,6 +42,9 @@ export interface SolveResult {
 // weight that turns unitless angular residuals into ~mm-scale pulls
 const ANG = 50;
 const W_REG = 0.005;
+// live-drag pull: below the hard-constraint weight (~1) so constraints win and
+// a fully-constrained sketch stays put, but far above W_REG so free DOF follow
+const W_PULL = 0.35;
 
 /** Solve `doc` in place. Returns convergence info. */
 export function solve(doc: SketchDoc, opts: SolveOptions = {}): SolveResult {
@@ -216,6 +225,11 @@ export function solve(doc: SketchDoc, opts: SolveOptions = {}): SolveResult {
         r.push(norm(...sub(P(v, e.p1), cc)) - norm(...sub(P(v, e.p2), cc)));
       }
     }
+    // live-drag soft pull toward the cursor (constraints still dominate)
+    for (const pl of opts.pull ?? []) {
+      const p = P(v, pl.id);
+      r.push((p[0] - pl.x) * W_PULL, (p[1] - pl.y) * W_PULL);
+    }
     // weak regularisation toward the pre-solve state
     for (let i = 0; i < N; i++) r.push((v[i] - x0[i]) * W_REG);
     return r;
@@ -282,8 +296,9 @@ export function solve(doc: SketchDoc, opts: SolveOptions = {}): SolveResult {
   // report satisfaction of the *hard* constraints only — the trailing N
   // regularisation rows are intentionally soft and shouldn't count as error
   const rFinal = residuals(x);
+  const softRows = N + 2 * (opts.pull?.length ?? 0); // trailing pull + reg rows
   let hard = 0;
-  for (let i = 0; i < rFinal.length - N; i++) hard += rFinal[i] * rFinal[i];
+  for (let i = 0; i < rFinal.length - softRows; i++) hard += rFinal[i] * rFinal[i];
   const hardRes = Math.sqrt(hard);
   return { ok: hardRes < 5e-3, iterations: iter, residual: hardRes };
 }

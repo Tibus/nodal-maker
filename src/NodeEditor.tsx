@@ -44,6 +44,9 @@ import {
   type ComponentDef,
   type InstanceDescriptor,
 } from "./kernel/client";
+import { starterRect } from "./sketch/presets";
+import { dimensions, isDim, type SketchDoc } from "./sketch/model";
+import SketchEditor from "./SketchEditor";
 
 type GeoData = {
   nodeType: string;
@@ -104,6 +107,8 @@ interface EditorCtx {
   /** is this node's body shown (default true; false once the user hides it)? */
   isVisible: (nodeId: string) => boolean;
   toggleVisible: (nodeId: string) => void;
+  /** open the 2D sketch editor overlay for a Sketch node */
+  editSketch: (nodeId: string) => void;
 }
 const Ctx = createContext<EditorCtx | null>(null);
 
@@ -194,6 +199,32 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
 
         {/* params — those that are portable get an OPTIONAL, hollow port */}
         {spec.params.map((ps) => {
+          // the sketch doc renders as an "Edit" button plus one field per
+          // driving dimension (those mirror into node params and re-solve)
+          if (ps.kind === "sketch") {
+            const doc = data.params[ps.name] as SketchDoc | null;
+            const dims = doc ? dimensions(doc) : [];
+            return (
+              <div className="gnode__sketch" key={`p-${ps.name}`}>
+                <button
+                  className="gnode__editsketch"
+                  onClick={(e) => { e.stopPropagation(); ctx.editSketch(id); }}
+                  title="Open the 2D constraint sketch editor"
+                >
+                  ✎ Edit sketch
+                </button>
+                {dims.map((dm) => (
+                  <div className="gnode__row gnode__row--param" key={`dim-${dm.name}`}>
+                    <ParamField
+                      spec={{ name: dm.name, kind: "number", label: `${dm.name} (${dm.kind === "angle" ? "°" : "mm"})`, step: 0.5 }}
+                      value={data.params[dm.name] ?? dm.value}
+                      onChange={(v) => ctx.setParam(id, dm.name, v)}
+                    />
+                  </div>
+                ))}
+              </div>
+            );
+          }
           const pt = paramPortType(ps);
           const linked = pt !== null && ctx.isLinked(id, ps.name);
           return (
@@ -828,6 +859,32 @@ export default function NodeEditor({
 
   const setOutput = useCallback((id: string) => setOutputId(id), []);
 
+  // 2D sketch editor overlay: which Sketch node is being edited (null = closed)
+  const [editingSketchId, setEditingSketchId] = useState<string | null>(null);
+  const editSketch = useCallback((id: string) => setEditingSketchId(id), []);
+  /**
+   * Commit an edited sketch back onto its node: store the doc and refresh the
+   * mirrored driving-dimension params (add new, drop removed) so the node's
+   * editable fields and the live re-solve stay in sync with the drawing.
+   */
+  const commitSketch = useCallback((id: string, doc: SketchDoc) => {
+    setNodes((prev) =>
+      prev.map((n) => {
+        if (n.id !== id) return n;
+        const params: Record<string, unknown> = { ...n.data.params, doc, plane: doc.plane };
+        const dims = dimensions(doc);
+        const names = new Set(dims.map((x) => x.name));
+        // drop params for dimensions that no longer exist
+        for (const k of Object.keys(params)) {
+          if (k !== "doc" && k !== "plane" && !names.has(k) && /^[dra]\d+$/.test(k)) delete params[k];
+        }
+        // the editor is authoritative on exit: mirror every dimension's value
+        for (const dm of dims) params[dm.name] = dm.value;
+        return { ...n, data: { ...n.data, params } };
+      }),
+    );
+  }, [setNodes]);
+
   // create a Face/Edge Select node from a viewport pick, and — if the currently
   // viewed node is a fillet/bevel/shell with an empty selection port of the
   // matching kind — auto-wire the new selector straight into it.
@@ -944,6 +1001,13 @@ export default function NodeEditor({
       const spec = NODE_SPECS[type];
       const params: Record<string, unknown> = {};
       for (const p of spec.params) params[p.name] = p.default;
+      // a fresh Sketch node starts as a fully-constrained rectangle whose
+      // width/height dimensions are mirrored as editable node params
+      if (type === "sketch") {
+        const doc = starterRect();
+        params.doc = doc;
+        for (const dim of dimensions(doc)) params[dim.name] = dim.value;
+      }
       const id = newId(type);
       const sel = nodes.find((n) => n.selected);
       const position =
@@ -1252,8 +1316,9 @@ export default function NodeEditor({
       setPortTip,
       isVisible: (nodeId) => !hidden.has(nodeId),
       toggleVisible,
+      editSketch,
     }),
-    [outputId, setOutput, setParam, linkedSet, sourceLinkedSet, errorNodeId, errorMessage, values, components, selOutputsMap, hidden, toggleVisible],
+    [outputId, setOutput, setParam, linkedSet, sourceLinkedSet, errorNodeId, errorMessage, values, components, selOutputsMap, hidden, toggleVisible, editSketch],
   );
 
   const outType = NODE_SPECS[nodes.find((n) => n.id === outputId)?.data.nodeType ?? ""]?.output;
@@ -1496,6 +1561,23 @@ export default function NodeEditor({
             })}
         </div>
       </div>
+
+      {/* full-screen 2D constraint sketch editor */}
+      {editingSketchId && (() => {
+        const node = nodes.find((n) => n.id === editingSketchId);
+        const doc = node?.data.params.doc as SketchDoc | undefined;
+        if (!node || !doc) { setEditingSketchId(null); return null; }
+        // open with dimension values synced from the node params (the user may
+        // have tweaked a dimension via the node field since the last edit)
+        const synced: SketchDoc = { ...doc, constraints: doc.constraints.map((c) => (isDim(c) && node.data.params[c.name] != null ? { ...c, value: Number(node.data.params[c.name]) } : c)) };
+        return (
+          <SketchEditor
+            initialDoc={synced}
+            onCommit={(d: SketchDoc) => { commitSketch(editingSketchId, d); setEditingSketchId(null); }}
+            onCancel={() => setEditingSketchId(null)}
+          />
+        );
+      })()}
     </div>
   );
 }

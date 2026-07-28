@@ -16,7 +16,7 @@ export interface PortSpec {
 
 export interface ParamSpec {
   name: string;
-  kind: "number" | "text" | "select" | "stl" | "step" | "font";
+  kind: "number" | "text" | "select" | "stl" | "step" | "font" | "sketch";
   label?: string;
   default?: unknown;
   min?: number;
@@ -75,6 +75,7 @@ export const NODE_DESCRIPTIONS: Record<string, string> = {
   clamp: "Constrain a number between a min and a max.",
   remap: "Rescale a number from an input range to an output range.",
   random: "A deterministic pseudo-random number from a seed, within a range.",
+  sketch: "A constraint-based 2D sketch (Fusion-style). Draw lines/arcs/circles/splines, add geometric constraints and driving dimensions — the dimensions become editable node parameters. Feeds Extrude/Revolve.",
   rect: "A rectangle profile, with optional rounded corners.",
   circle: "A circle profile of the given radius.",
   ellipse: "An ellipse profile from its two radii.",
@@ -138,7 +139,7 @@ export const NODE_DESCRIPTIONS: Record<string, string> = {
 /** Ordered palette categories (drives the grouped palette + search). */
 export const NODE_CATEGORIES: { name: string; types: string[] }[] = [
   { name: "Value", types: ["numberValue", "textValue", "math", "mathUnary", "clamp", "remap", "random"] },
-  { name: "2D Primitive", types: ["rect", "circle", "ellipse", "polygon", "star", "slot", "gear", "fingerBox", "svgInput", "textToSvg"] },
+  { name: "2D Primitive", types: ["sketch", "rect", "circle", "ellipse", "polygon", "star", "slot", "gear", "fingerBox", "svgInput", "textToSvg"] },
   { name: "2D Op", types: ["offset2d", "kerf", "fillet2d", "bevel2d", "boolean2d", "mirror2d", "transform2d", "arrayLinear2d", "arrayRadial2d", "group", "scoreCut"] },
   { name: "3D Primitive", types: ["box", "cylinder", "sphere", "cone", "torus", "thread", "internalThread", "importSTEP"] },
   { name: "Sketch → Solid", types: ["extrude", "revolve", "loft", "loftSections", "sweep", "bossOnCap"] },
@@ -224,6 +225,19 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     inputs: [],
     output: "sketch2d",
     params: [{ name: "d", kind: "text", label: "path d", default: "" }],
+  },
+  sketch: {
+    type: "sketch",
+    label: "Sketch",
+    inputs: [],
+    output: "sketch2d",
+    // `doc` holds the whole constraint sketch (edited via the 2D editor).
+    // `plane` places it in 3D. Driving dimensions surface as extra params
+    // dynamically (rendered by the editor from the doc).
+    params: [
+      { name: "plane", kind: "select", label: "plane", default: "XY", options: ["XY", "XZ", "YZ"] },
+      { name: "doc", kind: "sketch", label: "sketch", default: null },
+    ],
   },
   rect: {
     type: "rect",

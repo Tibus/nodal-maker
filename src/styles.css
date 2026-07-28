@@ -294,3 +294,95 @@ button.link {
 }
 .gnode__selhd:hover { color: #d19a66; }
 .gnode__portlabel--r { text-align: right; }
+/* ---- Sketch node: edit button + dimension fields ---- */
+.gnode__sketch { display: flex; flex-direction: column; gap: 6px; }
+.gnode__editsketch {
+  background: #2d3a4d; color: #cfe0f5; border: 1px solid #3f5670;
+  border-radius: 6px; padding: 6px 8px; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.gnode__editsketch:hover { background: #35465c; }
+
+/* ---- Sketch editor (full-screen overlay) ---- */
+.ske {
+  position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column;
+  background: #0f1216; color: #d8dbe0; font-size: 13px;
+}
+.ske__bar {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  background: #171b21; border-bottom: 1px solid #262b33; flex: 0 0 auto;
+}
+.ske__tools, .ske__cons { display: flex; gap: 4px; }
+.ske__tool, .ske__con {
+  width: 32px; height: 32px; display: grid; place-items: center;
+  background: #22272f; color: #cbd1da; border: 1px solid #333a44; border-radius: 6px;
+  font-size: 15px; cursor: pointer;
+}
+.ske__tool:hover, .ske__con:hover { background: #2c333d; }
+.ske__tool.on { background: #3d6fb4; border-color: #4f86d6; color: #fff; }
+.ske__con--dim { background: #2d3a2d; border-color: #3f5a3f; }
+.ske__cons { border-left: 1px solid #2a2f38; padding-left: 8px; margin-left: 4px; }
+.ske__spacer { flex: 1; }
+.ske__plane { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #99a0ab; }
+.ske__plane select { background: #22272f; color: #d8dbe0; border: 1px solid #333a44; border-radius: 5px; padding: 4px; }
+.ske__toggle, .ske__btn {
+  background: #22272f; color: #cbd1da; border: 1px solid #333a44; border-radius: 6px;
+  padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.ske__toggle.on { background: #39d98a; color: #10231a; border-color: #39d98a; }
+.ske__btn--cancel:hover { background: #3a2830; border-color: #6b3a48; }
+.ske__btn--ok { background: #2f9e57; border-color: #37b866; color: #fff; }
+.ske__btn--ok:hover { background: #37b866; }
+
+.ske__stage { flex: 1; display: flex; min-height: 0; }
+.ske__svg { flex: 1; display: block; background: #12161b; cursor: crosshair; }
+.ske__svg--select { cursor: default; }
+
+.ske__grid { stroke: #1c2128; stroke-width: 1; }
+.ske__grid0 { stroke: #2b333f; stroke-width: 1.5; }
+.ske__axis { stroke: #37414f; stroke-width: 1; stroke-dasharray: 3 4; }
+.ske__ent { stroke: #ccd3dd; stroke-width: 1.8; }
+.ske__ent.sel { stroke: #4f9bff; stroke-width: 2.6; }
+.ske__preview { stroke: #4f9bff; stroke-width: 1.5; stroke-dasharray: 4 4; }
+.ske__pt { fill: #dfe4ea; stroke: #12161b; stroke-width: 1; }
+.ske__pt.fixed { fill: #ff8c42; }
+.ske__pt.sel { fill: #4f9bff; }
+.ske__pt.snap { fill: #39d98a; }
+.ske__pt.start { stroke: #39d98a; stroke-width: 2; }
+.ske__snapring { fill: none; stroke: #39d98a; stroke-width: 1.5; }
+.ske__glyph { fill: #d19a66; font-size: 12px; font-weight: 700; cursor: pointer; user-select: none; }
+.ske__dimlabel rect { fill: rgba(20,26,34,0.85); stroke: #3a6a3a; }
+.ske__dimlabel text { fill: #9fe0a0; font-size: 11px; font-weight: 600; }
+
+.ske__panel {
+  flex: 0 0 250px; background: #171b21; border-left: 1px solid #262b33;
+  padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;
+}
+.ske__phd {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; color: #7f8792;
+  font-weight: 700; margin-top: 6px; display: flex; justify-content: space-between;
+}
+.ske__phd span { color: #4f9bff; }
+.ske__empty { font-size: 11px; color: #8a919c; line-height: 1.5; }
+.ske__dim { display: flex; align-items: center; gap: 4px; }
+.ske__dimname {
+  width: 52px; background: #12161b; color: #9fe0a0; border: 1px solid #2a3340;
+  border-radius: 4px; padding: 4px; font-size: 12px; font-weight: 600;
+}
+.ske__dimval {
+  flex: 1; background: #12161b; color: #e8ebf0; border: 1px solid #2a3340;
+  border-radius: 4px; padding: 4px; font-size: 12px;
+}
+.ske__dimu { font-size: 10px; color: #7f8792; width: 20px; }
+.ske__dimx { background: none; border: 0; color: #a06070; cursor: pointer; font-size: 15px; }
+.ske__dimx:hover { color: #ff6b81; }
+.ske__selinfo { font-size: 11px; color: #99a0ab; }
+.ske__del { background: #2a222a; color: #d09aa8; border: 1px solid #4a3540; border-radius: 6px; padding: 6px; font-size: 12px; cursor: pointer; }
+.ske__del:disabled { opacity: 0.4; cursor: default; }
+.ske__hintbox { margin-top: auto; font-size: 10.5px; color: #7f8792; line-height: 1.5; display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid #232830; }
+
+.ske__status {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 6px 12px;
+  background: #171b21; border-top: 1px solid #262b33; font-size: 12px; color: #aeb4bd;
+}
+.ske__status b { color: #cfd5de; font-weight: 600; }
+.ske__coord { margin-left: auto; color: #7f8792; font-variant-numeric: tabular-nums; }

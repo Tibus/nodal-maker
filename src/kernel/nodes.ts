@@ -49,6 +49,9 @@ import {
   type MeshData,
 } from "./manifold";
 import { parseBinarySTL, writeBinarySTL } from "./stl";
+import { cloneDoc, dimensions, type SketchDoc } from "../sketch/model";
+import { solve as solveSketch } from "../sketch/solver";
+import { buildDrawing } from "../sketch/build";
 
 /* ------------------------------------------------------------------ */
 /* Typed values that travel along the graph edges                      */
@@ -684,6 +687,23 @@ const REGISTRY: Record<string, NodeImpl> = {
   },
 
   /* --- primitives 2D (sources) — for laser / Cricut and profiles --- */
+  sketch: (_inputs, params) => {
+    // the constraint sketch, with driving dimensions overridden by the node's
+    // params (so editing a dimension value re-solves and updates the 3D live)
+    const raw = params.doc;
+    const doc: SketchDoc | null =
+      raw && typeof raw === "object" ? (raw as SketchDoc) : typeof raw === "string" && raw ? (JSON.parse(raw) as SketchDoc) : null;
+    if (!doc || !doc.entities?.length) throw new Error("[sketch] empty — open the sketch editor and draw a closed profile");
+    const overrides: Record<string, number> = {};
+    for (const dim of dimensions(doc)) {
+      const v = params[dim.name];
+      if (v !== undefined && v !== null && v !== "") overrides[dim.name] = Number(v);
+    }
+    const solved = cloneDoc(doc);
+    if (params.plane && solved.plane !== params.plane) solved.plane = params.plane as SketchDoc["plane"];
+    solveSketch(solved, { overrides });
+    return { kind: "sketch2d", drawing: buildDrawing(solved) };
+  },
   rect: (_inputs, params) => ({
     kind: "sketch2d",
     drawing: drawRectangle(Number(params.width ?? 40), Number(params.height ?? 30), Number(params.radius ?? 0)),
