@@ -604,6 +604,33 @@ const EXAMPLES = Object.entries(
   })
   .sort((a, b) => a.title.localeCompare(b.title));
 
+/* -------------------------------------------------------------------------- */
+/* Graph persistence — survive a page reload (localStorage)                    */
+/* -------------------------------------------------------------------------- */
+const STORAGE_KEY = "nodal-maker-graph-v1";
+interface SavedGraph { nodes: GeoNode[]; edges: Edge[]; outputId: string }
+
+function loadSavedGraph(): SavedGraph | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const g = JSON.parse(raw) as SavedGraph;
+    if (!Array.isArray(g.nodes) || !Array.isArray(g.edges)) return null;
+    return g;
+  } catch {
+    return null;
+  }
+}
+function persistGraph(nodes: GeoNode[], edges: Edge[], outputId: string) {
+  try {
+    // drop transient interaction flags so saves stay stable/small
+    const clean = nodes.map((n) => ({ ...n, selected: false, dragging: false }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ nodes: clean, edges, outputId }));
+  } catch {
+    /* quota / serialization issues — non-fatal, just skip persistence */
+  }
+}
+
 export default function NodeEditor({
   initialNodes,
   initialEdges,
@@ -621,9 +648,21 @@ export default function NodeEditor({
   onTopView,
   onExportPNG,
 }: NodeEditorProps) {
-  const [nodes, setNodes, onNodesChange] = useNodesState<GeoNode>(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
-  const [outputId, setOutputId] = useState(initialOutputId);
+  // restore a previously-saved graph (once), else fall back to the seed
+  const savedRef = useRef<SavedGraph | null | undefined>(undefined);
+  if (savedRef.current === undefined) savedRef.current = loadSavedGraph();
+  const saved = savedRef.current;
+  const [nodes, setNodes, onNodesChange] = useNodesState<GeoNode>(saved?.nodes ?? initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(saved?.edges ?? initialEdges);
+  const [outputId, setOutputId] = useState(saved?.outputId ?? initialOutputId);
+
+  // persist the graph on change (debounced) so a reload keeps the work
+  const saveTimer = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => persistGraph(nodes, edges, outputId), 400);
+    return () => window.clearTimeout(saveTimer.current);
+  }, [nodes, edges, outputId]);
 
   // Visibility is opt-OUT: every body is shown by default. Independent bodies
   // (not in the viewed node's own build chain) render translucent alongside the
@@ -1382,6 +1421,18 @@ export default function NodeEditor({
             <label className="palette__loadbtn" title="Load graph">
               📂<input type="file" accept=".json,application/json" hidden onChange={loadGraph} />
             </label>
+            <button
+              title="Reset to the starter graph (clears the auto-saved work)"
+              onClick={() => {
+                if (!confirm("Reset the graph? Your auto-saved work will be cleared.")) return;
+                try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+                setNodes(initialNodes);
+                setEdges(initialEdges);
+                setOutputId(initialOutputId);
+              }}
+            >
+              ♻︎
+            </button>
           </div>
           <select
             className="palette__examples"
