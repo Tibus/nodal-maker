@@ -60,6 +60,8 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
   const dragRef = useRef<Id | null>(null);
   const dragSnap = useRef<SketchDoc | null>(null);
   const dragMoved = useRef(false);
+  const rectCentered = useRef(false);
+  const rectCenterPos = useRef<Vec2>([0, 0]);
 
   // ---- doc mutation (synchronous, returns whatever `mutate` returns) -------
   const applyDoc = useCallback(<T,>(mutate: (d: SketchDoc) => T, opts?: { pin?: { id: Id; x: number; y: number }[]; pull?: { id: Id; x: number; y: number }[] }): T => {
@@ -217,16 +219,34 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
     }
     if (tool === "rect") {
       if (chain.current.length === 0) {
-        const id = applyDoc((d) => ensurePoint(d, w, onPoint));
-        chain.current = [id]; setStatus("rectangle: click the opposite corner");
+        rectCentered.current = e.altKey; // Alt on the first click = centred rect
+        if (rectCentered.current) {
+          rectCenterPos.current = w; // centre isn't a stored point, just an origin
+          chain.current = ["center"];
+          setStatus("centred rectangle: click a corner (Alt)");
+        } else {
+          const id = applyDoc((d) => ensurePoint(d, w, onPoint));
+          chain.current = [id];
+          setStatus("rectangle: click the opposite corner");
+        }
       } else {
         applyDoc((d) => {
-          const a = d.points.find((q) => q.id === chain.current[0])!;
-          const cId = ensurePoint(d, w, onPoint);
-          const c = d.points.find((q) => q.id === cId)!;
-          const bId = addPoint(d, c.x, a.y).id;
-          const dId = addPoint(d, a.x, c.y).id;
-          addLineSeg(d, a.id, bId); addLineSeg(d, bId, cId); addLineSeg(d, cId, dId); addLineSeg(d, dId, a.id);
+          if (rectCentered.current) {
+            const [cx, cy] = rectCenterPos.current;
+            const hx = w[0] - cx, hy = w[1] - cy;
+            const c1 = addPoint(d, cx - hx, cy - hy).id;
+            const c2 = addPoint(d, cx + hx, cy - hy).id;
+            const c3 = addPoint(d, cx + hx, cy + hy).id;
+            const c4 = addPoint(d, cx - hx, cy + hy).id;
+            addLineSeg(d, c1, c2); addLineSeg(d, c2, c3); addLineSeg(d, c3, c4); addLineSeg(d, c4, c1);
+          } else {
+            const a = d.points.find((q) => q.id === chain.current[0])!;
+            const cId = ensurePoint(d, w, onPoint);
+            const c = d.points.find((q) => q.id === cId)!;
+            const bId = addPoint(d, c.x, a.y).id;
+            const dId = addPoint(d, a.x, c.y).id;
+            addLineSeg(d, a.id, bId); addLineSeg(d, bId, cId); addLineSeg(d, cId, dId); addLineSeg(d, dId, a.id);
+          }
         });
         finishChain();
       }
@@ -749,7 +769,7 @@ function ConstraintGlyphs({ doc, toS, onRemove }: { doc: SketchDoc; toS: (w: Vec
 const TOOL_ICON: Record<Tool, string> = { select: "▲", line: "╱", rect: "▭", circle: "◯", arc: "◜", spline: "∿", polygon: "⬡", slot: "⬭" };
 const TOOL_HINT: Record<Tool, string> = {
   select: "Select / drag (V)", line: "Line — click points; click start or Esc to finish (L)",
-  rect: "Rectangle — two corners (R)", circle: "Circle — centre then radius (C)",
+  rect: "Rectangle — two corners, or Alt+click for a centred rectangle (R)", circle: "Circle — centre then radius (C)",
   arc: "Arc — start, end, then a point on the arc (A)", spline: "Spline — click points, Enter to finish (S)",
   polygon: "Polygon — centre then a vertex (P)", slot: "Slot — two centres then the width",
 };
