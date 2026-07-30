@@ -30,7 +30,7 @@ import {
 import { solve } from "./sketch/solver";
 import { tessellate, bbox, type Vec2 } from "./sketch/geometry";
 
-type Tool = "select" | "line" | "rect" | "circle" | "arc" | "spline";
+type Tool = "select" | "line" | "rect" | "circle" | "arc" | "spline" | "polygon" | "slot";
 interface View { ox: number; oy: number; scale: number }
 interface Props { initialDoc: SketchDoc; onCommit: (doc: SketchDoc) => void; onCancel: () => void }
 
@@ -45,6 +45,7 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
   const [view, setView] = useState<View>({ ox: 400, oy: 300, scale: 4 });
   const [tool, setToolState] = useState<Tool>("select");
   const [gridSnap, setGridSnap] = useState(true);
+  const [polySides, setPolySides] = useState(6);
   const [sel, setSel] = useState<{ points: Set<Id>; entities: Set<Id> }>({ points: new Set(), entities: new Set() });
   const [cursor, setCursor] = useState<Vec2 | null>(null);
   const [snapPt, setSnapPt] = useState<Id | null>(null);
@@ -269,6 +270,66 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
       setStatus(`spline: ${chain.current.length} point(s) — Enter / double-click to finish`);
       return;
     }
+    if (tool === "polygon") {
+      if (chain.current.length === 0) {
+        const id = applyDoc((d) => ensurePoint(d, w, onPoint));
+        chain.current = [id]; setStatus(`polygon (${polySides} sides): click a vertex`);
+      } else {
+        const n = polySides;
+        applyDoc((d) => {
+          const c = d.points.find((q) => q.id === chain.current[0])!;
+          const r = Math.hypot(w[0] - c.x, w[1] - c.y) || 5;
+          const a0 = Math.atan2(w[1] - c.y, w[0] - c.x);
+          const verts: string[] = [];
+          for (let i = 0; i < n; i++) {
+            const a = a0 + (2 * Math.PI * i) / n;
+            verts.push(addPoint(d, c.x + r * Math.cos(a), c.y + r * Math.sin(a)).id);
+          }
+          const edges: string[] = [];
+          for (let i = 0; i < n; i++) {
+            const e: Entity = { id: nextId(d, "e"), kind: "line", p1: verts[i], p2: verts[(i + 1) % n] };
+            d.entities.push(e); edges.push(e.id);
+          }
+          // keep it regular: all edges equal + all vertices on a construction circle
+          for (let i = 1; i < n; i++) d.constraints.push({ id: nextId(d, "c"), kind: "equal", a: edges[0], b: edges[i] } as Constraint);
+          const circ: Entity = { id: nextId(d, "e"), kind: "circle", c: c.id, r, construction: true };
+          d.entities.push(circ);
+          for (const v of verts) d.constraints.push({ id: nextId(d, "c"), kind: "pointOn", p: v, ent: circ.id } as Constraint);
+        });
+        finishChain();
+      }
+      return;
+    }
+    if (tool === "slot") {
+      if (chain.current.length < 2) {
+        const id = applyDoc((d) => ensurePoint(d, w, onPoint));
+        chain.current.push(id);
+        setStatus(chain.current.length === 1 ? "slot: click the 2nd centre" : "slot: click to set the width");
+      } else {
+        applyDoc((d) => {
+          const A = d.points.find((q) => q.id === chain.current[0])!;
+          const B = d.points.find((q) => q.id === chain.current[1])!;
+          const dx = B.x - A.x, dy = B.y - A.y, L = Math.hypot(dx, dy) || 1;
+          const ux = dx / L, uy = dy / L;      // along A→B
+          const nx = -uy, ny = ux;             // perpendicular
+          // radius = perpendicular distance from the width-click to line AB
+          const r = Math.max(0.5, Math.abs((w[0] - A.x) * nx + (w[1] - A.y) * ny));
+          const P = (x: number, y: number) => addPoint(d, x, y).id;
+          const p1 = P(A.x + nx * r, A.y + ny * r); // A side, +n
+          const p2 = P(B.x + nx * r, B.y + ny * r); // B side, +n
+          const p3 = P(B.x - nx * r, B.y - ny * r); // B side, -n
+          const p4 = P(A.x - nx * r, A.y - ny * r); // A side, -n
+          const line = (a: string, b: string) => d.entities.push({ id: nextId(d, "e"), kind: "line", p1: a, p2: b } as Entity);
+          const arc = (c: string, a: string, b: string, ccw: boolean) => d.entities.push({ id: nextId(d, "e"), kind: "arc", c, p1: a, p2: b, ccw } as Entity);
+          line(p1, p2);                         // +n side
+          arc(B.id, p2, p3, false);             // round cap at B (bulges away from A)
+          line(p3, p4);                         // -n side
+          arc(A.id, p4, p1, false);             // round cap at A (bulges away from B)
+        });
+        finishChain();
+      }
+      return;
+    }
   };
 
   const finishTool = useCallback(() => {
@@ -444,9 +505,13 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
     <div className="ske" onContextMenu={(e) => e.preventDefault()}>
       <div className="ske__bar">
         <div className="ske__tools">
-          {(["select", "line", "rect", "circle", "arc", "spline"] as Tool[]).map((t) => (
+          {(["select", "line", "rect", "circle", "arc", "spline", "polygon", "slot"] as Tool[]).map((t) => (
             <button key={t} className={`ske__tool${tool === t ? " on" : ""}`} onClick={() => setTool(t)} title={TOOL_HINT[t]}>{TOOL_ICON[t]}</button>
           ))}
+          {tool === "polygon" && (
+            <input className="ske__sides" type="number" min={3} max={24} value={polySides}
+              title="Polygon sides" onChange={(e) => setPolySides(Math.max(3, Math.min(24, Math.round(Number(e.target.value)) || 3)))} />
+          )}
         </div>
         <div className="ske__cons">
           <button className="ske__con" onClick={undo} title="Undo (⌘Z)">↶</button>
@@ -655,11 +720,12 @@ function ConstraintGlyphs({ doc, toS, onRemove }: { doc: SketchDoc; toS: (w: Vec
 /* helpers                                                                    */
 /* -------------------------------------------------------------------------- */
 
-const TOOL_ICON: Record<Tool, string> = { select: "▲", line: "╱", rect: "▭", circle: "◯", arc: "◜", spline: "∿" };
+const TOOL_ICON: Record<Tool, string> = { select: "▲", line: "╱", rect: "▭", circle: "◯", arc: "◜", spline: "∿", polygon: "⬡", slot: "⬭" };
 const TOOL_HINT: Record<Tool, string> = {
   select: "Select / drag (V)", line: "Line — click points; click start or Esc to finish (L)",
   rect: "Rectangle — two corners (R)", circle: "Circle — centre then radius (C)",
   arc: "Arc — start, end, then a point on the arc (A)", spline: "Spline — click points, Enter to finish (S)",
+  polygon: "Polygon — centre then a vertex (P)", slot: "Slot — two centres then the width",
 };
 const CONSTRAINTS = [
   { k: "coincident", g: "•", t: "Coincident — weld 2 points" },
