@@ -344,6 +344,7 @@ button.link {
 .ske__ent { stroke: #ccd3dd; stroke-width: 1.8; }
 .ske__ent.sel { stroke: #4f9bff; stroke-width: 2.6; }
 .ske__ent.constr { stroke: #d19a66; stroke-width: 1.2; stroke-dasharray: 6 4; }
+.ske__ent.fc { stroke: #4f9bff; }
 .ske__preview { stroke: #4f9bff; stroke-width: 1.5; stroke-dasharray: 4 4; }
 .ske__pt { fill: #dfe4ea; stroke: #12161b; stroke-width: 1; }
 .ske__pt.fixed { fill: #ff8c42; }
@@ -395,4 +396,6 @@ button.link {
   background: #171b21; border-top: 1px solid #262b33; font-size: 12px; color: #aeb4bd;
 }
 .ske__status b { color: #cfd5de; font-weight: 600; }
+.ske__dof { margin-left: 14px; font-size: 11px; font-weight: 600; color: #c9932f; }
+.ske__dof--full { color: #4f9bff; }
 .ske__coord { margin-left: auto; color: #7f8792; font-variant-numeric: tabular-nums; }

@@ -46,6 +46,144 @@ const W_REG = 0.005;
 // a fully-constrained sketch stays put, but far above W_REG so free DOF follow
 const W_PULL = 0.35;
 
+/** Accessors bound to a candidate vector — shared by solve() and DOF analysis. */
+interface RCtx {
+  P: (v: number[], id: Id) => [number, number];
+  R: (v: number[], id: Id) => number;
+  lineDir: (v: number[], e: Entity) => [number, number];
+  norm: (dx: number, dy: number) => number;
+  measureRL: (v: number[], e: Entity) => number;
+  dimValue: (name: string, fallback: number) => number;
+  entById: Map<Id, Entity>;
+}
+
+/** Hard-constraint residual rows (per-constraint switch + arc consistency). */
+function constraintRows(doc: SketchDoc, v: number[], cx: RCtx): number[] {
+  const { P, R, lineDir, norm, measureRL, dimValue, entById } = cx;
+  const r: number[] = [];
+  for (const c of doc.constraints) {
+    switch (c.kind) {
+      case "coincident": {
+        const [a, b] = [P(v, c.a), P(v, c.b)];
+        r.push(a[0] - b[0], a[1] - b[1]);
+        break;
+      }
+      case "horizontal": {
+        const e = entById.get(c.line)!;
+        if (e.kind === "line") { const [a, b] = [P(v, e.p1), P(v, e.p2)]; r.push(a[1] - b[1]); }
+        break;
+      }
+      case "vertical": {
+        const e = entById.get(c.line)!;
+        if (e.kind === "line") { const [a, b] = [P(v, e.p1), P(v, e.p2)]; r.push(a[0] - b[0]); }
+        break;
+      }
+      case "parallel": {
+        const [d1, d2] = [lineDir(v, entById.get(c.a)!), lineDir(v, entById.get(c.b)!)];
+        const cross = d1[0] * d2[1] - d1[1] * d2[0];
+        r.push((cross / (norm(...d1) * norm(...d2))) * ANG);
+        break;
+      }
+      case "perpendicular": {
+        const [d1, d2] = [lineDir(v, entById.get(c.a)!), lineDir(v, entById.get(c.b)!)];
+        const dot = d1[0] * d2[0] + d1[1] * d2[1];
+        r.push((dot / (norm(...d1) * norm(...d2))) * ANG);
+        break;
+      }
+      case "equal": {
+        const ea = entById.get(c.a)!, eb = entById.get(c.b)!;
+        r.push(measureRL(v, ea) - measureRL(v, eb));
+        break;
+      }
+      case "pointOn": {
+        const e = entById.get(c.ent)!;
+        const p = P(v, c.p);
+        if (e.kind === "line") {
+          const [a, b] = [P(v, e.p1), P(v, e.p2)];
+          const dx = b[0] - a[0], dy = b[1] - a[1];
+          const L = norm(dx, dy);
+          r.push(((p[0] - a[0]) * dy - (p[1] - a[1]) * dx) / L);
+        } else if (e.kind === "circle") {
+          const cc = P(v, e.c);
+          r.push(norm(p[0] - cc[0], p[1] - cc[1]) - R(v, e.id));
+        } else if (e.kind === "arc") {
+          const cc = P(v, e.c), rr = norm(...sub(P(v, e.p1), cc));
+          r.push(norm(p[0] - cc[0], p[1] - cc[1]) - rr);
+        }
+        break;
+      }
+      case "tangent": {
+        const ea = entById.get(c.a)!, eb = entById.get(c.b)!;
+        r.push(tangentResidual(v, ea, eb, P, R));
+        break;
+      }
+      case "midpoint": {
+        const e = entById.get(c.line)!;
+        if (e.kind === "line") {
+          const [a, b] = [P(v, e.p1), P(v, e.p2)];
+          const p = P(v, c.p);
+          r.push(p[0] - (a[0] + b[0]) / 2, p[1] - (a[1] + b[1]) / 2);
+        }
+        break;
+      }
+      case "symmetric": {
+        const [a, b] = [P(v, c.a), P(v, c.b)];
+        const e = entById.get(c.line)!;
+        if (e.kind === "line") {
+          const [la, lb] = [P(v, e.p1), P(v, e.p2)];
+          const dx = lb[0] - la[0], dy = lb[1] - la[1];
+          const L = norm(dx, dy);
+          const mid: [number, number] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+          r.push(((mid[0] - la[0]) * dy - (mid[1] - la[1]) * dx) / L);
+          const cdx = b[0] - a[0], cdy = b[1] - a[1];
+          r.push(((dx * cdx + dy * cdy) / (L * norm(cdx, cdy))) * ANG);
+        }
+        break;
+      }
+      case "fixed":
+        break; // enforced by exclusion from the unknowns
+      case "distance": {
+        const [a, b] = [P(v, c.a), P(v, c.b)];
+        r.push(norm(a[0] - b[0], a[1] - b[1]) - dimValue(c.name, c.value));
+        break;
+      }
+      case "distanceX": {
+        const [a, b] = [P(v, c.a), P(v, c.b)];
+        r.push(b[0] - a[0] - dimValue(c.name, c.value));
+        break;
+      }
+      case "distanceY": {
+        const [a, b] = [P(v, c.a), P(v, c.b)];
+        r.push(b[1] - a[1] - dimValue(c.name, c.value));
+        break;
+      }
+      case "radius": {
+        const e = entById.get(c.ent)!;
+        r.push(measureRL(v, e) - dimValue(c.name, c.value));
+        break;
+      }
+      case "angle": {
+        const [d1, d2] = [lineDir(v, entById.get(c.a)!), lineDir(v, entById.get(c.b)!)];
+        const ang = Math.atan2(d1[0] * d2[1] - d1[1] * d2[0], d1[0] * d2[0] + d1[1] * d2[1]);
+        const target = (dimValue(c.name, c.value) * Math.PI) / 180;
+        let diff = ang - target;
+        while (diff > Math.PI) diff -= 2 * Math.PI;
+        while (diff < -Math.PI) diff += 2 * Math.PI;
+        r.push(diff * ANG);
+        break;
+      }
+    }
+  }
+  // arc radius consistency (both endpoints equidistant from centre)
+  for (const e of doc.entities) {
+    if (e.kind === "arc") {
+      const cc = P(v, e.c);
+      r.push(norm(...sub(P(v, e.p1), cc)) - norm(...sub(P(v, e.p2), cc)));
+    }
+  }
+  return r;
+}
+
 /** Solve `doc` in place. Returns convergence info. */
 export function solve(doc: SketchDoc, opts: SolveOptions = {}): SolveResult {
   const maxIter = opts.maxIter ?? 80;
@@ -109,131 +247,9 @@ export function solve(doc: SketchDoc, opts: SolveOptions = {}): SolveResult {
   };
 
   // ---- residual vector ----------------------------------------------------
+  const cx: RCtx = { P, R, lineDir, norm, measureRL, dimValue, entById };
   const residuals = (v: number[]): number[] => {
-    const r: number[] = [];
-    for (const c of doc.constraints) {
-      switch (c.kind) {
-        case "coincident": {
-          const [a, b] = [P(v, c.a), P(v, c.b)];
-          r.push(a[0] - b[0], a[1] - b[1]);
-          break;
-        }
-        case "horizontal": {
-          const e = entById.get(c.line)!;
-          if (e.kind === "line") { const [a, b] = [P(v, e.p1), P(v, e.p2)]; r.push(a[1] - b[1]); }
-          break;
-        }
-        case "vertical": {
-          const e = entById.get(c.line)!;
-          if (e.kind === "line") { const [a, b] = [P(v, e.p1), P(v, e.p2)]; r.push(a[0] - b[0]); }
-          break;
-        }
-        case "parallel": {
-          const [d1, d2] = [lineDir(v, entById.get(c.a)!), lineDir(v, entById.get(c.b)!)];
-          const cross = d1[0] * d2[1] - d1[1] * d2[0];
-          r.push((cross / (norm(...d1) * norm(...d2))) * ANG);
-          break;
-        }
-        case "perpendicular": {
-          const [d1, d2] = [lineDir(v, entById.get(c.a)!), lineDir(v, entById.get(c.b)!)];
-          const dot = d1[0] * d2[0] + d1[1] * d2[1];
-          r.push((dot / (norm(...d1) * norm(...d2))) * ANG);
-          break;
-        }
-        case "equal": {
-          const ea = entById.get(c.a)!, eb = entById.get(c.b)!;
-          r.push(measureRL(v, ea) - measureRL(v, eb));
-          break;
-        }
-        case "pointOn": {
-          const e = entById.get(c.ent)!;
-          const p = P(v, c.p);
-          if (e.kind === "line") {
-            const [a, b] = [P(v, e.p1), P(v, e.p2)];
-            const dx = b[0] - a[0], dy = b[1] - a[1];
-            const L = norm(dx, dy);
-            r.push(((p[0] - a[0]) * dy - (p[1] - a[1]) * dx) / L);
-          } else if (e.kind === "circle") {
-            const cc = P(v, e.c);
-            r.push(norm(p[0] - cc[0], p[1] - cc[1]) - R(v, e.id));
-          } else if (e.kind === "arc") {
-            const cc = P(v, e.c), rr = norm(...sub(P(v, e.p1), cc));
-            r.push(norm(p[0] - cc[0], p[1] - cc[1]) - rr);
-          }
-          break;
-        }
-        case "tangent": {
-          const ea = entById.get(c.a)!, eb = entById.get(c.b)!;
-          r.push(tangentResidual(v, ea, eb, P, R));
-          break;
-        }
-        case "midpoint": {
-          const e = entById.get(c.line)!;
-          if (e.kind === "line") {
-            const [a, b] = [P(v, e.p1), P(v, e.p2)];
-            const p = P(v, c.p);
-            r.push(p[0] - (a[0] + b[0]) / 2, p[1] - (a[1] + b[1]) / 2);
-          }
-          break;
-        }
-        case "symmetric": {
-          const [a, b] = [P(v, c.a), P(v, c.b)];
-          const e = entById.get(c.line)!;
-          if (e.kind === "line") {
-            const [la, lb] = [P(v, e.p1), P(v, e.p2)];
-            const dx = lb[0] - la[0], dy = lb[1] - la[1];
-            const L = norm(dx, dy);
-            const mid: [number, number] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-            // midpoint on the line …
-            r.push(((mid[0] - la[0]) * dy - (mid[1] - la[1]) * dx) / L);
-            // … and the chord perpendicular to the line
-            const cdx = b[0] - a[0], cdy = b[1] - a[1];
-            r.push(((dx * cdx + dy * cdy) / (L * norm(cdx, cdy))) * ANG);
-          }
-          break;
-        }
-        case "fixed":
-          break; // enforced by exclusion from the unknowns
-        case "distance": {
-          const [a, b] = [P(v, c.a), P(v, c.b)];
-          r.push(norm(a[0] - b[0], a[1] - b[1]) - dimValue(c.name, c.value));
-          break;
-        }
-        case "distanceX": {
-          const [a, b] = [P(v, c.a), P(v, c.b)];
-          r.push(b[0] - a[0] - dimValue(c.name, c.value));
-          break;
-        }
-        case "distanceY": {
-          const [a, b] = [P(v, c.a), P(v, c.b)];
-          r.push(b[1] - a[1] - dimValue(c.name, c.value));
-          break;
-        }
-        case "radius": {
-          const e = entById.get(c.ent)!;
-          r.push(measureRL(v, e) - dimValue(c.name, c.value));
-          break;
-        }
-        case "angle": {
-          const [d1, d2] = [lineDir(v, entById.get(c.a)!), lineDir(v, entById.get(c.b)!)];
-          const ang = Math.atan2(d1[0] * d2[1] - d1[1] * d2[0], d1[0] * d2[0] + d1[1] * d2[1]);
-          let target = (dimValue(c.name, c.value) * Math.PI) / 180;
-          // wrap the difference into (-π, π] so the residual is smooth
-          let diff = ang - target;
-          while (diff > Math.PI) diff -= 2 * Math.PI;
-          while (diff < -Math.PI) diff += 2 * Math.PI;
-          r.push(diff * ANG);
-          break;
-        }
-      }
-    }
-    // arc radius consistency (both endpoints equidistant from centre)
-    for (const e of doc.entities) {
-      if (e.kind === "arc") {
-        const cc = P(v, e.c);
-        r.push(norm(...sub(P(v, e.p1), cc)) - norm(...sub(P(v, e.p2), cc)));
-      }
-    }
+    const r = constraintRows(doc, v, cx); // constraints + arc consistency
     // live-drag soft pull toward the cursor (constraints still dominate)
     for (const pl of opts.pull ?? []) {
       const p = P(v, pl.id);
@@ -312,11 +328,84 @@ export function solve(doc: SketchDoc, opts: SolveOptions = {}): SolveResult {
   return { ok: hardRes < 5e-3, iterations: iter, residual: hardRes };
 }
 
+/**
+ * Remaining degrees of freedom of the sketch = (#unknowns − rank of the
+ * constraint Jacobian). 0 (or fewer) means fully constrained. Assumes `doc`
+ * is already solved (accessors evaluate at the current point).
+ */
+export function degreesOfFreedom(doc: SketchDoc): number {
+  const px = new Map<Id, number>();
+  const rIx = new Map<Id, number>();
+  const x: number[] = [];
+  for (const p of doc.points) {
+    if (p.fixed) continue;
+    px.set(p.id, x.length);
+    x.push(p.x, p.y);
+  }
+  for (const e of doc.entities) if (e.kind === "circle") { rIx.set(e.id, x.length); x.push(e.r); }
+  const N = x.length;
+  if (N === 0) return 0;
+
+  const pointById = new Map(doc.points.map((p) => [p.id, p] as const));
+  const entById = new Map(doc.entities.map((e) => [e.id, e] as const));
+  const P = (v: number[], id: Id): [number, number] => {
+    const b = px.get(id);
+    if (b === undefined) { const p = pointById.get(id)!; return [p.x, p.y]; }
+    return [v[b], v[b + 1]];
+  };
+  const R = (v: number[], id: Id): number => {
+    const i = rIx.get(id);
+    return i === undefined ? (entById.get(id) as Extract<Entity, { kind: "circle" }>).r : v[i];
+  };
+  const lineDir = (v: number[], e: Entity): [number, number] => {
+    if (e.kind !== "line") return [1, 0];
+    const [a, b] = [P(v, e.p1), P(v, e.p2)];
+    return [b[0] - a[0], b[1] - a[1]];
+  };
+  const norm = (dx: number, dy: number) => Math.hypot(dx, dy) || 1e-9;
+  const measureRL = (v: number[], e: Entity): number => {
+    if (e.kind === "line") { const [a, b] = [P(v, e.p1), P(v, e.p2)]; return Math.hypot(a[0] - b[0], a[1] - b[1]); }
+    if (e.kind === "circle") return R(v, e.id);
+    if (e.kind === "arc") { const cc = P(v, e.c), p1 = P(v, e.p1); return Math.hypot(p1[0] - cc[0], p1[1] - cc[1]); }
+    return 0;
+  };
+  const cx: RCtx = { P, R, lineDir, norm, measureRL, dimValue: (_n, f) => f, entById };
+
+  const r0 = constraintRows(doc, x, cx);
+  const M = r0.length;
+  if (M === 0) return N;
+  const J = jacobian((v) => constraintRows(doc, v, cx), x, r0); // M×N
+  return N - matrixRank(J, N);
+}
+
 /* -------------------------------------------------------------------------- */
 /* residual helpers                                                           */
 /* -------------------------------------------------------------------------- */
 
 const sub = (a: [number, number], b: [number, number]): [number, number] => [a[0] - b[0], a[1] - b[1]];
+
+/** Numerical rank of an M×N matrix via Gaussian elimination with tolerance. */
+function matrixRank(J: number[][], n: number): number {
+  const M = J.map((row) => row.slice(0, n));
+  const rows = M.length;
+  let rank = 0;
+  const tol = 1e-6;
+  for (let col = 0; col < n && rank < rows; col++) {
+    let piv = -1, best = tol;
+    for (let r = rank; r < rows; r++) if (Math.abs(M[r][col]) > best) { best = Math.abs(M[r][col]); piv = r; }
+    if (piv < 0) continue;
+    [M[rank], M[piv]] = [M[piv], M[rank]];
+    const d = M[rank][col];
+    for (let r = 0; r < rows; r++) {
+      if (r === rank) continue;
+      const f = M[r][col] / d;
+      if (f === 0) continue;
+      for (let c = col; c < n; c++) M[r][c] -= f * M[rank][c];
+    }
+    rank++;
+  }
+  return rank;
+}
 
 function tangentResidual(
   v: number[],

@@ -27,7 +27,7 @@ import {
   type DimConstraint,
   type Id,
 } from "./sketch/model";
-import { solve } from "./sketch/solver";
+import { solve, degreesOfFreedom } from "./sketch/solver";
 import { tessellate, bbox, type Vec2 } from "./sketch/geometry";
 
 type Tool = "select" | "line" | "rect" | "circle" | "arc" | "spline" | "polygon" | "slot";
@@ -499,6 +499,8 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
   const dims = dimensions(doc);
   const tess = tessellate(doc);
   const gs = gridStep(view.scale);
+  const dof = useMemo(() => { try { return degreesOfFreedom(doc); } catch { return -1; } }, [doc]);
+  const fullyConstrained = dof <= 0 && doc.entities.length > 0;
   const chainStart = chain.current[0] ? doc.points.find((p) => p.id === chain.current[0]) : null;
   const chainTail = chain.current.length ? doc.points.find((p) => p.id === chain.current[chain.current.length - 1]) : null;
   void forceRender;
@@ -548,7 +550,7 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
 
           {tess.map((t) => {
             const d = t.pts.map(toS).map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
-            return <path key={t.id} d={d} className={`ske__ent${t.construction ? " constr" : ""}${sel.entities.has(t.id) ? " sel" : ""}`} fill="none" />;
+            return <path key={t.id} d={d} className={`ske__ent${t.construction ? " constr" : ""}${fullyConstrained && !t.construction ? " fc" : ""}${sel.entities.has(t.id) ? " sel" : ""}`} fill="none" />;
           })}
 
           {cursor && chainTail && (
@@ -605,6 +607,11 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
 
       <div className="ske__status">
         <b>{TOOL_HINT[tool]}</b>{status && ` — ${status}`}
+        {doc.entities.length > 0 && (
+          <span className={`ske__dof${fullyConstrained ? " ske__dof--full" : ""}`}>
+            {fullyConstrained ? "✓ fully constrained" : dof < 0 ? "" : `${dof} DOF`}
+          </span>
+        )}
         <span className="ske__coord">{cursor ? `x ${cursor[0].toFixed(1)}  y ${cursor[1].toFixed(1)}  ·  ${dims.length} dims` : ""}</span>
       </div>
     </div>
