@@ -362,9 +362,34 @@ Ajout d'un **éditeur d'esquisse paramétrique à contraintes**, façon Fusion 3
 - ⚠ **Clavier** : quand l'overlay est ouvert, `NodeEditor` ignore ses
   raccourcis et React Flow désactive Delete (sinon ⌘Z fermait l'éditeur).
 
-### Reste à faire (idées)
+### Fait depuis (2e vague)
 
-- Sélection d'entité un peu plus tolérante encore ; witness/arrow lines sur les
-  cotes ; trim/extend/offset dans l'esquisse ; polygon/slot tools ; afficher
-  l'esquisse comme **line-work** sur le plan en 3D (plutôt qu'une plaque 0.5mm) ;
-  crits de sélection corrects pour extrude non-XY ; revolve honorant le plan.
+Toutes les idées ci-dessus ont été livrées, plus :
+
+- **Persistance du graphe** (localStorage, debounce) + bouton reset ♻︎.
+- **Outils** : polygon (N côtés, cercle de construction + arêtes égales), slot
+  (2 lignes + 2 arcs), rectangle centré (Alt), **trim** (`src/sketch/trim.ts` :
+  intersections seg-seg / seg-cercle / cercle-cercle → lignes ou arcs).
+- **Cotes façon CAO** (witness/arrow lines) + **édition inline** par double-clic
+  sur le label canvas.
+- **Indicateur fully-constrained** : `degreesOfFreedom(doc)` = N − rang(J) (le
+  switch des résidus est extrait en `constraintRows`, partagé solve/DOF) ;
+  géométrie bleue + badge « ✓ fully constrained ».
+- **Inférence point-sur-courbe** pendant le dessin (contrainte pointOn + marqueur
+  croix magenta), en plus de l'auto H/V et du weld de points.
+- **Cotes comme ports d'entrée number** du nœud (branchables sur Number/Math) —
+  `resolveInputs` traite les cotes comme ports dynamiques.
+- **Extrude** direction up/down/symmetric ; **revolve** honore un plan explicite.
+- **Esquisse en line-work** cyan sur son plan en 3D (flag `isSketch`).
+- **Crits de sélection extrude non-XY** (faceOnPlane/edgeOnPlane + axisDir).
+- **Sketch on face** : picker une face plane → nœud Sketch sur son plan (base +
+  `planeOffset`) → éditeur ; extrude/preview/crits honorent l'offset.
+- **Vignette** du nœud Sketch + exemple librairie `sketch-plate`.
+
+### Reste à faire (idées futures)
+
+- Split (au lieu de trim), extend, offset/mirror *dans* l'esquisse.
+- Sketch sur une face NON axis-alignée (transform de plan arbitraire).
+- Inférence perpendiculaire/parallèle/tangente au survol (pas seulement H/V).
+- Cercle 3-points, arc tangent ; contraintes de la barre affichées en glyphes
+  pour midpoint/pointOn/concentric/symmetric.
