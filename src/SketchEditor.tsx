@@ -198,7 +198,9 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
     }
 
     const { w, onPoint } = snapWorld(sp);
-    snapshot(); // each drawing click is an undoable step
+    // snapshot once per primitive (on its first click) so a single undo removes
+    // the whole thing — never leaving an orphan centre/endpoint behind
+    if (chain.current.length === 0) snapshot();
     if (tool === "line") {
       const closing = onPoint && chain.current.length > 0 && onPoint === chain.current[0];
       const id = applyDoc((d) => {
