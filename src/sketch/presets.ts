@@ -34,3 +34,20 @@ export function starterRect(w = 40, h = 30): SketchDoc {
   con(d, { kind: "distanceY", a: a.id, b: e.id, value: h, name: "height" });
   return d;
 }
+
+/**
+ * A rectangular plate with a centred circular hole — a good demo profile
+ * (extrude → washer plate). Exposes width / height / hole (radius) dimensions.
+ */
+export function plateWithHole(w = 60, h = 40, r = 10): SketchDoc {
+  const d = starterRect(w, h);
+  const c = addPoint(d, 0, 0);
+  const circ: Entity = { id: nextId(d, "e"), kind: "circle", c: c.id, r };
+  d.entities.push(circ);
+  // centre the hole via distances from the fixed bottom-left corner + a radius
+  const a = d.points[0]; // starterRect's fixed corner
+  con(d, { kind: "distanceX", a: a.id, b: c.id, value: w / 2, name: "holeX" });
+  con(d, { kind: "distanceY", a: a.id, b: c.id, value: h / 2, name: "holeY" });
+  con(d, { kind: "radius", ent: circ.id, value: r, name: "hole" });
+  return d;
+}

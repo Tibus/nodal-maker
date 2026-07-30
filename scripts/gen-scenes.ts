@@ -11,6 +11,15 @@ import { setOC } from "replicad";
 import { evalToPayload, type BuildResult } from "../src/kernel/model";
 import { NODE_SPECS, SOCKET_COLORS, type Graph, type NodeDescriptor } from "../src/kernel/nodes";
 import { setManifold } from "../src/kernel/manifold";
+import { plateWithHole } from "../src/sketch/presets";
+import { dimensions } from "../src/sketch/model";
+
+// a Sketch node's params = the doc + its plane + a mirror of each driving dim
+function sketchParams(doc: ReturnType<typeof plateWithHole>): Record<string, unknown> {
+  const p: Record<string, unknown> = { doc, plane: "XY" };
+  for (const dm of dimensions(doc)) p[dm.name] = dm.value;
+  return p;
+}
 
 const require = createRequire(import.meta.url);
 const wasmPath = require.resolve("replicad-opencascadejs/src/replicad_single.wasm");
@@ -34,6 +43,16 @@ interface Scene {
 }
 
 const scenes: Scene[] = [
+  {
+    name: "sketch-plate",
+    title: "Sketch plate (constraint sketch) — rectangle + centred hole, extruded. Edit dims on the node.",
+    outputId: "plate",
+    expect: "solid",
+    nodes: [
+      { id: "sk", type: "sketch", params: sketchParams(plateWithHole(60, 40, 10)) },
+      { id: "plate", type: "extrude", inputs: { in: "sk" }, params: { height: 6, mode: "up" } },
+    ],
+  },
   {
     name: "hollow-tray",
     title: "Hollow tray (3D print) — box, shell open-top, rounded corners",

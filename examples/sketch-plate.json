@@ -1,0 +1,176 @@
+{
+  "version": 1,
+  "title": "Sketch plate (constraint sketch) — rectangle + centred hole, extruded. Edit dims on the node.",
+  "outputId": "plate",
+  "nodes": [
+    {
+      "id": "sk",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "sketch",
+        "params": {
+          "doc": {
+            "plane": "XY",
+            "points": [
+              {
+                "id": "p1",
+                "x": -30,
+                "y": -20,
+                "fixed": true
+              },
+              {
+                "id": "p2",
+                "x": 30,
+                "y": -20
+              },
+              {
+                "id": "p3",
+                "x": 30,
+                "y": 20
+              },
+              {
+                "id": "p4",
+                "x": -30,
+                "y": 20
+              },
+              {
+                "id": "p15",
+                "x": 0,
+                "y": 0
+              }
+            ],
+            "entities": [
+              {
+                "id": "e5",
+                "kind": "line",
+                "p1": "p1",
+                "p2": "p2"
+              },
+              {
+                "id": "e6",
+                "kind": "line",
+                "p1": "p2",
+                "p2": "p3"
+              },
+              {
+                "id": "e7",
+                "kind": "line",
+                "p1": "p3",
+                "p2": "p4"
+              },
+              {
+                "id": "e8",
+                "kind": "line",
+                "p1": "p4",
+                "p2": "p1"
+              },
+              {
+                "id": "e16",
+                "kind": "circle",
+                "c": "p15",
+                "r": 10
+              }
+            ],
+            "constraints": [
+              {
+                "id": "c9",
+                "kind": "horizontal",
+                "line": "e5"
+              },
+              {
+                "id": "c10",
+                "kind": "vertical",
+                "line": "e6"
+              },
+              {
+                "id": "c11",
+                "kind": "horizontal",
+                "line": "e7"
+              },
+              {
+                "id": "c12",
+                "kind": "vertical",
+                "line": "e8"
+              },
+              {
+                "id": "c13",
+                "kind": "distanceX",
+                "a": "p1",
+                "b": "p2",
+                "value": 60,
+                "name": "width"
+              },
+              {
+                "id": "c14",
+                "kind": "distanceY",
+                "a": "p1",
+                "b": "p4",
+                "value": 40,
+                "name": "height"
+              },
+              {
+                "id": "c17",
+                "kind": "distanceX",
+                "a": "p1",
+                "b": "p15",
+                "value": 30,
+                "name": "holeX"
+              },
+              {
+                "id": "c18",
+                "kind": "distanceY",
+                "a": "p1",
+                "b": "p15",
+                "value": 20,
+                "name": "holeY"
+              },
+              {
+                "id": "c19",
+                "kind": "radius",
+                "ent": "e16",
+                "value": 10,
+                "name": "hole"
+              }
+            ],
+            "seq": 20
+          },
+          "plane": "XY",
+          "width": 60,
+          "height": 40,
+          "holeX": 30,
+          "holeY": 20,
+          "hole": 10
+        }
+      }
+    },
+    {
+      "id": "plate",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "extrude",
+        "params": {
+          "height": 6,
+          "mode": "up"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "sk",
+      "sourceHandle": "out",
+      "target": "plate",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    }
+  ]
+}

@@ -10,6 +10,7 @@ import { writeFileSync } from "fs";
 import { setOC } from "replicad";
 import { evalGraph, type Graph, type GraphValue } from "../src/kernel/nodes";
 import { setManifold } from "../src/kernel/manifold";
+import { starterRect } from "../src/sketch/presets";
 
 const require = createRequire(import.meta.url);
 const wasmPath = require.resolve("replicad-opencascadejs/src/replicad_single.wasm");
@@ -82,6 +83,7 @@ const MESH = (id: string, src: string): Graph[number] => ({ id, type: "tessellat
 
 const REPS: Record<string, { graph: Graph; out: string }> = {
   // 2D primitives
+  sketch: { graph: [{ id: "n", type: "sketch", params: { doc: starterRect(40, 28), plane: "XY" } }], out: "n" },
   rect: { graph: [{ id: "n", type: "rect", params: { width: 40, height: 28, radius: 4 } }], out: "n" },
   circle: { graph: [SC("n")], out: "n" },
   ellipse: { graph: [{ id: "n", type: "ellipse", params: { rx: 26, ry: 16 } }], out: "n" },
