@@ -523,6 +523,8 @@ export interface EditorApi {
   /** add a Face/Edge Select node preconfigured from a viewport pick */
   addFaceSelect: (where: string, offset: number) => void;
   addEdgeSelect: (where: string, offset: number) => void;
+  /** create a new Sketch node placed on a base plane at an offset, and edit it */
+  addSketchOnPlane: (base: "XY" | "XZ" | "YZ", offset: number) => void;
 }
 
 export interface NodeEditorProps {
@@ -1017,9 +1019,22 @@ export default function NodeEditor({
   const addFaceSelect = useCallback((where: string, offset: number) => addSelectFromPick("face", where, offset), [addSelectFromPick]);
   const addEdgeSelect = useCallback((where: string, offset: number) => addSelectFromPick("edge", where, offset), [addSelectFromPick]);
 
+  const addSketchOnPlane = useCallback((base: "XY" | "XZ" | "YZ", offset: number) => {
+    const doc = starterRect();
+    doc.plane = base;
+    doc.planeOffset = offset;
+    const params: Record<string, unknown> = { plane: base, doc };
+    for (const dim of dimensions(doc)) params[dim.name] = dim.value;
+    const nid = newId("sketch");
+    const sel = nodes.find((n) => n.selected);
+    const position = sel ? { x: sel.position.x, y: sel.position.y + 200 } : { x: 80, y: 80 };
+    setNodes((prev) => [...prev.map((n) => ({ ...n, selected: false })), { id: nid, type: "geo", position, selected: true, data: { nodeType: "sketch", params } }]);
+    setEditingSketchId(nid); // jump straight into the 2D editor
+  }, [nodes, setNodes]);
+
   useEffect(() => {
-    onReady?.({ setParam, addFaceSelect, addEdgeSelect });
-  }, [onReady, setParam, addFaceSelect, addEdgeSelect]);
+    onReady?.({ setParam, addFaceSelect, addEdgeSelect, addSketchOnPlane });
+  }, [onReady, setParam, addFaceSelect, addEdgeSelect, addSketchOnPlane]);
 
   const onConnect = useCallback(
     (c: Connection) => {

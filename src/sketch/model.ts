@@ -70,6 +70,8 @@ export function isDim(c: Constraint): c is DimConstraint {
 export interface SketchDoc {
   /** onto which base plane the sketch is placed when shown/extruded in 3D */
   plane: "XY" | "XZ" | "YZ";
+  /** signed offset of that plane along its normal (for sketching on a face) */
+  planeOffset?: number;
   points: SPoint[];
   entities: Entity[];
   constraints: Constraint[];
@@ -85,6 +87,7 @@ export function emptyDoc(plane: SketchDoc["plane"] = "XY"): SketchDoc {
 export function cloneDoc(d: SketchDoc): SketchDoc {
   return {
     plane: d.plane,
+    planeOffset: d.planeOffset,
     seq: d.seq,
     points: d.points.map((p) => ({ ...p })),
     entities: d.entities.map((e) => ({ ...e }) as Entity),

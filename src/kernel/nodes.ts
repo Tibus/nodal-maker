@@ -58,9 +58,10 @@ import { buildDrawing } from "../sketch/build";
 /* ------------------------------------------------------------------ */
 
 export type GraphValue =
-  // `plane` (optional) records which base plane a Sketch was drawn on, so the
-  // 3D preview and Extrude/Revolve place it there instead of always on XY.
-  | { kind: "sketch2d"; drawing: Drawing; plane?: "XY" | "XZ" | "YZ" }
+  // `plane`/`planeOffset` (optional) record which base plane (and offset along
+  // its normal) a Sketch was drawn on, so the 3D preview and Extrude/Revolve
+  // place it there instead of always on XY z=0.
+  | { kind: "sketch2d"; drawing: Drawing; plane?: "XY" | "XZ" | "YZ"; planeOffset?: number }
   | { kind: "solid"; solid: Shape3D }
   | { kind: "mesh"; mesh: MeshData }
   | { kind: "number"; value: number }
@@ -228,14 +229,14 @@ function zBounds(solid: Shape3D): { min: number; max: number } {
  * source shape when available, so ports can read its actual bounds instead of
  * guessing from params (needed for revolve / boss, whose caps come from upstream).
  */
-type CritBuilder = (p: Record<string, unknown>, solid?: Shape3D, plane?: Plane) => Crit;
+type CritBuilder = (p: Record<string, unknown>, solid?: Shape3D, plane?: Plane, offset?: number) => Crit;
 const LEAF_PORTS: Record<string, Record<string, CritBuilder>> = {
   extrude: {
-    cap: (p, _s, pl = "XY") => faceOnPlane(pl, extrudeCapZ(p)),
-    bottom: (p, _s, pl = "XY") => faceOnPlane(pl, extrudeBottomZ(p)),
+    cap: (p, _s, pl = "XY", o = 0) => faceOnPlane(pl, extrudeCapZ(p) + o),
+    bottom: (p, _s, pl = "XY", o = 0) => faceOnPlane(pl, extrudeBottomZ(p) + o),
     sideEdges: (_p, _s, pl = "XY") => edgeDir(axisDir(pl)),
-    capEdges: (p, _s, pl = "XY") => edgeOnPlane(pl, extrudeCapZ(p)),
-    bottomEdges: (p, _s, pl = "XY") => edgeOnPlane(pl, extrudeBottomZ(p)),
+    capEdges: (p, _s, pl = "XY", o = 0) => edgeOnPlane(pl, extrudeCapZ(p) + o),
+    bottomEdges: (p, _s, pl = "XY", o = 0) => edgeOnPlane(pl, extrudeBottomZ(p) + o),
   },
   box: {
     top: (p) => faceXY(Number(p.z ?? 30)),
@@ -331,13 +332,14 @@ function resolveCrit(
   const leaf = LEAF_PORTS[src.type]?.[handle];
   if (leaf) {
     const v = evalNode(node);
-    // for an extrude, the cap/bottom live on the input sketch's base plane
+    // for an extrude, the cap/bottom live on the input sketch's base plane+offset
     let plane: Plane | undefined;
+    let offset = 0;
     if (src.type === "extrude" && src.inputs?.in) {
       const inV = evalNode(parseRef(src.inputs.in).node);
-      if (inV.kind === "sketch2d" && inV.plane) plane = inV.plane;
+      if (inV.kind === "sketch2d") { if (inV.plane) plane = inV.plane; offset = inV.planeOffset ?? 0; }
     }
-    return leaf(src.params ?? {}, v.kind === "solid" ? v.solid : undefined, plane);
+    return leaf(src.params ?? {}, v.kind === "solid" ? v.solid : undefined, plane, offset);
   }
   if (FORWARD_TYPES.has(src.type)) {
     const inputRef = src.inputs?.in;
@@ -374,6 +376,10 @@ function expectSketch(v: GraphValue | undefined, node: string): Drawing {
 /** The base plane a sketch2d input was drawn on (defaults to `def`, XY). */
 function sketchPlane(v: GraphValue | undefined, def: "XY" | "XZ" | "YZ" = "XY"): "XY" | "XZ" | "YZ" {
   return v && v.kind === "sketch2d" && v.plane ? v.plane : def;
+}
+/** Offset of that plane along its normal (for a sketch placed on a face). */
+function sketchOffset(v: GraphValue | undefined): number {
+  return v && v.kind === "sketch2d" && v.planeOffset ? v.planeOffset : 0;
 }
 
 function expectSolid(v: GraphValue | undefined, node: string): Shape3D {
@@ -742,7 +748,7 @@ const REGISTRY: Record<string, NodeImpl> = {
     const solved = cloneDoc(doc);
     if (params.plane && solved.plane !== params.plane) solved.plane = params.plane as SketchDoc["plane"];
     solveSketch(solved, { overrides });
-    return { kind: "sketch2d", drawing: buildDrawing(solved), plane: solved.plane };
+    return { kind: "sketch2d", drawing: buildDrawing(solved), plane: solved.plane, planeOffset: solved.planeOffset };
   },
   rect: (_inputs, params) => ({
     kind: "sketch2d",
@@ -1157,9 +1163,10 @@ const REGISTRY: Record<string, NodeImpl> = {
     const dr = expectSketch(inputs.in, "extrude");
     const h = Number(params.height ?? 1);
     const plane = sketchPlane(inputs.in);
+    const off = sketchOffset(inputs.in);
     const mode = String(params.mode ?? "up");
-    // up: [0,h]  ·  down: [-h,0]  ·  symmetric: [-h/2, h/2]
-    const base = mode === "down" ? -h : mode === "symmetric" ? -h / 2 : 0;
+    // up: [0,h]  ·  down: [-h,0]  ·  symmetric: [-h/2, h/2]  (+ plane offset)
+    const base = (mode === "down" ? -h : mode === "symmetric" ? -h / 2 : 0) + off;
     const solid = dr.sketchOnPlane(plane, base).extrude(h) as Shape3D;
     return { kind: "solid", solid };
   },

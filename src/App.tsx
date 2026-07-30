@@ -41,7 +41,7 @@ export default function App() {
   const [status, setStatus] = useState("initialising kernels…");
   const [graphError, setGraphError] = useState<{ nodeId?: string; message: string } | null>(null);
   const [graphValues, setGraphValues] = useState<Record<string, string>>({});
-  const [pickMode, setPickMode] = useState<"face" | "edge" | "border" | null>(null);
+  const [pickMode, setPickMode] = useState<"face" | "edge" | "border" | "sketchFace" | null>(null);
   const [viewMode, setViewMode] = useState<"shaded" | "edges" | "wireframe">("shaded");
   const hoverRAF = useRef<number | undefined>(undefined);
   const lastHover = useRef<{ x: number; y: number } | null>(null);
@@ -56,7 +56,7 @@ export default function App() {
       hoverRAF.current = requestAnimationFrame(() => {
         hoverRAF.current = undefined;
         const p = lastHover.current;
-        if (p && pickMode) viewportRef.current?.hoverHighlight(pickMode, p.x, p.y);
+        if (p && pickMode) viewportRef.current?.hoverHighlight(pickMode === "sketchFace" ? "face" : pickMode, p.x, p.y);
       });
     },
     [pickMode],
@@ -72,6 +72,16 @@ export default function App() {
   const onViewportClick = useCallback(
     (e: React.MouseEvent) => {
       if (!pickMode) return;
+      if (pickMode === "sketchFace") {
+        const pick = viewportRef.current?.pickFace(e.clientX, e.clientY);
+        if (!pick || pick.axis === "curved") { setStatus("sketch on face: pick a FLAT face"); return; }
+        // face normal axis → base sketch plane: Z→XY, X→YZ, Y→XZ
+        const base = pick.axis === "Z" ? "XY" : pick.axis === "X" ? "YZ" : "XZ";
+        editorApi.current?.addSketchOnPlane(base, pick.offset);
+        setStatus(`new Sketch on ${base} @ ${pick.offset}`);
+        setPickMode(null);
+        return;
+      }
       if (pickMode === "face") {
         const pick = viewportRef.current?.pickFace(e.clientX, e.clientY);
         if (!pick) { setStatus("pick: no face under the cursor"); return; }
@@ -239,6 +249,13 @@ export default function App() {
             title="Pick a flat face → selects its border (rim) edges as an Edge Select (auto-wires into a fillet/bevel)"
           >
             ▢ {pickMode === "border" ? "Click a face…" : "Pick border"}
+          </button>
+          <button
+            className={`vp-pick${pickMode === "sketchFace" ? " vp-pick--on" : ""}`}
+            onClick={(e) => { e.stopPropagation(); setPickMode((v) => (v === "sketchFace" ? null : "sketchFace")); }}
+            title="Pick a flat face → start a new 2D Sketch on that face's plane (Fusion workflow)"
+          >
+            ✎ {pickMode === "sketchFace" ? "Click a face…" : "Sketch on face"}
           </button>
           <button
             className="vp-pick vp-pick--view"
