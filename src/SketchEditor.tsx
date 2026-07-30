@@ -51,6 +51,7 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
   const [sel, setSel] = useState<{ points: Set<Id>; entities: Set<Id> }>({ points: new Set(), entities: new Set() });
   const [cursor, setCursor] = useState<Vec2 | null>(null);
   const [snapPt, setSnapPt] = useState<Id | null>(null);
+  const [onCurve, setOnCurve] = useState<Vec2 | null>(null); // point-on-curve inference marker
   const [status, setStatus] = useState("");
   const [, forceRender] = useState(0);
 
@@ -158,13 +159,31 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
     }
     return best;
   }, [toS]);
-  const snapWorld = useCallback((sp: Vec2, exclude?: Set<Id>): { w: Vec2; onPoint: Id | null } => {
+  // nearest point ON an entity (projected), for point-on-curve snapping
+  const nearestOnEntity = useCallback((sp: Vec2, exclude?: Set<Id>): { id: Id; w: Vec2 } | null => {
+    let best: { id: Id; w: Vec2 } | null = null, bestD = 9;
+    for (const t of tessellate(docRef.current)) {
+      if (exclude?.has(t.id)) continue;
+      for (let i = 0; i < t.pts.length - 1; i++) {
+        const a = toS(t.pts[i]), b = toS(t.pts[i + 1]);
+        const dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy || 1e-9;
+        const u = Math.max(0, Math.min(1, ((sp[0] - a[0]) * dx + (sp[1] - a[1]) * dy) / L2));
+        const proj: Vec2 = [a[0] + u * dx, a[1] + u * dy];
+        const d = Math.hypot(sp[0] - proj[0], sp[1] - proj[1]);
+        if (d < bestD) { bestD = d; best = { id: t.id, w: toW(proj) }; }
+      }
+    }
+    return best;
+  }, [toS, toW]);
+  const snapWorld = useCallback((sp: Vec2, exclude?: Set<Id>): { w: Vec2; onPoint: Id | null; onEntity: Id | null } => {
     const hit = nearestPoint(sp, exclude);
-    if (hit) { const p = docRef.current.points.find((q) => q.id === hit)!; return { w: [p.x, p.y], onPoint: hit }; }
+    if (hit) { const p = docRef.current.points.find((q) => q.id === hit)!; return { w: [p.x, p.y], onPoint: hit, onEntity: null }; }
+    const onEnt = nearestOnEntity(sp, exclude);
+    if (onEnt) return { w: onEnt.w, onPoint: null, onEntity: onEnt.id };
     let w = toW(sp);
     if (gridSnap) { const step = gridStep(view.scale); w = [Math.round(w[0] / step) * step, Math.round(w[1] / step) * step]; }
-    return { w, onPoint: null };
-  }, [nearestPoint, toW, gridSnap, view.scale]);
+    return { w, onPoint: null, onEntity: null };
+  }, [nearestPoint, nearestOnEntity, toW, gridSnap, view.scale]);
   const entityAt = useCallback((sp: Vec2): Id | null => {
     let best: Id | null = null, bestD = 10;
     for (const t of tessellate(docRef.current)) for (let i = 0; i < t.pts.length - 1; i++) {
@@ -187,7 +206,15 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
     if (near(0) || near(180)) d.constraints.push({ id: nextId(d, "c"), kind: "horizontal", line: e.id } as Constraint);
     else if (near(90) || near(-90)) d.constraints.push({ id: nextId(d, "c"), kind: "vertical", line: e.id } as Constraint);
   };
-  const ensurePoint = (d: SketchDoc, w: Vec2, onPoint: Id | null): Id => onPoint ?? addPoint(d, w[0], w[1]).id;
+  const ensurePoint = (d: SketchDoc, w: Vec2, onPoint: Id | null, onEntity: Id | null = null): Id => {
+    if (onPoint) return onPoint;
+    const id = addPoint(d, w[0], w[1]).id;
+    // snapped onto an existing curve → keep the point on it (Fusion inference)
+    if (onEntity && d.entities.some((e) => e.id === onEntity)) {
+      d.constraints.push({ id: nextId(d, "c"), kind: "pointOn", p: id, ent: onEntity } as Constraint);
+    }
+    return id;
+  };
 
   const onCanvasClick = (e: React.MouseEvent) => {
     if (e.button !== 0 || panRef.current) return;
@@ -202,14 +229,14 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
       return;
     }
 
-    const { w, onPoint } = snapWorld(sp);
+    const { w, onPoint, onEntity } = snapWorld(sp);
     // snapshot once per primitive (on its first click) so a single undo removes
     // the whole thing — never leaving an orphan centre/endpoint behind
     if (chain.current.length === 0) snapshot();
     if (tool === "line") {
       const closing = onPoint && chain.current.length > 0 && onPoint === chain.current[0];
       const id = applyDoc((d) => {
-        const pid = closing ? chain.current[0] : ensurePoint(d, w, onPoint);
+        const pid = closing ? chain.current[0] : ensurePoint(d, w, onPoint, onEntity);
         const prev = chain.current[chain.current.length - 1];
         if (prev) addLineSeg(d, prev, pid);
         return pid;
@@ -225,7 +252,7 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
           chain.current = ["center"];
           setStatus("centred rectangle: click a corner (Alt)");
         } else {
-          const id = applyDoc((d) => ensurePoint(d, w, onPoint));
+          const id = applyDoc((d) => ensurePoint(d, w, onPoint, onEntity));
           chain.current = [id];
           setStatus("rectangle: click the opposite corner");
         }
@@ -241,7 +268,7 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
             addLineSeg(d, c1, c2); addLineSeg(d, c2, c3); addLineSeg(d, c3, c4); addLineSeg(d, c4, c1);
           } else {
             const a = d.points.find((q) => q.id === chain.current[0])!;
-            const cId = ensurePoint(d, w, onPoint);
+            const cId = ensurePoint(d, w, onPoint, onEntity);
             const c = d.points.find((q) => q.id === cId)!;
             const bId = addPoint(d, c.x, a.y).id;
             const dId = addPoint(d, a.x, c.y).id;
@@ -254,7 +281,7 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
     }
     if (tool === "circle") {
       if (chain.current.length === 0) {
-        const id = applyDoc((d) => ensurePoint(d, w, onPoint));
+        const id = applyDoc((d) => ensurePoint(d, w, onPoint, onEntity));
         chain.current = [id]; setStatus("circle: click to set the radius");
       } else {
         applyDoc((d) => {
@@ -268,7 +295,7 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
     }
     if (tool === "arc") {
       if (chain.current.length < 2) {
-        const id = applyDoc((d) => ensurePoint(d, w, onPoint));
+        const id = applyDoc((d) => ensurePoint(d, w, onPoint, onEntity));
         chain.current.push(id);
         setStatus(chain.current.length === 1 ? "arc: click the end point" : "arc: click a point on the arc");
       } else {
@@ -287,14 +314,14 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
       return;
     }
     if (tool === "spline") {
-      const id = applyDoc((d) => ensurePoint(d, w, onPoint));
+      const id = applyDoc((d) => ensurePoint(d, w, onPoint, onEntity));
       chain.current.push(id);
       setStatus(`spline: ${chain.current.length} point(s) — Enter / double-click to finish`);
       return;
     }
     if (tool === "polygon") {
       if (chain.current.length === 0) {
-        const id = applyDoc((d) => ensurePoint(d, w, onPoint));
+        const id = applyDoc((d) => ensurePoint(d, w, onPoint, onEntity));
         chain.current = [id]; setStatus(`polygon (${polySides} sides): click a vertex`);
       } else {
         const n = polySides;
@@ -324,7 +351,7 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
     }
     if (tool === "slot") {
       if (chain.current.length < 2) {
-        const id = applyDoc((d) => ensurePoint(d, w, onPoint));
+        const id = applyDoc((d) => ensurePoint(d, w, onPoint, onEntity));
         chain.current.push(id);
         setStatus(chain.current.length === 1 ? "slot: click the 2nd centre" : "slot: click to set the width");
       } else {
@@ -401,7 +428,10 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
       applyDoc(() => {}, { pull: [{ id, x: snap.w[0], y: snap.w[1] }] });
       setSnapPt(snap.onPoint);
     } else if (tool !== "select") {
-      setSnapPt(nearestPoint(sp));
+      const pid = nearestPoint(sp);
+      setSnapPt(pid);
+      // show a point-on-curve inference marker when not snapping to a point
+      setOnCurve(!pid ? nearestOnEntity(sp)?.w ?? null : null);
     }
   };
   const onMouseUp = (e: React.MouseEvent) => {
@@ -586,6 +616,7 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
               className={`ske__pt${p.fixed ? " fixed" : ""}${sel.points.has(p.id) ? " sel" : ""}${snapPt === p.id ? " snap" : ""}${chainStart?.id === p.id ? " start" : ""}`} />;
           })}
           {snapPt && (() => { const p = doc.points.find((q) => q.id === snapPt)!; const s = toS([p.x, p.y]); return <circle cx={s[0]} cy={s[1]} r={9} className="ske__snapring" />; })()}
+          {onCurve && !snapPt && (() => { const s = toS(onCurve); return <g className="ske__oncurve"><line x1={s[0] - 5} y1={s[1] - 5} x2={s[0] + 5} y2={s[1] + 5} /><line x1={s[0] - 5} y1={s[1] + 5} x2={s[0] + 5} y2={s[1] - 5} /></g>; })()}
         </svg>
 
         {editDim && (

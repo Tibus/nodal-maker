@@ -352,6 +352,7 @@ button.link {
 .ske__pt.snap { fill: #39d98a; }
 .ske__pt.start { stroke: #39d98a; stroke-width: 2; }
 .ske__snapring { fill: none; stroke: #39d98a; stroke-width: 1.5; }
+.ske__oncurve line { stroke: #d06fff; stroke-width: 1.8; }
 .ske__glyph { fill: #d19a66; font-size: 12px; font-weight: 700; cursor: pointer; user-select: none; }
 .ske__dimlabel rect { fill: rgba(20,26,34,0.9); stroke: #3a6a3a; }
 .ske__dimlabel text { fill: #9fe0a0; font-size: 11px; font-weight: 600; }
