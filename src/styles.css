@@ -334,7 +334,7 @@ button.link {
 .ske__btn--ok { background: #2f9e57; border-color: #37b866; color: #fff; }
 .ske__btn--ok:hover { background: #37b866; }
 
-.ske__stage { flex: 1; display: flex; min-height: 0; }
+.ske__stage { flex: 1; display: flex; min-height: 0; position: relative; }
 .ske__svg { flex: 1; display: block; background: #12161b; cursor: crosshair; }
 .ske__svg--select { cursor: default; }
 
@@ -357,6 +357,11 @@ button.link {
 .ske__witness { stroke: #5a6b57; stroke-width: 1; }
 .ske__dimline { stroke: #6f9a6a; stroke-width: 1; }
 .ske__dimarrow { fill: #6f9a6a; }
+.ske__diminput {
+  position: absolute; z-index: 10; width: 58px; text-align: center;
+  background: #12161b; color: #9fe0a0; border: 1px solid #39d98a;
+  border-radius: 4px; padding: 2px 3px; font-size: 12px; font-weight: 600;
+}
 
 .ske__panel {
   flex: 0 0 250px; background: #171b21; border-left: 1px solid #262b33;

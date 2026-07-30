@@ -46,6 +46,8 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
   const [tool, setToolState] = useState<Tool>("select");
   const [gridSnap, setGridSnap] = useState(true);
   const [polySides, setPolySides] = useState(6);
+  // inline dimension editor (double-click a dim label on the canvas)
+  const [editDim, setEditDim] = useState<{ id: Id; sx: number; sy: number; value: number } | null>(null);
   const [sel, setSel] = useState<{ points: Set<Id>; entities: Set<Id> }>({ points: new Set(), entities: new Set() });
   const [cursor, setCursor] = useState<Vec2 | null>(null);
   const [snapPt, setSnapPt] = useState<Id | null>(null);
@@ -553,7 +555,7 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
             <PreviewSeg tool={tool} from={[chainTail.x, chainTail.y]} cursor={cursor} toS={toS} />
           )}
 
-          {dims.map((dm) => <DimLabel key={dm.id} dim={dm} doc={doc} toS={toS} />)}
+          {dims.map((dm) => <DimLabel key={dm.id} dim={dm} doc={doc} toS={toS} onEdit={(id, sx, sy) => setEditDim({ id, sx, sy, value: dm.value })} />)}
           <ConstraintGlyphs doc={doc} toS={toS} onRemove={removeConstraint} />
 
           {doc.points.map((p) => {
@@ -563,6 +565,22 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
           })}
           {snapPt && (() => { const p = doc.points.find((q) => q.id === snapPt)!; const s = toS([p.x, p.y]); return <circle cx={s[0]} cy={s[1]} r={9} className="ske__snapring" />; })()}
         </svg>
+
+        {editDim && (
+          <input
+            className="ske__diminput"
+            style={{ left: editDim.sx - 28, top: editDim.sy - 10 }}
+            type="number"
+            step={0.5}
+            autoFocus
+            defaultValue={round(editDim.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { setDimValue(editDim.id, Number((e.target as HTMLInputElement).value)); setEditDim(null); }
+              else if (e.key === "Escape") setEditDim(null);
+            }}
+            onBlur={(e) => { setDimValue(editDim.id, Number(e.target.value)); setEditDim(null); }}
+          />
+        )}
 
         <div className="ske__panel">
           <div className="ske__phd">Dimensions <span>{dims.length}</span></div>
@@ -623,9 +641,9 @@ function PreviewSeg({ tool, from, cursor, toS }: { tool: Tool; from: Vec2; curso
 
 const DIM_OFFSET = 26; // px the dimension line sits off the measured geometry
 
-function labelBox(s: Vec2, text: string) {
+function labelBox(s: Vec2, text: string, onDbl?: (e: React.MouseEvent) => void) {
   return (
-    <g className="ske__dimlabel">
+    <g className="ske__dimlabel" onDoubleClick={onDbl} style={onDbl ? { cursor: "text" } : undefined}>
       <rect x={s[0] - text.length * 3.2 - 3} y={s[1] - 8} width={text.length * 6.4 + 6} height={15} rx={2} />
       <text x={s[0]} y={s[1] + 2.5} textAnchor="middle">{text}</text>
     </g>
@@ -640,8 +658,9 @@ function arrow(at: Vec2, dir: Vec2) {
   return <path d={`M${at[0]},${at[1]} L${p1[0]},${p1[1]} L${p2[0]},${p2[1]} Z`} className="ske__dimarrow" />;
 }
 
-function DimLabel({ dim, doc, toS }: { dim: DimConstraint; doc: SketchDoc; toS: (w: Vec2) => Vec2 }) {
+function DimLabel({ dim, doc, toS, onEdit }: { dim: DimConstraint; doc: SketchDoc; toS: (w: Vec2) => Vec2; onEdit: (id: Id, sx: number, sy: number) => void }) {
   const P = (id: Id) => doc.points.find((q) => q.id === id);
+  const edit = (s: Vec2) => (e: React.MouseEvent) => { e.stopPropagation(); onEdit(dim.id, s[0], s[1]); };
 
   // linear dimensions: witness lines + offset dimension line + arrows + label
   if (dim.kind === "distance" || dim.kind === "distanceX" || dim.kind === "distanceY") {
@@ -663,7 +682,7 @@ function DimLabel({ dim, doc, toS }: { dim: DimConstraint; doc: SketchDoc; toS: 
         <line x1={da[0]} y1={da[1]} x2={db[0]} y2={db[1]} className="ske__dimline" />
         {arrow(da, [-d[0], -d[1]])}
         {arrow(db, d)}
-        {labelBox(mid, text)}
+        {labelBox(mid, text, edit(mid))}
       </g>
     );
   }
@@ -681,7 +700,7 @@ function DimLabel({ dim, doc, toS }: { dim: DimConstraint; doc: SketchDoc; toS: 
     return (
       <g>
         <line x1={sc[0]} y1={sc[1]} x2={edge[0]} y2={edge[1]} className="ske__dimline" />
-        {labelBox([edge[0] + 22, edge[1] - 8], `${dim.name} R${round(dim.value)}`)}
+        {labelBox([edge[0] + 22, edge[1] - 8], `${dim.name} R${round(dim.value)}`, edit([edge[0] + 22, edge[1] - 8]))}
       </g>
     );
   }
@@ -692,7 +711,7 @@ function DimLabel({ dim, doc, toS }: { dim: DimConstraint; doc: SketchDoc; toS: 
     if (a?.kind !== "line") return null;
     const p = P(a.p1)!, q = P(a.p2)!;
     const s = toS([(p.x + q.x) / 2, (p.y + q.y) / 2]);
-    return labelBox(s, `${dim.name} ${round(dim.value)}°`);
+    return labelBox(s, `${dim.name} ${round(dim.value)}°`, edit(s));
   }
   return null;
 }
