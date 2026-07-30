@@ -159,6 +159,8 @@ type Crit =
   | { target: "face"; t: "all" }
   | { target: "edge"; t: "dir"; d: Vec3 }
   | { target: "edge"; t: "planeXY"; z: number }
+  | { target: "edge"; t: "planeXZ"; y: number }
+  | { target: "edge"; t: "planeYZ"; x: number }
   | { target: "edge"; t: "all" };
 
 // where an extrude's cap / bottom sit along the extrusion axis, per direction
@@ -176,6 +178,14 @@ const faceXZ = (y: number): Crit => ({ target: "face", t: "planeXZ", y });
 const faceCyl = (): Crit => ({ target: "face", t: "cyl" });
 const edgeDir = (d: Vec3): Crit => ({ target: "edge", t: "dir", d });
 const edgeXY = (z: number): Crit => ({ target: "edge", t: "planeXY", z });
+
+// plane-aware helpers: which face/edge crit for an extrude on a given base plane
+type Plane = "XY" | "XZ" | "YZ";
+const faceOnPlane = (plane: Plane, off: number): Crit =>
+  plane === "XZ" ? faceXZ(off) : plane === "YZ" ? faceYZ(off) : faceXY(off);
+const edgeOnPlane = (plane: Plane, off: number): Crit =>
+  plane === "XZ" ? { target: "edge", t: "planeXZ", y: off } : plane === "YZ" ? { target: "edge", t: "planeYZ", x: off } : edgeXY(off);
+const axisDir = (plane: Plane): Vec3 => (plane === "XZ" ? [0, 1, 0] : plane === "YZ" ? [1, 0, 0] : [0, 0, 1]);
 
 /** Compile a crit into the finder-mutating closure that fillet/bevel/shell call. */
 function critApply(c: Crit): (finder: unknown) => unknown {
@@ -198,6 +208,8 @@ function critApply(c: Crit): (finder: unknown) => unknown {
     switch (c.t) {
       case "dir": return ee.inDirection(c.d);
       case "planeXY": return ee.inPlane("XY", c.z);
+      case "planeXZ": return ee.inPlane("XZ", c.y);
+      case "planeYZ": return ee.inPlane("YZ", c.x);
       case "all": return ee;
     }
   };
@@ -216,14 +228,14 @@ function zBounds(solid: Shape3D): { min: number; max: number } {
  * source shape when available, so ports can read its actual bounds instead of
  * guessing from params (needed for revolve / boss, whose caps come from upstream).
  */
-type CritBuilder = (p: Record<string, unknown>, solid?: Shape3D) => Crit;
+type CritBuilder = (p: Record<string, unknown>, solid?: Shape3D, plane?: Plane) => Crit;
 const LEAF_PORTS: Record<string, Record<string, CritBuilder>> = {
   extrude: {
-    cap: (p) => faceXY(extrudeCapZ(p)),
-    bottom: (p) => faceXY(extrudeBottomZ(p)),
-    sideEdges: () => edgeDir([0, 0, 1]),
-    capEdges: (p) => edgeXY(extrudeCapZ(p)),
-    bottomEdges: (p) => edgeXY(extrudeBottomZ(p)),
+    cap: (p, _s, pl = "XY") => faceOnPlane(pl, extrudeCapZ(p)),
+    bottom: (p, _s, pl = "XY") => faceOnPlane(pl, extrudeBottomZ(p)),
+    sideEdges: (_p, _s, pl = "XY") => edgeDir(axisDir(pl)),
+    capEdges: (p, _s, pl = "XY") => edgeOnPlane(pl, extrudeCapZ(p)),
+    bottomEdges: (p, _s, pl = "XY") => edgeOnPlane(pl, extrudeBottomZ(p)),
   },
   box: {
     top: (p) => faceXY(Number(p.z ?? 30)),
@@ -319,7 +331,13 @@ function resolveCrit(
   const leaf = LEAF_PORTS[src.type]?.[handle];
   if (leaf) {
     const v = evalNode(node);
-    return leaf(src.params ?? {}, v.kind === "solid" ? v.solid : undefined);
+    // for an extrude, the cap/bottom live on the input sketch's base plane
+    let plane: Plane | undefined;
+    if (src.type === "extrude" && src.inputs?.in) {
+      const inV = evalNode(parseRef(src.inputs.in).node);
+      if (inV.kind === "sketch2d" && inV.plane) plane = inV.plane;
+    }
+    return leaf(src.params ?? {}, v.kind === "solid" ? v.solid : undefined, plane);
   }
   if (FORWARD_TYPES.has(src.type)) {
     const inputRef = src.inputs?.in;
