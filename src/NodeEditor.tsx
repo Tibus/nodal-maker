@@ -213,15 +213,34 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
                 >
                   ✎ Edit sketch
                 </button>
-                {dims.map((dm) => (
-                  <div className="gnode__row gnode__row--param" key={`dim-${dm.name}`}>
-                    <ParamField
-                      spec={{ name: dm.name, kind: "number", label: `${dm.name} (${dm.kind === "angle" ? "°" : "mm"})`, step: 0.5 }}
-                      value={data.params[dm.name] ?? dm.value}
-                      onChange={(v) => ctx.setParam(id, dm.name, v)}
-                    />
-                  </div>
-                ))}
+                {dims.map((dm) => {
+                  const dlinked = ctx.isLinked(id, dm.name);
+                  return (
+                    <div className="gnode__row gnode__row--param" key={`dim-${dm.name}`}>
+                      <Handle
+                        id={dm.name}
+                        type="target"
+                        position={Position.Left}
+                        className="rf-port rf-port--opt"
+                        style={{ borderColor: SOCKET_COLORS.number }}
+                        title={`${dm.name}: number (optional — drives this dimension)`}
+                        {...tipH("number")}
+                      />
+                      {dlinked ? (
+                        <div className="pf pf--linked">
+                          <span>{dm.name} ({dm.kind === "angle" ? "°" : "mm"})</span>
+                          <em style={{ color: SOCKET_COLORS.number }}>◀ linked</em>
+                        </div>
+                      ) : (
+                        <ParamField
+                          spec={{ name: dm.name, kind: "number", label: `${dm.name} (${dm.kind === "angle" ? "°" : "mm"})`, step: 0.5 }}
+                          value={data.params[dm.name] ?? dm.value}
+                          onChange={(v) => ctx.setParam(id, dm.name, v)}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             );
           }
@@ -709,6 +728,11 @@ export default function NodeEditor({
   const nodeInType = useCallback(
     (n: GeoNode, handle: string): SocketType | undefined => {
       if (n.data.component) return components[n.data.component]?.inputs.find((i) => i.name === handle)?.type;
+      // a Sketch node's dynamic dimension handles accept numbers
+      if (n.data.nodeType === "sketch" && n.data.params.doc) {
+        const doc = n.data.params.doc as SketchDoc;
+        if (dimensions(doc).some((dm) => dm.name === handle)) return "number";
+      }
       return handleType(n.data.nodeType, handle);
     },
     [components],

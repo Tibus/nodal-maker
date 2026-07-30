@@ -90,7 +90,7 @@ type NodeImpl = (
 
 // Node metadata (ports, params, socket colours) lives dependency-free in
 // `specs.ts` so the editor can import it without pulling in the WASM kernels.
-import { NODE_SPECS, paramPortType } from "./specs";
+import { NODE_SPECS, paramPortType, type SocketType } from "./specs";
 export type { SocketType, PortSpec, ParamSpec, NodeSpec } from "./specs";
 export { NODE_SPECS, SOCKET_COLORS } from "./specs";
 
@@ -106,9 +106,15 @@ function resolveInputs(
 ): { inputs: Record<string, GraphValue>; params: Record<string, unknown> } {
   const spec = NODE_SPECS[nodeType];
   if (!spec) return { inputs: rawInputs, params };
-  const paramPorts = new Map(
+  const paramPorts = new Map<string, SocketType | null>(
     spec.params.map((p) => [p.name, paramPortType(p)] as const).filter(([, t]) => t !== null),
   );
+  // a Sketch node's driving dimensions are dynamic number param ports
+  if (nodeType === "sketch") {
+    const raw = params.doc;
+    const doc = raw && typeof raw === "object" ? (raw as SketchDoc) : typeof raw === "string" && raw ? (JSON.parse(raw) as SketchDoc) : null;
+    if (doc?.constraints) for (const dim of dimensions(doc)) paramPorts.set(dim.name, "number");
+  }
   const inputs: Record<string, GraphValue> = {};
   const merged: Record<string, unknown> = { ...params };
   for (const [port, v] of Object.entries(rawInputs)) {
