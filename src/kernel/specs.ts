@@ -649,7 +649,10 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     label: "Extrude",
     inputs: [{ name: "in", type: "sketch2d" }],
     output: "solid",
-    params: [{ name: "height", kind: "number", default: 10, min: 1, max: 100, step: 1 }],
+    params: [
+      { name: "height", kind: "number", default: 10, min: 1, max: 100, step: 1 },
+      { name: "mode", kind: "select", label: "direction", default: "up", options: ["up", "down", "symmetric"] },
+    ],
     selectionOutputs: [
       { name: "cap", target: "face" },
       { name: "bottom", target: "face" },

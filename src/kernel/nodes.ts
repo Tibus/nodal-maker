@@ -161,6 +161,15 @@ type Crit =
   | { target: "edge"; t: "planeXY"; z: number }
   | { target: "edge"; t: "all" };
 
+// where an extrude's cap / bottom sit along the extrusion axis, per direction
+const extrudeCapZ = (p: Record<string, unknown>): number => {
+  const h = Number(p.height ?? 1), m = String(p.mode ?? "up");
+  return m === "down" ? 0 : m === "symmetric" ? h / 2 : h;
+};
+const extrudeBottomZ = (p: Record<string, unknown>): number => {
+  const h = Number(p.height ?? 1), m = String(p.mode ?? "up");
+  return m === "down" ? -h : m === "symmetric" ? -h / 2 : 0;
+};
 const faceXY = (z: number): Crit => ({ target: "face", t: "planeXY", z });
 const faceYZ = (x: number): Crit => ({ target: "face", t: "planeYZ", x });
 const faceXZ = (y: number): Crit => ({ target: "face", t: "planeXZ", y });
@@ -210,11 +219,11 @@ function zBounds(solid: Shape3D): { min: number; max: number } {
 type CritBuilder = (p: Record<string, unknown>, solid?: Shape3D) => Crit;
 const LEAF_PORTS: Record<string, Record<string, CritBuilder>> = {
   extrude: {
-    cap: (p) => faceXY(Number(p.height ?? 1)),
-    bottom: () => faceXY(0),
+    cap: (p) => faceXY(extrudeCapZ(p)),
+    bottom: (p) => faceXY(extrudeBottomZ(p)),
     sideEdges: () => edgeDir([0, 0, 1]),
-    capEdges: (p) => edgeXY(Number(p.height ?? 1)),
-    bottomEdges: () => edgeXY(0),
+    capEdges: (p) => edgeXY(extrudeCapZ(p)),
+    bottomEdges: (p) => edgeXY(extrudeBottomZ(p)),
   },
   box: {
     top: (p) => faceXY(Number(p.z ?? 30)),
@@ -344,9 +353,9 @@ function expectSketch(v: GraphValue | undefined, node: string): Drawing {
   return v.drawing;
 }
 
-/** The base plane a sketch2d input was drawn on (defaults to XY). */
-function sketchPlane(v: GraphValue | undefined): "XY" | "XZ" | "YZ" {
-  return v && v.kind === "sketch2d" && v.plane ? v.plane : "XY";
+/** The base plane a sketch2d input was drawn on (defaults to `def`, XY). */
+function sketchPlane(v: GraphValue | undefined, def: "XY" | "XZ" | "YZ" = "XY"): "XY" | "XZ" | "YZ" {
+  return v && v.kind === "sketch2d" && v.plane ? v.plane : def;
 }
 
 function expectSolid(v: GraphValue | undefined, node: string): Shape3D {
@@ -944,7 +953,10 @@ const REGISTRY: Record<string, NodeImpl> = {
   revolve: (inputs, params) => {
     const dr = expectSketch(inputs.in, "revolve");
     const angle = Number(params.angle ?? 360);
-    const solid = dr.sketchOnPlane("XZ").revolve([0, 0, 1], { angle }) as Shape3D;
+    // revolve around Z; profile lives on XZ by default (a Sketch node can pick
+    // another plane containing the axis)
+    const plane = sketchPlane(inputs.in, "XZ");
+    const solid = dr.sketchOnPlane(plane).revolve([0, 0, 1], { angle }) as Shape3D;
     return { kind: "solid", solid };
   },
   loft: (inputs, params) => {
@@ -1127,7 +1139,10 @@ const REGISTRY: Record<string, NodeImpl> = {
     const dr = expectSketch(inputs.in, "extrude");
     const h = Number(params.height ?? 1);
     const plane = sketchPlane(inputs.in);
-    const solid = dr.sketchOnPlane(plane).extrude(h) as Shape3D;
+    const mode = String(params.mode ?? "up");
+    // up: [0,h]  ·  down: [-h,0]  ·  symmetric: [-h/2, h/2]
+    const base = mode === "down" ? -h : mode === "symmetric" ? -h / 2 : 0;
+    const solid = dr.sketchOnPlane(plane, base).extrude(h) as Shape3D;
     return { kind: "solid", solid };
   },
 
