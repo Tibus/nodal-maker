@@ -32,6 +32,8 @@ export class Viewport {
   private brepEdges: THREE.LineSegments | null = null;
   // pinned-visible extra bodies (for assembling several B-reps) — non-pickable
   private extraGroup: THREE.Group | null = null;
+  // the current payload is a 2D sketch → show it as line-work on its plane
+  private isSketchView = false;
   // 3D translation gizmo (edits a Transform node's tx/ty/tz)
   private gizmo: TransformControls | null = null;
   private gizmoProxy: THREE.Object3D | null = null;
@@ -106,6 +108,7 @@ export class Viewport {
     }
     this.clearPick();
     this.payload = payload;
+    this.isSketchView = !!payload.isSketch;
 
     const geom = new THREE.BufferGeometry();
     geom.setAttribute("position", new THREE.BufferAttribute(payload.vertices, 3));
@@ -178,6 +181,15 @@ export class Viewport {
   }
 
   private applyViewMode() {
+    // a sketch always shows as bright line-work on its plane (no filled plate)
+    if (this.isSketchView) {
+      if (this.mesh) this.mesh.visible = false;
+      if (this.brepEdges) {
+        this.brepEdges.visible = true;
+        (this.brepEdges.material as THREE.LineBasicMaterial).color.setHex(0x39d0ff);
+      }
+      return;
+    }
     if (this.mesh) this.mesh.visible = this.viewMode !== "wireframe";
     if (this.brepEdges) {
       this.brepEdges.visible = this.viewMode !== "shaded";

@@ -1541,6 +1541,8 @@ export interface MeshPayload {
   /** the real B-rep construction edges as line segments (for a Fusion-style
    * wireframe) — absent for mesh-domain payloads (which have no B-rep edges). */
   edges?: Float32Array;
+  /** this payload is a 2D sketch preview → render as line-work on its plane */
+  isSketch?: boolean;
   stats: {
     faceCount: number;
     triangleCount: number;

@@ -231,7 +231,7 @@ export function evalToPayload(
     // placed on the sketch's own base plane; the true (non-faceted) geometry
     // is what `exportGraphSVG` emits.
     const plate = v.drawing.sketchOnPlane(v.plane ?? "XY").extrude(0.5) as Shape3D;
-    return { mesh: meshAndTag(plate), topCapFaceId: null, topCapZ: 0, outputKind: "sketch2d", values, extras };
+    return { mesh: { ...meshAndTag(plate), isSketch: true }, topCapFaceId: null, topCapZ: 0, outputKind: "sketch2d", values, extras };
   }
   throw new Error(`output node "${outputId}" is a ${v.kind}; connect it to geometry to preview`);
 }
