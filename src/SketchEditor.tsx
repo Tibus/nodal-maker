@@ -29,8 +29,9 @@ import {
 } from "./sketch/model";
 import { solve, degreesOfFreedom } from "./sketch/solver";
 import { tessellate, bbox, type Vec2 } from "./sketch/geometry";
+import { trimAt } from "./sketch/trim";
 
-type Tool = "select" | "line" | "rect" | "circle" | "arc" | "spline" | "polygon" | "slot";
+type Tool = "select" | "line" | "rect" | "circle" | "arc" | "spline" | "polygon" | "slot" | "trim";
 interface View { ox: number; oy: number; scale: number }
 interface Props { initialDoc: SketchDoc; onCommit: (doc: SketchDoc) => void; onCancel: () => void }
 
@@ -226,6 +227,12 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
       if (pid) setSel((s) => toggle(s, "points", pid, e.shiftKey));
       else if (ent) setSel((s) => toggle(s, "entities", ent, e.shiftKey));
       else if (!e.shiftKey) setSel({ points: new Set(), entities: new Set() });
+      return;
+    }
+
+    if (tool === "trim") {
+      const ent = entityAt(sp);
+      if (ent) { snapshot(); applyDoc((d) => { trimAt(d, ent, toW(sp)); }); }
       return;
     }
 
@@ -537,6 +544,8 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
       else if (e.key === "a") setTool("arc");
       else if (e.key === "s") setTool("spline");
       else if (e.key === "v") setTool("select");
+      else if (e.key === "p") setTool("polygon");
+      else if (e.key === "t") setTool("trim");
       else if (e.key === "x") toggleConstruction();
       else if (e.key === "f") fit(size.w, size.h);
     };
@@ -559,7 +568,7 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
     <div className="ske" onContextMenu={(e) => e.preventDefault()}>
       <div className="ske__bar">
         <div className="ske__tools">
-          {(["select", "line", "rect", "circle", "arc", "spline", "polygon", "slot"] as Tool[]).map((t) => (
+          {(["select", "line", "rect", "circle", "arc", "spline", "polygon", "slot", "trim"] as Tool[]).map((t) => (
             <button key={t} className={`ske__tool${tool === t ? " on" : ""}`} onClick={() => setTool(t)} title={TOOL_HINT[t]}>{TOOL_ICON[t]}</button>
           ))}
           {tool === "polygon" && (
@@ -797,12 +806,13 @@ function ConstraintGlyphs({ doc, toS, onRemove }: { doc: SketchDoc; toS: (w: Vec
 /* helpers                                                                    */
 /* -------------------------------------------------------------------------- */
 
-const TOOL_ICON: Record<Tool, string> = { select: "▲", line: "╱", rect: "▭", circle: "◯", arc: "◜", spline: "∿", polygon: "⬡", slot: "⬭" };
+const TOOL_ICON: Record<Tool, string> = { select: "▲", line: "╱", rect: "▭", circle: "◯", arc: "◜", spline: "∿", polygon: "⬡", slot: "⬭", trim: "✂" };
 const TOOL_HINT: Record<Tool, string> = {
   select: "Select / drag (V)", line: "Line — click points; click start or Esc to finish (L)",
   rect: "Rectangle — two corners, or Alt+click for a centred rectangle (R)", circle: "Circle — centre then radius (C)",
   arc: "Arc — start, end, then a point on the arc (A)", spline: "Spline — click points, Enter to finish (S)",
   polygon: "Polygon — centre then a vertex (P)", slot: "Slot — two centres then the width",
+  trim: "Trim — click the part of an entity to remove (T)",
 };
 const CONSTRAINTS = [
   { k: "coincident", g: "•", t: "Coincident — weld 2 points" },
