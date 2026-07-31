@@ -34,6 +34,8 @@ export class Viewport {
   private extraGroup: THREE.Group | null = null;
   // the current payload is a 2D sketch → show it as line-work on its plane
   private isSketchView = false;
+  // the last picked face's triangle group (fallback outline source)
+  private lastFaceGroup: { start: number; count: number } | null = null;
   // 3D translation gizmo (edits a Transform node's tx/ty/tz)
   private gizmo: TransformControls | null = null;
   private gizmoProxy: THREE.Object3D | null = null;
@@ -519,26 +521,50 @@ export class Viewport {
     hmesh.renderOrder = 999;
     this.scene.add(hmesh);
     this.pickHighlight = hmesh;
+    this.lastFaceGroup = { start: f.group.start, count: f.group.count };
     return { axis: f.axis, offset: f.offset, tag: f.tag, centroid: f.centroid };
   }
 
   /**
-   * The B-rep edges lying in a base plane at `offset`, projected to that plane's
-   * 2D coordinates. Used to seed a "sketch on face" with the face outline as
-   * reference geometry. Returns line segments [[x1,y1],[x2,y2]] in sketch space.
+   * The picked face's outline, projected to its base plane's 2D coordinates —
+   * to seed a "sketch on face" with reference geometry. Prefers the clean B-rep
+   * edges; falls back to the face's triangle boundary for shapes whose edges
+   * aren't available (e.g. compounds). Returns segments [[x1,y1],[x2,y2]].
    */
   faceOutline2D(base: "XY" | "XZ" | "YZ", offset: number): [number, number][][] {
-    const edges = this.payload?.edges;
-    if (!edges) return [];
-    const tol = 0.05;
-    const out: [number, number][][] = [];
-    // normal coordinate index + the two in-plane coordinate indices
     const [nrm, u, v] = base === "XY" ? [2, 0, 1] : base === "XZ" ? [1, 0, 2] : [0, 1, 2];
-    for (let i = 0; i + 5 < edges.length; i += 6) {
-      const a = [edges[i], edges[i + 1], edges[i + 2]];
-      const b = [edges[i + 3], edges[i + 4], edges[i + 5]];
-      if (Math.abs(a[nrm] - offset) > tol || Math.abs(b[nrm] - offset) > tol) continue;
-      out.push([[a[u], a[v]], [b[u], b[v]]]);
+    const out: [number, number][][] = [];
+    const edges = this.payload?.edges;
+    if (edges) {
+      const tol = 0.05;
+      for (let i = 0; i + 5 < edges.length; i += 6) {
+        const a = [edges[i], edges[i + 1], edges[i + 2]];
+        const b = [edges[i + 3], edges[i + 4], edges[i + 5]];
+        if (Math.abs(a[nrm] - offset) > tol || Math.abs(b[nrm] - offset) > tol) continue;
+        out.push([[a[u], a[v]], [b[u], b[v]]]);
+      }
+    }
+    if (out.length > 0) return out;
+
+    // fallback: boundary of the picked face's triangles (edges used by exactly
+    // one triangle), projected to 2D
+    const g = this.lastFaceGroup;
+    if (!g || !this.payload) return out;
+    const { vertices, indices } = this.payload;
+    const count = new Map<string, { a: number; b: number }>();
+    const seen = new Set<string>();
+    for (let t = 0; t < g.count; t += 3) {
+      const tri = [indices[g.start + t], indices[g.start + t + 1], indices[g.start + t + 2]];
+      for (let e = 0; e < 3; e++) {
+        const a = tri[e], b = tri[(e + 1) % 3];
+        const key = a < b ? `${a}_${b}` : `${b}_${a}`;
+        if (seen.has(key)) { seen.delete(key); count.delete(key); } // seen twice → interior
+        else { seen.add(key); count.set(key, { a, b }); }
+      }
+    }
+    for (const { a, b } of count.values()) {
+      const pa = a * 3, pb = b * 3;
+      out.push([[vertices[pa + u], vertices[pa + v]], [vertices[pb + u], vertices[pb + v]]]);
     }
     return out;
   }
