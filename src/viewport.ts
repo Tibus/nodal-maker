@@ -34,8 +34,6 @@ export class Viewport {
   private extraGroup: THREE.Group | null = null;
   // the current payload is a 2D sketch → show it as line-work on its plane
   private isSketchView = false;
-  // the last picked face's triangle group (fallback outline source)
-  private lastFaceGroup: { start: number; count: number } | null = null;
   // 3D translation gizmo (edits a Transform node's tx/ty/tz)
   private gizmo: TransformControls | null = null;
   private gizmoProxy: THREE.Object3D | null = null;
@@ -521,7 +519,6 @@ export class Viewport {
     hmesh.renderOrder = 999;
     this.scene.add(hmesh);
     this.pickHighlight = hmesh;
-    this.lastFaceGroup = { start: f.group.start, count: f.group.count };
     return { axis: f.axis, offset: f.offset, tag: f.tag, centroid: f.centroid };
   }
 
@@ -546,23 +543,27 @@ export class Viewport {
     }
     if (out.length > 0) return out;
 
-    // fallback: boundary of the picked face's triangles (edges used by exactly
-    // one triangle), projected to 2D
-    const g = this.lastFaceGroup;
-    if (!g || !this.payload) return out;
+    // fallback: boundary of every triangle lying IN the plane (edges used by a
+    // single in-plane triangle). Captures the outer outline AND inner loops /
+    // holes at this offset — works even for compounds with no B-rep edges.
+    if (!this.payload) return out;
     const { vertices, indices } = this.payload;
-    const count = new Map<string, { a: number; b: number }>();
-    const seen = new Set<string>();
-    for (let t = 0; t < g.count; t += 3) {
-      const tri = [indices[g.start + t], indices[g.start + t + 1], indices[g.start + t + 2]];
+    const tol = 0.05;
+    const onPlane = (vi: number) => Math.abs(vertices[vi * 3 + nrm] - offset) < tol;
+    const edge = new Map<string, { a: number; b: number; n: number }>();
+    for (let t = 0; t + 2 < indices.length; t += 3) {
+      const tri = [indices[t], indices[t + 1], indices[t + 2]];
+      if (!onPlane(tri[0]) || !onPlane(tri[1]) || !onPlane(tri[2])) continue; // triangle not on the plane
       for (let e = 0; e < 3; e++) {
         const a = tri[e], b = tri[(e + 1) % 3];
         const key = a < b ? `${a}_${b}` : `${b}_${a}`;
-        if (seen.has(key)) { seen.delete(key); count.delete(key); } // seen twice → interior
-        else { seen.add(key); count.set(key, { a, b }); }
+        const rec = edge.get(key);
+        if (rec) rec.n++;
+        else edge.set(key, { a, b, n: 1 });
       }
     }
-    for (const { a, b } of count.values()) {
+    for (const { a, b, n } of edge.values()) {
+      if (n !== 1) continue; // interior (shared) edge
       const pa = a * 3, pb = b * 3;
       out.push([[vertices[pa + u], vertices[pa + v]], [vertices[pb + u], vertices[pb + v]]]);
     }
