@@ -523,6 +523,27 @@ export class Viewport {
   }
 
   /**
+   * The B-rep edges lying in a base plane at `offset`, projected to that plane's
+   * 2D coordinates. Used to seed a "sketch on face" with the face outline as
+   * reference geometry. Returns line segments [[x1,y1],[x2,y2]] in sketch space.
+   */
+  faceOutline2D(base: "XY" | "XZ" | "YZ", offset: number): [number, number][][] {
+    const edges = this.payload?.edges;
+    if (!edges) return [];
+    const tol = 0.05;
+    const out: [number, number][][] = [];
+    // normal coordinate index + the two in-plane coordinate indices
+    const [nrm, u, v] = base === "XY" ? [2, 0, 1] : base === "XZ" ? [1, 0, 2] : [0, 1, 2];
+    for (let i = 0; i + 5 < edges.length; i += 6) {
+      const a = [edges[i], edges[i + 1], edges[i + 2]];
+      const b = [edges[i + 3], edges[i + 4], edges[i + 5]];
+      if (Math.abs(a[nrm] - offset) > tol || Math.abs(b[nrm] - offset) > tol) continue;
+      out.push([[a[u], a[v]], [b[u], b[v]]]);
+    }
+    return out;
+  }
+
+  /**
    * Pick a flat face and highlight its BORDER — the feature edges lying in the
    * face's plane, within its extent — rather than the face fill. Returns the
    * plane (axis + offset) so an Edge Select can target that rim.

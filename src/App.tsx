@@ -77,8 +77,10 @@ export default function App() {
         if (!pick || pick.axis === "curved") { setStatus("sketch on face: pick a FLAT face"); return; }
         // face normal axis → base sketch plane: Z→XY, X→YZ, Y→XZ
         const base = pick.axis === "Z" ? "XY" : pick.axis === "X" ? "YZ" : "XZ";
-        editorApi.current?.addSketchOnPlane(base, pick.offset);
-        setStatus(`new Sketch on ${base} @ ${pick.offset}`);
+        // project the face outline into the sketch as reference geometry
+        const ref = viewportRef.current?.faceOutline2D(base, pick.offset) ?? [];
+        editorApi.current?.addSketchOnPlane(base, pick.offset, ref);
+        setStatus(`new Sketch on ${base} @ ${pick.offset} — ${ref.length} reference edge(s)`);
         setPickMode(null);
         return;
       }

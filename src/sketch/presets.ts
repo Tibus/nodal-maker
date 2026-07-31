@@ -36,6 +36,34 @@ export function starterRect(w = 40, h = 30): SketchDoc {
 }
 
 /**
+ * Build a sketch seeded with reference (construction) geometry projected from a
+ * picked face — its outline, so the user can snap to / dimension against it.
+ * The reference points are pinned (they mirror the real face, they don't move).
+ */
+export function docFromReference(
+  base: SketchDoc["plane"],
+  offset: number,
+  segments: [number, number][][],
+): SketchDoc {
+  const d = emptyDoc(base);
+  d.planeOffset = offset;
+  const key = (x: number, y: number) => `${Math.round(x * 1000)},${Math.round(y * 1000)}`;
+  const cache = new Map<string, string>();
+  const getPt = (x: number, y: number) => {
+    const k = key(x, y);
+    let id = cache.get(k);
+    if (!id) { const p = addPoint(d, x, y, true); id = p.id; cache.set(k, id); }
+    return id;
+  };
+  for (const [a, b] of segments) {
+    if (Math.hypot(a[0] - b[0], a[1] - b[1]) < 1e-4) continue;
+    const p1 = getPt(a[0], a[1]), p2 = getPt(b[0], b[1]);
+    d.entities.push({ id: nextId(d, "e"), kind: "line", p1, p2, construction: true });
+  }
+  return d;
+}
+
+/**
  * A rectangular plate with a centred circular hole — a good demo profile
  * (extrude → washer plate). Exposes width / height / hole (radius) dimensions.
  */

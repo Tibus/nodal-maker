@@ -44,7 +44,7 @@ import {
   type ComponentDef,
   type InstanceDescriptor,
 } from "./kernel/client";
-import { starterRect } from "./sketch/presets";
+import { starterRect, docFromReference } from "./sketch/presets";
 import { dimensions, isDim, type SketchDoc } from "./sketch/model";
 import SketchEditor from "./SketchEditor";
 
@@ -523,8 +523,9 @@ export interface EditorApi {
   /** add a Face/Edge Select node preconfigured from a viewport pick */
   addFaceSelect: (where: string, offset: number) => void;
   addEdgeSelect: (where: string, offset: number) => void;
-  /** create a new Sketch node placed on a base plane at an offset, and edit it */
-  addSketchOnPlane: (base: "XY" | "XZ" | "YZ", offset: number) => void;
+  /** create a new Sketch node on a base plane at an offset (with optional face
+   * outline as reference geometry), and open the editor */
+  addSketchOnPlane: (base: "XY" | "XZ" | "YZ", offset: number, reference?: [number, number][][]) => void;
 }
 
 export interface NodeEditorProps {
@@ -1019,8 +1020,10 @@ export default function NodeEditor({
   const addFaceSelect = useCallback((where: string, offset: number) => addSelectFromPick("face", where, offset), [addSelectFromPick]);
   const addEdgeSelect = useCallback((where: string, offset: number) => addSelectFromPick("edge", where, offset), [addSelectFromPick]);
 
-  const addSketchOnPlane = useCallback((base: "XY" | "XZ" | "YZ", offset: number) => {
-    const doc = starterRect();
+  const addSketchOnPlane = useCallback((base: "XY" | "XZ" | "YZ", offset: number, reference?: [number, number][][]) => {
+    // seed with the face outline as reference geometry when available, else a
+    // starter rectangle to draw on
+    const doc = reference && reference.length ? docFromReference(base, offset, reference) : starterRect();
     doc.plane = base;
     doc.planeOffset = offset;
     const params: Record<string, unknown> = { plane: base, doc };
