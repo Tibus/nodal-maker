@@ -82,6 +82,7 @@ export const NODE_DESCRIPTIONS: Record<string, string> = {
   polygon: "A regular polygon (hexagon, pentagon…) from radius + side count.",
   star: "A star profile from outer/inner radii and point count.",
   slot: "A rounded slot (stadium) profile.",
+  livingHinge: "A rectangular board cut with staggered slots so it flexes (lattice/living hinge). Bends across the width. Export to laser DXF/SVG.",
   gear: "A spur-gear silhouette (trapezoidal teeth) — for laser or as an extrude profile.",
   fingerBox: "Flat pattern for a press-fit finger-joint box (5 or 6 panels) — laser cutting.",
   svgInput: "Import a 2D profile from an SVG path 'd' string.",
@@ -144,7 +145,7 @@ export const NODE_DESCRIPTIONS: Record<string, string> = {
 /** Ordered palette categories (drives the grouped palette + search). */
 export const NODE_CATEGORIES: { name: string; types: string[] }[] = [
   { name: "Value", types: ["numberValue", "textValue", "math", "mathUnary", "clamp", "remap", "random"] },
-  { name: "2D Primitive", types: ["sketch", "rect", "circle", "ellipse", "polygon", "star", "slot", "gear", "fingerBox", "svgInput", "textToSvg"] },
+  { name: "2D Primitive", types: ["sketch", "rect", "circle", "ellipse", "polygon", "star", "slot", "gear", "fingerBox", "livingHinge", "svgInput", "textToSvg"] },
   { name: "2D Op", types: ["offset2d", "kerf", "fillet2d", "bevel2d", "boolean2d", "mirror2d", "transform2d", "arrayLinear2d", "arrayRadial2d", "group", "scoreCut"] },
   { name: "3D Primitive", types: ["box", "cylinder", "sphere", "cone", "torus", "thread", "internalThread", "importSTEP"] },
   { name: "Sketch → Solid", types: ["extrude", "pocket", "hole", "revolve", "loft", "loftSections", "sweep", "bossOnCap"] },
@@ -312,6 +313,20 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     params: [
       { name: "length", kind: "number", default: 40, min: 1, max: 300, step: 1 },
       { name: "width", kind: "number", default: 12, min: 1, max: 300, step: 0.5 },
+    ],
+  },
+  livingHinge: {
+    type: "livingHinge",
+    label: "Living hinge",
+    inputs: [],
+    output: "sketch2d",
+    params: [
+      { name: "width", kind: "number", default: 80, min: 10, max: 400, step: 1 },
+      { name: "height", kind: "number", default: 40, min: 10, max: 400, step: 1 },
+      { name: "spacing", kind: "number", label: "col pitch", default: 5, min: 1, max: 40, step: 0.5 },
+      { name: "slotLen", kind: "number", label: "slot length", default: 24, min: 2, max: 380, step: 1 },
+      { name: "bridge", kind: "number", label: "bridge", default: 4, min: 0.5, max: 40, step: 0.5 },
+      { name: "kerf", kind: "number", label: "slot width", default: 0.7, min: 0.1, max: 5, step: 0.1 },
     ],
   },
   fingerBox: {

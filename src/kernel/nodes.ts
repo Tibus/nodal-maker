@@ -842,6 +842,36 @@ const REGISTRY: Record<string, NodeImpl> = {
     const w = Number(params.width ?? 12);
     return { kind: "sketch2d", drawing: drawRectangle(len, w, w / 2) };
   },
+  /**
+   * Living (lattice) hinge: a rectangular board cut with staggered vertical
+   * slots so it flexes about the Y axis. Columns of slots along X, offset by
+   * half a period on alternate columns; top/bottom margins keep the board in
+   * one piece. Feed to a laser DXF/SVG export. Bends across the width (X).
+   */
+  livingHinge: (_inputs, params) => {
+    const W = Number(params.width ?? 80);
+    const H = Number(params.height ?? 40);
+    const spacing = Math.max(1, Number(params.spacing ?? 5)); // column pitch (X)
+    const slotLen = Math.max(2, Number(params.slotLen ?? 24));
+    const bridge = Math.max(0.5, Number(params.bridge ?? 4)); // gap between slot ends & to edges
+    const kerf = Math.max(0.1, Number(params.kerf ?? 0.7)); // slot width
+    let board = drawRectangle(W, H);
+    const yLo = -H / 2 + bridge, yHi = H / 2 - bridge;
+    const period = slotLen + bridge;
+    const nCols = Math.max(1, Math.floor((W - spacing) / spacing));
+    const x0 = -W / 2 + (W - (nCols - 1) * spacing) / 2; // centre the columns
+    for (let i = 0; i < nCols; i++) {
+      const x = x0 + i * spacing;
+      const off = i % 2 === 1 ? period / 2 : 0;
+      for (let sy = yLo - off; sy < yHi; sy += period) {
+        const a = Math.max(sy, yLo), b = Math.min(sy + slotLen, yHi);
+        const len = b - a;
+        if (len < 1) continue;
+        board = board.cut(drawRectangle(kerf, len).translate(x, (a + b) / 2));
+      }
+    }
+    return { kind: "sketch2d", drawing: board };
+  },
   fingerBox: (_inputs, params) => {
     // Flat pattern for a press-fit, finger-jointed box (laser cutting). Emits
     // the 5 (or 6) panels laid out side by side; feed the result into a
