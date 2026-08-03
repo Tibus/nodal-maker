@@ -391,6 +391,23 @@ export default function App() {
                 <tr><td>Bounding box</td><td>{fmt(props.bbox.size[0])} × {fmt(props.bbox.size[1])} × {fmt(props.bbox.size[2])} mm</td></tr>
                 <tr><td>Centre of mass</td><td>{props.center.map((c) => fmt(c)).join(", ")}</td></tr>
                 <tr><td>Triangles</td><td>{props.triangles}</td></tr>
+                {(() => {
+                  // resin estimates (assumptions: 1.1 g/mL, €50/L, 0.05 mm layers, 7 s/layer)
+                  const mL = props.volume / 1000;
+                  const grams = mL * 1.1;
+                  const euro = (mL / 1000) * 50;
+                  const layers = Math.ceil(props.bbox.size[2] / 0.05);
+                  const mins = Math.round((layers * 7) / 60);
+                  const hh = Math.floor(mins / 60), mm = mins % 60;
+                  return (
+                    <>
+                      <tr className="propspanel__sep"><td colSpan={2}>Resin estimate (≈)</td></tr>
+                      <tr><td>Volume</td><td>{fmt(mL)} mL · {fmt(grams)} g</td></tr>
+                      <tr><td>Material cost</td><td>€{euro.toFixed(2)} <span className="propspanel__dim">@ €50/L</span></td></tr>
+                      <tr><td>Print time</td><td>{hh ? `${hh} h ` : ""}{mm} min <span className="propspanel__dim">· {layers} layers @ 50 µm</span></td></tr>
+                    </>
+                  );
+                })()}
               </tbody>
             </table>
           </div>
