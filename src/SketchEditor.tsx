@@ -207,6 +207,17 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
     const near = (t: number) => Math.abs(((ang - t + 540) % 360) - 180) < AXIS_SNAP_DEG;
     if (near(0) || near(180)) d.constraints.push({ id: nextId(d, "c"), kind: "horizontal", line: e.id } as Constraint);
     else if (near(90) || near(-90)) d.constraints.push({ id: nextId(d, "c"), kind: "vertical", line: e.id } as Constraint);
+    else {
+      // inférence ⊥/∥ vis-à-vis d'une ligne adjacente (sommet partagé p1)
+      const adj = d.entities.find((x) => x.kind === "line" && x.id !== e.id && (x.p1 === p1 || x.p2 === p1));
+      if (adj && adj.kind === "line") {
+        const c = d.points.find((q) => q.id === adj.p1)!, dd = d.points.find((q) => q.id === adj.p2)!;
+        const ang2 = (Math.atan2(dd.y - c.y, dd.x - c.x) * 180) / Math.PI;
+        const rel = Math.abs(((ang - ang2 + 540) % 360) - 180); // 0..180
+        if (Math.abs(rel - 90) < AXIS_SNAP_DEG) d.constraints.push({ id: nextId(d, "c"), kind: "perpendicular", a: e.id, b: adj.id } as Constraint);
+        else if (rel < AXIS_SNAP_DEG || rel > 180 - AXIS_SNAP_DEG) d.constraints.push({ id: nextId(d, "c"), kind: "parallel", a: e.id, b: adj.id } as Constraint);
+      }
+    }
   };
   const ensurePoint = (d: SketchDoc, w: Vec2, onPoint: Id | null, onEntity: Id | null = null): Id => {
     if (onPoint) return onPoint;
@@ -850,6 +861,9 @@ function ConstraintGlyphs({ doc, toS, onRemove }: { doc: SketchDoc; toS: (w: Vec
       if (e?.kind === "line") { const a = P(e.p1)!, b = P(e.p2)!; pos = [(a.x + b.x) / 2, (a.y + b.y) / 2]; }
       g = c.kind === "parallel" ? "∥" : c.kind === "perpendicular" ? "⊥" : c.kind === "equal" ? "=" : "◜";
     } else if (c.kind === "fixed") { const p = P(c.p); if (p) { pos = [p.x, p.y]; g = "▪"; } }
+    else if (c.kind === "pointOn") { const p = P(c.p); if (p) { pos = [p.x, p.y]; g = "⌖"; } }
+    else if (c.kind === "midpoint") { const p = P(c.p); if (p) { pos = [p.x, p.y]; g = "⊢"; } }
+    else if (c.kind === "symmetric") { const a = P(c.a), b = P(c.b); if (a && b) { pos = [(a.x + b.x) / 2, (a.y + b.y) / 2]; g = "⋈"; } }
     if (pos) { const s = toS(pos); out.push(<text key={c.id} x={s[0] + 6} y={s[1] - 6} className="ske__glyph" onClick={(e) => { e.stopPropagation(); onRemove(c.id); }}>{g}</text>); }
   }
   return <g>{out}</g>;
