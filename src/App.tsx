@@ -49,6 +49,7 @@ export default function App() {
   const [pickMode, setPickMode] = useState<"face" | "edge" | "border" | "sketchFace" | "measure" | null>(null);
   const measureA = useRef<[number, number, number] | null>(null);
   const [viewMode, setViewMode] = useState<"shaded" | "edges" | "wireframe">("shaded");
+  const [analysis, setAnalysis] = useState<"overhang" | "thickness" | null>(null);
   const [props, setProps] = useState<MassProps | null>(null);
   const [showProps, setShowProps] = useState(false);
   const [clipAxis, setClipAxis] = useState<"X" | "Y" | "Z" | null>(null);
@@ -331,6 +332,19 @@ export default function App() {
             title="Cycle display: shaded → shaded + B-rep edges → wireframe (construction edges only)"
           >
             {viewMode === "shaded" ? "◧ Shaded" : viewMode === "edges" ? "◫ Edges" : "△ Wireframe"}
+          </button>
+          <button
+            className={`vp-pick${analysis ? " vp-pick--on" : ""}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              const next = analysis === null ? "overhang" : analysis === "overhang" ? "thickness" : null;
+              setAnalysis(next);
+              viewportRef.current?.setAnalysis(next ? { mode: next, angle: 45, minWall: 1 } : null);
+              setStatus(next === "overhang" ? "analyse : surplombs > 45° en rouge (supports requis)" : next === "thickness" ? "analyse : parois < 1 mm en rouge" : "analyse désactivée");
+            }}
+            title="Analyse d'impression : surplombs (45°) → épaisseur de paroi (1 mm) → off"
+          >
+            {analysis === "overhang" ? "🌡 Overhang" : analysis === "thickness" ? "🌡 Wall" : "🌡 Analyze"}
           </button>
           <button
             className={`vp-pick${showProps ? " vp-pick--on" : ""}`}

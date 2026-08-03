@@ -37,6 +37,9 @@ export class Viewport {
   private isSketchView = false;
   // section view: active clipping planes (empty = off)
   private clip: THREE.Plane[] = [];
+  // print-analysis overlay (overhang / wall-thickness) as vertex colours
+  private analysis: { mode: "overhang" | "thickness"; angle: number; minWall: number } | null = null;
+  private analysisMat: THREE.MeshStandardMaterial | null = null;
   // 3D translation gizmo (edits a Transform node's tx/ty/tz)
   private gizmo: TransformControls | null = null;
   private gizmoProxy: THREE.Object3D | null = null;
@@ -158,6 +161,7 @@ export class Viewport {
     this.scene.add(this.brepEdges);
     this.applyViewMode();
     this.applyClip(); // keep any active section plane on the new geometry
+    this.applyAnalysis(); // re-apply any overhang/thickness overlay after re-eval
 
     const box = new THREE.Box3().setFromObject(mesh);
     this.modelDiag = Math.max(box.getSize(new THREE.Vector3()).length(), 1);
@@ -215,6 +219,79 @@ export class Viewport {
         }
       }
     }
+  }
+
+  /**
+   * Toggle a print-analysis overlay that recolours the model per-vertex:
+   *  - "overhang":  red where a down-facing surface is steeper than `angle`
+   *                 (from vertical) and would need supports.
+   *  - "thickness": red where the local wall is thinner than `minWall`
+   *                 (measured by casting a ray inward and hitting the far wall).
+   * Pass null to restore the normal tag-coloured shading.
+   */
+  setAnalysis(a: { mode: "overhang" | "thickness"; angle: number; minWall: number } | null) {
+    this.analysis = a;
+    this.applyAnalysis();
+  }
+
+  private applyAnalysis() {
+    if (!this.mesh || !this.payload || this.isSketchView) return;
+    const geom = this.mesh.geometry;
+    if (!this.analysis) {
+      geom.deleteAttribute("color");
+      this.mesh.material = this.materials; // restore per-tag materials + groups
+      return;
+    }
+    const colors = this.analysis.mode === "overhang" ? this.overhangColors(this.analysis.angle) : this.thicknessColors(this.analysis.minWall);
+    geom.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    if (!this.analysisMat) this.analysisMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.65, metalness: 0.04 });
+    this.analysisMat.clippingPlanes = this.clip.length ? this.clip : null;
+    this.mesh.material = this.analysisMat; // single material → geometry groups ignored
+  }
+
+  /** Per-vertex colours flagging down-facing overhangs steeper than `angle`. */
+  private overhangColors(angle: number): Float32Array {
+    const n = this.payload!.normals;
+    const N = this.payload!.vertices.length / 3;
+    const cosT = Math.cos((angle * Math.PI) / 180); // support if -nz > cosT
+    const col = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) {
+      const d = -n[i * 3 + 2]; // downward component (1 = faces straight down)
+      const s = Math.max(0, Math.min(1, (d - cosT) / Math.max(1e-3, 1 - cosT)));
+      // neutral grey → hot red as the overhang worsens
+      col[i * 3] = 0.62 + s * 0.32;
+      col[i * 3 + 1] = 0.63 - s * 0.47;
+      col[i * 3 + 2] = 0.66 - s * 0.5;
+    }
+    return col;
+  }
+
+  /** Per-vertex colours flagging walls thinner than `minWall` (ray to far side). */
+  private thicknessColors(minWall: number): Float32Array {
+    const { vertices, normals } = this.payload!;
+    const N = vertices.length / 3;
+    const col = new Float32Array(N * 3);
+    // a double-sided proxy so inward rays register the opposite (back) wall
+    const proxy = new THREE.Mesh(this.mesh!.geometry, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+    proxy.updateMatrixWorld();
+    const ray = new THREE.Raycaster();
+    const eps = Math.max(1e-3, this.modelDiag * 1e-4);
+    const o = new THREE.Vector3(), dir = new THREE.Vector3();
+    for (let i = 0; i < N; i++) {
+      const vx = vertices[i * 3], vy = vertices[i * 3 + 1], vz = vertices[i * 3 + 2];
+      dir.set(-normals[i * 3], -normals[i * 3 + 1], -normals[i * 3 + 2]).normalize();
+      o.set(vx + dir.x * eps, vy + dir.y * eps, vz + dir.z * eps);
+      ray.set(o, dir);
+      const hit = ray.intersectObject(proxy, false)[0];
+      const t = hit ? hit.distance + eps : Infinity;
+      // s: 0 = fine (>=minWall), 1 = paper-thin
+      const s = t >= minWall ? 0 : 1 - t / minWall;
+      col[i * 3] = 0.62 + s * 0.32;
+      col[i * 3 + 1] = 0.63 - s * 0.47;
+      col[i * 3 + 2] = 0.66 - s * 0.5;
+    }
+    (proxy.material as THREE.Material).dispose();
+    return col;
   }
 
   /**
@@ -286,6 +363,7 @@ export class Viewport {
   private applyClip() {
     const planes = this.clip;
     for (const m of this.materials) (m as THREE.Material).clippingPlanes = planes;
+    if (this.analysisMat) this.analysisMat.clippingPlanes = planes.length ? planes : null;
     if (this.brepEdges) (this.brepEdges.material as THREE.Material).clippingPlanes = planes;
     if (this.extraGroup) this.extraGroup.traverse((o) => {
       if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) (o.material as THREE.Material).clippingPlanes = planes;
