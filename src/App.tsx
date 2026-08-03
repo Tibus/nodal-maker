@@ -46,7 +46,8 @@ export default function App() {
   const [status, setStatus] = useState("initialising kernels…");
   const [graphError, setGraphError] = useState<{ nodeId?: string; message: string } | null>(null);
   const [graphValues, setGraphValues] = useState<Record<string, string>>({});
-  const [pickMode, setPickMode] = useState<"face" | "edge" | "border" | "sketchFace" | null>(null);
+  const [pickMode, setPickMode] = useState<"face" | "edge" | "border" | "sketchFace" | "measure" | null>(null);
+  const measureA = useRef<[number, number, number] | null>(null);
   const [viewMode, setViewMode] = useState<"shaded" | "edges" | "wireframe">("shaded");
   const [props, setProps] = useState<MassProps | null>(null);
   const [showProps, setShowProps] = useState(false);
@@ -60,7 +61,7 @@ export default function App() {
   // click would select. rAF-throttled so mousemove stays cheap.
   const onViewportMove = useCallback(
     (e: React.MouseEvent) => {
-      if (!pickMode) return;
+      if (!pickMode || pickMode === "measure") return;
       lastHover.current = { x: e.clientX, y: e.clientY };
       if (hoverRAF.current != null) return;
       hoverRAF.current = requestAnimationFrame(() => {
@@ -76,12 +77,29 @@ export default function App() {
   const clearHover = useCallback(() => viewportRef.current?.clearPick(), []);
   useEffect(() => {
     if (!pickMode) viewportRef.current?.clearPick();
+    if (pickMode !== "measure") { measureA.current = null; viewportRef.current?.clearMeasure(); }
   }, [pickMode]);
 
   // click in the viewport (pick mode) → a preconfigured Face/Edge Select node
   const onViewportClick = useCallback(
     (e: React.MouseEvent) => {
       if (!pickMode) return;
+      if (pickMode === "measure") {
+        const p = viewportRef.current?.pickPoint(e.clientX, e.clientY);
+        if (!p) { setStatus("mesure : vise la surface du modèle"); return; }
+        if (!measureA.current) {
+          measureA.current = p;
+          viewportRef.current?.clearMeasure();
+          setStatus(`mesure : point A posé (${p.map((v) => v.toFixed(1)).join(", ")}) — clique le point B`);
+        } else {
+          const a = measureA.current;
+          const dist = viewportRef.current?.showMeasure(a, p) ?? 0;
+          const d = [p[0] - a[0], p[1] - a[1], p[2] - a[2]];
+          setStatus(`distance = ${dist.toFixed(3)} mm  (Δx ${d[0].toFixed(2)}, Δy ${d[1].toFixed(2)}, Δz ${d[2].toFixed(2)})`);
+          measureA.current = null;
+        }
+        return; // reste en mode mesure pour enchaîner
+      }
       if (pickMode === "sketchFace") {
         const pick = viewportRef.current?.pickFace(e.clientX, e.clientY);
         if (!pick || pick.axis === "curved") { setStatus("sketch on face: pick a FLAT face"); return; }
@@ -284,6 +302,13 @@ export default function App() {
             title="Pick a flat face → start a new 2D Sketch on that face's plane (Fusion workflow)"
           >
             ✎ {pickMode === "sketchFace" ? "Click a face…" : "Sketch on face"}
+          </button>
+          <button
+            className={`vp-pick${pickMode === "measure" ? " vp-pick--on" : ""}`}
+            onClick={(e) => { e.stopPropagation(); setPickMode((v) => (v === "measure" ? null : "measure")); }}
+            title="Mesure : clique deux points sur le modèle → distance 3D (et Δx/Δy/Δz)"
+          >
+            📏 {pickMode === "measure" ? (measureA.current ? "Click point B…" : "Click point A…") : "Measure"}
           </button>
           <button
             className="vp-pick vp-pick--view"

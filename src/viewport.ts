@@ -25,6 +25,7 @@ export class Viewport {
   private payload: MeshPayload | null = null;
   private raycaster = new THREE.Raycaster();
   private pickHighlight: THREE.Object3D | null = null;
+  private measureObj: THREE.Object3D | null = null;
   private edgesObj: THREE.LineSegments | null = null;
   private modelDiag = 100;
   // Fusion-style display: shaded / shaded+edges / wireframe (edges only)
@@ -450,6 +451,54 @@ export class Viewport {
       });
       this.pickHighlight = null;
     }
+  }
+
+  /** Raycast the model surface and return the world-space hit point (for Measure). */
+  pickPoint(clientX: number, clientY: number): [number, number, number] | null {
+    if (!this.mesh) return null;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    this.raycaster.setFromCamera(ndc, this.camera);
+    const hit = this.raycaster.intersectObject(this.mesh, false)[0];
+    if (!hit) return null;
+    return [hit.point.x, hit.point.y, hit.point.z];
+  }
+
+  /** Remove the measurement overlay (line + endpoint markers). */
+  clearMeasure() {
+    if (this.measureObj) {
+      this.scene.remove(this.measureObj);
+      this.measureObj.traverse((o) => {
+        const g = (o as THREE.Mesh).geometry;
+        if (g) g.dispose();
+      });
+      this.measureObj = null;
+    }
+  }
+
+  /** Draw a measurement line between two world points; returns their distance. */
+  showMeasure(a: [number, number, number], b: [number, number, number]): number {
+    this.clearMeasure();
+    const grp = new THREE.Group();
+    const va = new THREE.Vector3(...a), vb = new THREE.Vector3(...b);
+    const geo = new THREE.BufferGeometry().setFromPoints([va, vb]);
+    const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xffcc00, depthTest: false }));
+    line.renderOrder = 999;
+    grp.add(line);
+    const r = Math.max(0.4, this.modelDiag * 0.006);
+    const dotMat = new THREE.MeshBasicMaterial({ color: 0xffcc00, depthTest: false });
+    for (const v of [va, vb]) {
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 12), dotMat);
+      dot.position.copy(v);
+      dot.renderOrder = 999;
+      grp.add(dot);
+    }
+    this.scene.add(grp);
+    this.measureObj = grp;
+    return va.distanceTo(vb);
   }
 
   /**
