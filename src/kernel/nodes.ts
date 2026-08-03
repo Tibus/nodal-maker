@@ -1209,6 +1209,38 @@ const REGISTRY: Record<string, NodeImpl> = {
     return { kind: "solid", solid };
   },
 
+  /** Parametric hole (simple / counterbore / countersink), placed by (x,y) on a
+   * base plane, cutting into a solid along the plane normal. */
+  hole: (inputs, params) => {
+    const target = expectSolid(inputs.in, "hole");
+    const plane = String(params.plane ?? "XY") as "XY" | "XZ" | "YZ";
+    const off = Number(params.offset ?? 0);
+    const x = Number(params.x ?? 0), y = Number(params.y ?? 0);
+    const dia = Math.max(0.1, Number(params.diameter ?? 6));
+    const depth = Math.max(0.1, Number(params.depth ?? 20));
+    const through = String(params.mode ?? "through") === "through";
+    const type = String(params.type ?? "simple");
+    const D = through ? 1e4 : depth;
+    // main bore: circle extruded from the face (off) downward
+    const at = (dr: Drawing) => dr.translate(x, y);
+    let tool = at(drawCircle(dia / 2)).sketchOnPlane(plane, off - D).extrude(D) as Shape3D;
+    if (type === "counterbore") {
+      const cd = Math.max(dia, Number(params.headDia ?? dia * 2));
+      const cdep = Math.max(0.1, Number(params.headDepth ?? 4));
+      const cb = at(drawCircle(cd / 2)).sketchOnPlane(plane, off - cdep).extrude(cdep) as Shape3D;
+      tool = tool.fuse(cb) as Shape3D;
+    } else if (type === "countersink") {
+      const cd = Math.max(dia, Number(params.headDia ?? dia * 2));
+      const ang = Math.max(30, Math.min(179, Number(params.headAngle ?? 90)));
+      const csDepth = ((cd - dia) / 2) / Math.tan((ang / 2) * (Math.PI / 180));
+      // frustum: small circle (dia) at the countersink bottom → big circle (cd) at the face
+      const bottom = at(drawCircle(dia / 2)).sketchOnPlane(plane, off - csDepth) as unknown as { loftWith: (o: unknown) => Shape3D };
+      const topSk = at(drawCircle(cd / 2)).sketchOnPlane(plane, off);
+      tool = tool.fuse(bottom.loftWith(topSk) as Shape3D) as Shape3D;
+    }
+    return { kind: "solid", solid: target.cut(tool) as Shape3D };
+  },
+
   /* --- criteria-based selectors (survive regeneration) --- */
   edgeSelect: (_inputs, params) => {
     const where = String(params.where ?? "all");

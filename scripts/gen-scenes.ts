@@ -65,6 +65,17 @@ const scenes: Scene[] = [
     ],
   },
   {
+    name: "counterbored-plate",
+    title: "Counterbored + countersunk holes — parametric Hole feature on a plate",
+    outputId: "h2",
+    expect: "solid",
+    nodes: [
+      { id: "body", type: "box", params: { x: 60, y: 30, z: 12 } },
+      { id: "h1", type: "hole", inputs: { in: "body" }, params: { plane: "XY", offset: 12, x: -15, y: 0, diameter: 5, mode: "through", type: "counterbore", headDia: 10, headDepth: 4 } },
+      { id: "h2", type: "hole", inputs: { in: "h1" }, params: { plane: "XY", offset: 12, x: 15, y: 0, diameter: 5, mode: "through", type: "countersink", headDia: 10, headAngle: 90 } },
+    ],
+  },
+  {
     name: "twisted-tower",
     title: "Twisted tapered tower — extrude with taper + twist (draft-like)",
     outputId: "tower",
