@@ -180,8 +180,9 @@ export function evalToPayload(
   outputId: string,
   cache?: EvalCache,
   extraIds?: string[],
+  vars?: Record<string, number>,
 ): BuildResult {
-  const outputs = cache ? evalGraphCached(graph, cache).outputs : evalGraph(graph).outputs;
+  const outputs = cache ? evalGraphCached(graph, cache, vars).outputs : evalGraph(graph, vars).outputs;
 
   // collect inline value previews for scalar nodes
   const values: Record<string, string> = {};

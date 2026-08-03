@@ -104,6 +104,20 @@ button.link {
   background: #2a2e36; color: #d8dbe0; border: 1px solid #3a3f48;
   border-radius: 6px; padding: 5px 6px; font-size: 12px; width: 100%; cursor: pointer;
 }
+/* user parameters panel */
+.uparams { display: flex; flex-direction: column; gap: 4px; border-top: 1px solid #2a2e36; padding-top: 8px; margin-top: 2px; }
+.uparams__hd { display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: 700; color: #98c379; letter-spacing: 0.3px; }
+.uparams__add { background: #22331f; color: #98c379; border: 1px solid #3a5233; border-radius: 5px; width: 20px; height: 20px; padding: 0; font-size: 14px; line-height: 1; cursor: pointer; }
+.uparams__row { display: flex; align-items: center; gap: 3px; }
+.uparams__row--bad .uparams__name { border-color: #a0503a; color: #ff8c72; }
+.uparams__name { width: 58px; background: #0e1015; color: #98c379; border: 1px solid #2a2e36; border-radius: 4px; padding: 3px 4px; font-size: 11px; font-weight: 600; }
+.uparams__expr { flex: 1; min-width: 0; background: #0e1015; color: #d8dbe0; border: 1px solid #2a2e36; border-radius: 4px; padding: 3px 4px; font-size: 11px; font-family: ui-monospace, monospace; }
+.uparams__val { width: 40px; text-align: right; font-size: 10px; color: #8a8f98; font-variant-numeric: tabular-nums; overflow: hidden; }
+.uparams__del { background: none; border: 0; color: #a06070; cursor: pointer; font-size: 13px; padding: 0 2px; }
+.uparams__del:hover { color: #ff6b81; }
+.uparams__hint { font-size: 10px; color: #6a6f78; }
+.uparams__hint code { color: #98c379; }
+.pf__expr { color: #98c379 !important; font-family: ui-monospace, monospace; }
 .palette__actions { display: flex; flex-wrap: wrap; gap: 4px; }
 .palette__actions button, .palette__loadbtn {
   background: #2a2e36; color: #d8dbe0; border: 1px solid #3a3f48; border-radius: 6px;

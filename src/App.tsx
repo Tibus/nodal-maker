@@ -119,11 +119,11 @@ export default function App() {
     }
   }, []);
 
-  const onGraphChange = useCallback((graph: Graph, outputId: string, pinnedIds: string[]) => {
+  const onGraphChange = useCallback((graph: Graph, outputId: string, pinnedIds: string[], userVars: Record<string, number>) => {
     window.clearTimeout(graphTimer.current);
     graphTimer.current = window.setTimeout(async () => {
       try {
-        const res = await kernel.evalGraph(graph, outputId, pinnedIds);
+        const res = await kernel.evalGraph(graph, outputId, pinnedIds, userVars);
         if (!res.ok) {
           setGraphError(res.error);
           setStatus("⚠ " + res.error.message);

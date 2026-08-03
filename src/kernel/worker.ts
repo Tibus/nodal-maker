@@ -67,10 +67,10 @@ const api = {
     await ensureKernels();
     return exportMeshSTL(stl, o);
   },
-  async evalGraph(graph: Graph, outputId: string, extraIds?: string[]) {
+  async evalGraph(graph: Graph, outputId: string, extraIds?: string[], userParams?: Record<string, number>) {
     await ensureKernels();
     try {
-      return { ok: true as const, ...evalToPayload(graph, outputId, graphCache, extraIds) };
+      return { ok: true as const, ...evalToPayload(graph, outputId, graphCache, extraIds, userParams) };
     } catch (e) {
       const nodeId =
         e && typeof e === "object" && "nodeId" in e ? String((e as { nodeId: unknown }).nodeId) : undefined;

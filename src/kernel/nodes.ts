@@ -50,6 +50,7 @@ import {
 } from "./manifold";
 import { parseBinarySTL, writeBinarySTL } from "./stl";
 import { cloneDoc, dimensions, type SketchDoc } from "../sketch/model";
+import { toNumber } from "./expr";
 import { solve as solveSketch } from "../sketch/solver";
 import { buildDrawing } from "../sketch/build";
 
@@ -104,17 +105,19 @@ function resolveInputs(
   nodeType: string,
   rawInputs: Record<string, GraphValue>,
   params: Record<string, unknown>,
+  vars: Record<string, number> = {},
 ): { inputs: Record<string, GraphValue>; params: Record<string, unknown> } {
   const spec = NODE_SPECS[nodeType];
   if (!spec) return { inputs: rawInputs, params };
   const paramPorts = new Map<string, SocketType | null>(
     spec.params.map((p) => [p.name, paramPortType(p)] as const).filter(([, t]) => t !== null),
   );
+  const numberParams = new Set(spec.params.filter((p) => p.kind === "number").map((p) => p.name));
   // a Sketch node's driving dimensions are dynamic number param ports
   if (nodeType === "sketch") {
     const raw = params.doc;
     const doc = raw && typeof raw === "object" ? (raw as SketchDoc) : typeof raw === "string" && raw ? (JSON.parse(raw) as SketchDoc) : null;
-    if (doc?.constraints) for (const dim of dimensions(doc)) paramPorts.set(dim.name, "number");
+    if (doc?.constraints) for (const dim of dimensions(doc)) { paramPorts.set(dim.name, "number"); numberParams.add(dim.name); }
   }
   const inputs: Record<string, GraphValue> = {};
   const merged: Record<string, unknown> = { ...params };
@@ -125,6 +128,12 @@ function resolveInputs(
     } else {
       inputs[port] = v;
     }
+  }
+  // evaluate number params that are expressions ("width/2 + 5") using the user
+  // parameters. Wired ports already hold numbers, so this only touches inline
+  // string values.
+  for (const name of numberParams) {
+    if (typeof merged[name] === "string") merged[name] = toNumber(merged[name], vars, NaN);
   }
   return { inputs, params: merged };
 }
@@ -1391,7 +1400,7 @@ const REGISTRY: Record<string, NodeImpl> = {
 /* Graph evaluation (topological)                                      */
 /* ------------------------------------------------------------------ */
 
-export function evalGraph(graph: Graph): { outputs: Record<string, GraphValue>; order: string[] } {
+export function evalGraph(graph: Graph, vars: Record<string, number> = {}): { outputs: Record<string, GraphValue>; order: string[] } {
   const byId = new Map(graph.map((n) => [n.id, n]));
   const cache = new Map<string, GraphValue>();
   const visiting = new Set<string>();
@@ -1411,7 +1420,7 @@ export function evalGraph(graph: Graph): { outputs: Record<string, GraphValue>; 
     }
     const impl = REGISTRY[node.type];
     if (!impl) throw new Error(`no implementation for node type "${node.type}"`);
-    const { inputs, params } = resolveInputs(node.type, rawInputs, node.params ?? {});
+    const { inputs, params } = resolveInputs(node.type, rawInputs, node.params ?? {}, vars);
     const out = impl(inputs, params);
 
     visiting.delete(id);
@@ -1482,9 +1491,12 @@ function disposeValue(v: GraphValue): void {
 export function evalGraphCached(
   graph: Graph,
   cache: EvalCache,
+  vars: Record<string, number> = {},
 ): { outputs: Record<string, GraphValue>; hits: number; misses: number } {
   cache.run++;
   const byId = new Map(graph.map((n) => [n.id, n]));
+  // user params affect any expression param, so fold them into every cache key
+  const varsKey = Object.keys(vars).sort().map((k) => `${k}=${vars[k]}`).join(";");
   const keyMemo = new Map<string, string>();
   const valMemo = new Map<string, GraphValue>();
   const visiting = new Set<string>();
@@ -1502,7 +1514,7 @@ export function evalGraphCached(
       childParts.push(`${port}=${keyOf(srcId)}#${handle}`);
     }
     const key = fnv1a(
-      `${node.type}(${hashParams(node.params ?? {})})[${childParts.sort().join(",")}]`,
+      `${node.type}(${hashParams(node.params ?? {})})[${childParts.sort().join(",")}]{${varsKey}}`,
     );
     keyMemo.set(id, key);
     return key;
@@ -1529,7 +1541,7 @@ export function evalGraphCached(
       }
       const impl = REGISTRY[node.type];
       if (!impl) throw new Error(`no implementation for node type "${node.type}"`);
-      const { inputs, params } = resolveInputs(node.type, rawInputs, node.params ?? {});
+      const { inputs, params } = resolveInputs(node.type, rawInputs, node.params ?? {}, vars);
       try {
         value = impl(inputs, params);
       } catch (e) {

@@ -45,6 +45,7 @@ import {
   type InstanceDescriptor,
 } from "./kernel/client";
 import { starterRect, docFromReference } from "./sketch/presets";
+import { evalExpr } from "./kernel/expr";
 import { dimensions, isDim, type SketchDoc } from "./sketch/model";
 import SketchEditor from "./SketchEditor";
 
@@ -337,16 +338,23 @@ function ParamField({
 }) {
   const label = spec.label ?? spec.name;
   if (spec.kind === "number") {
+    // a number field also accepts an expression ("width/2 + 4"); a plain number
+    // is stored as a number, anything else as a string the kernel evaluates
+    const isExpr = typeof value === "string" && value.trim() !== "" && Number.isNaN(Number(value));
     return (
       <label className="pf">
         <span>{label}</span>
         <input
-          type="number"
-          value={Number(value ?? 0)}
-          min={spec.min}
-          max={spec.max}
-          step={spec.step}
-          onChange={(e) => onChange(Number(e.target.value))}
+          type="text"
+          inputMode="decimal"
+          className={isExpr ? "pf__expr" : undefined}
+          title={isExpr ? "expression" : "number or expression (e.g. width/2)"}
+          value={value == null ? "" : String(value)}
+          onChange={(e) => {
+            const raw = e.target.value;
+            const n = Number(raw);
+            onChange(raw.trim() !== "" && !Number.isNaN(n) ? n : raw);
+          }}
         />
       </label>
     );
@@ -532,7 +540,7 @@ export interface NodeEditorProps {
   initialNodes: GeoNode[];
   initialEdges: Edge[];
   initialOutputId: string;
-  onChange: (graph: Graph, outputId: string, pinnedIds: string[]) => void;
+  onChange: (graph: Graph, outputId: string, pinnedIds: string[], userVars: Record<string, number>) => void;
   /** hands the parent an imperative handle once mounted */
   onReady?: (api: EditorApi) => void;
   errorNodeId?: string | null;
@@ -549,6 +557,7 @@ export interface NodeEditorProps {
 
 let uid = 0;
 const newId = (t: string) => `${t}_${++uid}`;
+const round4 = (n: number) => (Number.isInteger(n) ? String(n) : (Math.round(n * 10000) / 10000).toString());
 
 /** Build serialisable instance descriptors from React Flow nodes + edges. */
 /** Comment/frame nodes carry no geometry — they never reach the graph engine. */
@@ -630,7 +639,19 @@ const EXAMPLES = Object.entries(
 /* Graph persistence — survive a page reload (localStorage)                    */
 /* -------------------------------------------------------------------------- */
 const STORAGE_KEY = "nodal-maker-graph-v1";
-interface SavedGraph { nodes: GeoNode[]; edges: Edge[]; outputId: string }
+interface UserParam { id: string; name: string; expr: string }
+interface SavedGraph { nodes: GeoNode[]; edges: Edge[]; outputId: string; userParams?: UserParam[] }
+
+/** Resolve user parameters (in order, later ones may reference earlier) into a
+ * flat name→number map for the evaluator. Bad expressions resolve to 0. */
+function resolveUserParams(list: UserParam[]): Record<string, number> {
+  const vars: Record<string, number> = {};
+  for (const p of list) {
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(p.name)) continue;
+    try { vars[p.name] = evalExpr(p.expr || "0", vars); } catch { vars[p.name] = 0; }
+  }
+  return vars;
+}
 
 function loadSavedGraph(): SavedGraph | null {
   try {
@@ -643,11 +664,11 @@ function loadSavedGraph(): SavedGraph | null {
     return null;
   }
 }
-function persistGraph(nodes: GeoNode[], edges: Edge[], outputId: string) {
+function persistGraph(nodes: GeoNode[], edges: Edge[], outputId: string, userParams: UserParam[]) {
   try {
     // drop transient interaction flags so saves stay stable/small
     const clean = nodes.map((n) => ({ ...n, selected: false, dragging: false }));
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ nodes: clean, edges, outputId }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ nodes: clean, edges, outputId, userParams }));
   } catch {
     /* quota / serialization issues — non-fatal, just skip persistence */
   }
@@ -677,14 +698,16 @@ export default function NodeEditor({
   const [nodes, setNodes, onNodesChange] = useNodesState<GeoNode>(saved?.nodes ?? initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(saved?.edges ?? initialEdges);
   const [outputId, setOutputId] = useState(saved?.outputId ?? initialOutputId);
+  const [userParams, setUserParams] = useState<UserParam[]>(saved?.userParams ?? []);
+  const userVars = useMemo(() => resolveUserParams(userParams), [userParams]);
 
   // persist the graph on change (debounced) so a reload keeps the work
   const saveTimer = useRef<number | undefined>(undefined);
   useEffect(() => {
     window.clearTimeout(saveTimer.current);
-    saveTimer.current = window.setTimeout(() => persistGraph(nodes, edges, outputId), 400);
+    saveTimer.current = window.setTimeout(() => persistGraph(nodes, edges, outputId, userParams), 400);
     return () => window.clearTimeout(saveTimer.current);
-  }, [nodes, edges, outputId]);
+  }, [nodes, edges, outputId, userParams]);
 
   // Visibility is opt-OUT: every body is shown by default. Independent bodies
   // (not in the viewed node's own build chain) render translucent alongside the
@@ -801,7 +824,8 @@ export default function NodeEditor({
       )
       .map((n) => expandOutputId(n.id, descs, components))
       .filter((fid) => fid !== flatOut);
-    const sig = graphSignature(flat, flatOut) + "|pins:" + flatPins.slice().sort().join(",");
+    const varsSig = Object.keys(userVars).sort().map((k) => `${k}=${userVars[k]}`).join(";");
+    const sig = graphSignature(flat, flatOut) + "|pins:" + flatPins.slice().sort().join(",") + "|vars:" + varsSig;
     if (sig !== lastSig.current) {
       const isFirst = lastSig.current === "";
       if (!applying.current && !isFirst) {
@@ -812,10 +836,10 @@ export default function NodeEditor({
       }
       applying.current = false;
       lastSig.current = sig;
-      onChange(flat, flatOut, flatPins);
+      onChange(flat, flatOut, flatPins, userVars);
     }
     prevSnap.current = { nodes, edges, outputId: validOut };
-  }, [nodes, edges, outputId, onChange, components, hidden]);
+  }, [nodes, edges, outputId, onChange, components, hidden, userVars]);
 
   const undo = useCallback(() => {
     const snap = undoStack.current.pop();
@@ -1494,6 +1518,41 @@ export default function NodeEditor({
               </option>
             ))}
           </select>
+
+          {/* user parameters: named values / expressions usable in any number
+              field as `name` (e.g. width/2 + thickness) */}
+          <div className="uparams">
+            <div className="uparams__hd">
+              <span>ƒ Parameters</span>
+              <button
+                className="uparams__add"
+                title="Add a parameter"
+                onClick={() => setUserParams((p) => [...p, { id: newId("up"), name: `p${p.length + 1}`, expr: "10" }])}
+              >
+                +
+              </button>
+            </div>
+            {userParams.map((up) => {
+              const bad = !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(up.name) || !(up.name in userVars);
+              return (
+                <div className={`uparams__row${bad ? " uparams__row--bad" : ""}`} key={up.id}>
+                  <input
+                    className="uparams__name" value={up.name} spellCheck={false} title="name"
+                    onChange={(e) => setUserParams((p) => p.map((x) => (x.id === up.id ? { ...x, name: e.target.value } : x)))}
+                  />
+                  <input
+                    className="uparams__expr" value={up.expr} spellCheck={false} title="value or expression"
+                    onChange={(e) => setUserParams((p) => p.map((x) => (x.id === up.id ? { ...x, expr: e.target.value } : x)))}
+                  />
+                  <span className="uparams__val" title="resolved value">{up.name in userVars ? round4(userVars[up.name]) : "—"}</span>
+                  <button className="uparams__del" title="remove" onClick={() => setUserParams((p) => p.filter((x) => x.id !== up.id))}>×</button>
+                </div>
+              );
+            })}
+            {userParams.length > 0 && (
+              <div className="uparams__hint">Use these names in any number field, e.g. <code>width/2</code>.</div>
+            )}
+          </div>
         </div>
 
         <div className="palette__list">
