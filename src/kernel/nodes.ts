@@ -843,6 +843,37 @@ const REGISTRY: Record<string, NodeImpl> = {
     return { kind: "sketch2d", drawing: drawRectangle(len, w, w / 2) };
   },
   /**
+   * Nest several 2D profiles onto a sheet (shelf/row packing by bounding box)
+   * to minimise offcut. Connect up to 6 profiles (s0…s5); `copies` repeats each.
+   * Rows wrap at `sheetWidth`; `gap` keeps a kerf-safe margin between parts.
+   */
+  nest: (inputs, params) => {
+    const items = ["s0", "s1", "s2", "s3", "s4", "s5"]
+      .map((k) => inputs[k])
+      .filter((v): v is Extract<GraphValue, { kind: "sketch2d" }> => !!v && v.kind === "sketch2d")
+      .map((v) => v.drawing);
+    if (!items.length) throw new Error("[nest] connect at least one 2D profile (s0…)");
+    const sheetW = Math.max(1, Number(params.sheetWidth ?? 200));
+    const gap = Math.max(0, Number(params.gap ?? 3));
+    const copies = Math.max(1, Math.round(Number(params.copies ?? 1)));
+    const all: Drawing[] = [];
+    for (const d of items) for (let i = 0; i < copies; i++) all.push(d);
+    const boxed = all.map((d) => {
+      const [lo, hi] = d.boundingBox.bounds;
+      return { d, lo, w: hi[0] - lo[0], h: hi[1] - lo[1] };
+    });
+    boxed.sort((a, b) => b.h - a.h); // tallest first → tighter shelves
+    let cx = 0, cy = 0, shelfH = 0;
+    const placed: Drawing[] = [];
+    for (const it of boxed) {
+      if (cx > 0 && cx + it.w > sheetW) { cy += shelfH + gap; cx = 0; shelfH = 0; }
+      placed.push(it.d.translate(cx - it.lo[0], cy - it.lo[1]));
+      cx += it.w + gap;
+      shelfH = Math.max(shelfH, it.h);
+    }
+    return { kind: "sketch2d", drawing: combineDrawings(placed) };
+  },
+  /**
    * Living (lattice) hinge: a rectangular board cut with staggered vertical
    * slots so it flexes about the Y axis. Columns of slots along X, offset by
    * half a period on alternate columns; top/bottom margins keep the board in

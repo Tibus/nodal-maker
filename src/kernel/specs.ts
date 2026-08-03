@@ -83,6 +83,7 @@ export const NODE_DESCRIPTIONS: Record<string, string> = {
   star: "A star profile from outer/inner radii and point count.",
   slot: "A rounded slot (stadium) profile.",
   livingHinge: "A rectangular board cut with staggered slots so it flexes (lattice/living hinge). Bends across the width. Export to laser DXF/SVG.",
+  nest: "Pack several 2D profiles onto a sheet (shelf packing) to minimise offcut; rows wrap at the sheet width. copies repeats each part.",
   gear: "A spur-gear silhouette (trapezoidal teeth) — for laser or as an extrude profile.",
   fingerBox: "Flat pattern for a press-fit finger-joint box (5 or 6 panels) — laser cutting.",
   svgInput: "Import a 2D profile from an SVG path 'd' string.",
@@ -146,7 +147,7 @@ export const NODE_DESCRIPTIONS: Record<string, string> = {
 export const NODE_CATEGORIES: { name: string; types: string[] }[] = [
   { name: "Value", types: ["numberValue", "textValue", "math", "mathUnary", "clamp", "remap", "random"] },
   { name: "2D Primitive", types: ["sketch", "rect", "circle", "ellipse", "polygon", "star", "slot", "gear", "fingerBox", "livingHinge", "svgInput", "textToSvg"] },
-  { name: "2D Op", types: ["offset2d", "kerf", "fillet2d", "bevel2d", "boolean2d", "mirror2d", "transform2d", "arrayLinear2d", "arrayRadial2d", "group", "scoreCut"] },
+  { name: "2D Op", types: ["offset2d", "kerf", "fillet2d", "bevel2d", "boolean2d", "mirror2d", "transform2d", "arrayLinear2d", "arrayRadial2d", "nest", "group", "scoreCut"] },
   { name: "3D Primitive", types: ["box", "cylinder", "sphere", "cone", "torus", "thread", "internalThread", "importSTEP"] },
   { name: "Sketch → Solid", types: ["extrude", "pocket", "hole", "revolve", "loft", "loftSections", "sweep", "bossOnCap"] },
   { name: "3D Op", types: ["transform", "rotate3d", "scale3d", "mirror3d", "fillet", "bevel", "shell", "hollow", "split", "supports", "boolean3d", "assemble", "arrayLinear3d", "arrayRadial3d"] },
@@ -313,6 +314,24 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     params: [
       { name: "length", kind: "number", default: 40, min: 1, max: 300, step: 1 },
       { name: "width", kind: "number", default: 12, min: 1, max: 300, step: 0.5 },
+    ],
+  },
+  nest: {
+    type: "nest",
+    label: "Nest 2D",
+    inputs: [
+      { name: "s0", type: "sketch2d" },
+      { name: "s1", type: "sketch2d" },
+      { name: "s2", type: "sketch2d" },
+      { name: "s3", type: "sketch2d" },
+      { name: "s4", type: "sketch2d" },
+      { name: "s5", type: "sketch2d" },
+    ],
+    output: "sketch2d",
+    params: [
+      { name: "sheetWidth", kind: "number", label: "sheet width", default: 200, min: 10, max: 2000, step: 5 },
+      { name: "gap", kind: "number", default: 3, min: 0, max: 50, step: 0.5 },
+      { name: "copies", kind: "number", label: "copies each", default: 1, min: 1, max: 50, step: 1 },
     ],
   },
   livingHinge: {
