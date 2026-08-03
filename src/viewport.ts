@@ -34,6 +34,8 @@ export class Viewport {
   private extraGroup: THREE.Group | null = null;
   // the current payload is a 2D sketch → show it as line-work on its plane
   private isSketchView = false;
+  // section view: active clipping planes (empty = off)
+  private clip: THREE.Plane[] = [];
   // 3D translation gizmo (edits a Transform node's tx/ty/tz)
   private gizmo: TransformControls | null = null;
   private gizmoProxy: THREE.Object3D | null = null;
@@ -50,6 +52,7 @@ export class Viewport {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(container.clientWidth, container.clientHeight);
+    this.renderer.localClippingEnabled = true; // section-view clipping planes
     this.renderer.shadowMap.enabled = true;
     container.appendChild(this.renderer.domElement);
 
@@ -153,6 +156,7 @@ export class Viewport {
     this.brepEdges.renderOrder = 1;
     this.scene.add(this.brepEdges);
     this.applyViewMode();
+    this.applyClip(); // keep any active section plane on the new geometry
 
     const box = new THREE.Box3().setFromObject(mesh);
     this.modelDiag = Math.max(box.getSize(new THREE.Vector3()).length(), 1);
@@ -260,6 +264,31 @@ export class Viewport {
     this.scene.add(group);
     this.extraGroup = group;
     this.applyViewMode();
+  }
+
+  /**
+   * Section view: clip everything past a plane at `offset` along `axis`.
+   * `flip` shows the other half. Pass axis=null to turn it off.
+   */
+  setClip(axis: "X" | "Y" | "Z" | null, offset = 0, flip = false) {
+    if (!axis) {
+      this.clip = [];
+    } else {
+      const n = new THREE.Vector3(axis === "X" ? 1 : 0, axis === "Y" ? 1 : 0, axis === "Z" ? 1 : 0);
+      if (flip) n.negate();
+      // keep the half where n·p + c < 0 → c = -(n·offset) = -(offset) along axis
+      this.clip = [new THREE.Plane(n, flip ? offset : -offset)];
+    }
+    this.applyClip();
+  }
+
+  private applyClip() {
+    const planes = this.clip;
+    for (const m of this.materials) (m as THREE.Material).clippingPlanes = planes;
+    if (this.brepEdges) (this.brepEdges.material as THREE.Material).clippingPlanes = planes;
+    if (this.extraGroup) this.extraGroup.traverse((o) => {
+      if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) (o.material as THREE.Material).clippingPlanes = planes;
+    });
   }
 
   /** Force the next setGeometry to re-frame the camera (used on first load). */

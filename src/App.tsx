@@ -48,6 +48,9 @@ export default function App() {
   const [viewMode, setViewMode] = useState<"shaded" | "edges" | "wireframe">("shaded");
   const [props, setProps] = useState<MassProps | null>(null);
   const [showProps, setShowProps] = useState(false);
+  const [clipAxis, setClipAxis] = useState<"X" | "Y" | "Z" | null>(null);
+  const [clipPos, setClipPos] = useState(0);
+  const [clipFlip, setClipFlip] = useState(false);
   const hoverRAF = useRef<number | undefined>(undefined);
   const lastHover = useRef<{ x: number; y: number } | null>(null);
 
@@ -123,6 +126,11 @@ export default function App() {
       viewportRef.current.reframeOnNext(); // recenter the camera on the first model
     }
   }, []);
+
+  // apply the section-view clipping plane whenever it changes
+  useEffect(() => {
+    viewportRef.current?.setClip(clipAxis, clipPos, clipFlip);
+  }, [clipAxis, clipPos, clipFlip]);
 
   const onGraphChange = useCallback((graph: Graph, outputId: string, pinnedIds: string[], userVars: Record<string, number>) => {
     window.clearTimeout(graphTimer.current);
@@ -286,7 +294,33 @@ export default function App() {
           >
             ⓘ Props
           </button>
+          <button
+            className={`vp-pick${clipAxis ? " vp-pick--on" : ""}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              const next = clipAxis === null ? "X" : clipAxis === "X" ? "Y" : clipAxis === "Y" ? "Z" : null;
+              setClipAxis(next);
+              if (next && props) {
+                const ax = next === "X" ? 0 : next === "Y" ? 1 : 2;
+                setClipPos((props.bbox.min[ax] + props.bbox.max[ax]) / 2);
+              }
+            }}
+            title="Section view — clip the model along an axis to see inside"
+          >
+            ✂ {clipAxis ? `Section ${clipAxis}` : "Section"}
+          </button>
         </div>
+        {clipAxis && props && (() => {
+          const ax = clipAxis === "X" ? 0 : clipAxis === "Y" ? 1 : 2;
+          const lo = props.bbox.min[ax], hi = props.bbox.max[ax];
+          return (
+            <div className="clipbar" onClick={(e) => e.stopPropagation()}>
+              <input type="range" min={lo} max={hi} step={(hi - lo) / 200 || 1} value={clipPos}
+                onChange={(e) => setClipPos(Number(e.target.value))} />
+              <button className="clipbar__flip" onClick={() => setClipFlip((f) => !f)} title="Flip which half is kept">⇄</button>
+            </div>
+          );
+        })()}
         {showProps && props && (
           <div className="propspanel">
             <div className="propspanel__hd">Properties</div>
