@@ -1056,7 +1056,10 @@ const REGISTRY: Record<string, NodeImpl> = {
   mirror3d: (inputs, params) => {
     const solid = expectSolid(inputs.in, "mirror3d");
     const plane = String(params.plane ?? "YZ") as "XY" | "XZ" | "YZ";
-    return { kind: "solid", solid: solid.clone().mirror(plane) as Shape3D };
+    const mirrored = solid.clone().mirror(plane) as Shape3D;
+    // "keep original" → a symmetric body (original ∪ its mirror)
+    const out = params.keep === "yes" ? (solid.clone().fuse(mirrored) as Shape3D) : mirrored;
+    return { kind: "solid", solid: out };
   },
   rotate3d: (inputs, params) => {
     const solid = expectSolid(inputs.in, "rotate3d");

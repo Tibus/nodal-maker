@@ -551,7 +551,10 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     label: "Mirror 3D",
     inputs: [{ name: "in", type: "solid" }],
     output: "solid",
-    params: [{ name: "plane", kind: "select", default: "YZ", options: ["XY", "XZ", "YZ"] }],
+    params: [
+      { name: "plane", kind: "select", default: "YZ", options: ["XY", "XZ", "YZ"] },
+      { name: "keep", kind: "select", label: "keep original", default: "no", options: ["no", "yes"] },
+    ],
   },
   rotate3d: {
     type: "rotate3d",
