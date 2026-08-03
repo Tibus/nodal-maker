@@ -601,6 +601,44 @@ export class Viewport {
   }
 
   /**
+   * Pick any PLANAR face (including tilted, non-axis-aligned ones) and return a
+   * placement frame for a sketch: an origin on the face, its outward normal
+   * (extrusion direction) and a stable local +X axis. Returns null if the face
+   * under the cursor is curved (not planar). Highlights the face like pickFace.
+   */
+  pickFacePlane(clientX: number, clientY: number): { origin: [number, number, number]; normal: [number, number, number]; xDir: [number, number, number] } | null {
+    const f = this.detectFace(clientX, clientY);
+    if (!f || !this.payload) return null;
+    const { vertices, normals, indices } = this.payload;
+    // averaged normal over the face group
+    let nx = 0, ny = 0, nz = 0;
+    for (let i = f.group.start; i < f.group.start + f.group.count; i++) {
+      const v = indices[i] * 3;
+      nx += normals[v]; ny += normals[v + 1]; nz += normals[v + 2];
+    }
+    const nl = Math.hypot(nx, ny, nz) || 1;
+    const n: [number, number, number] = [nx / nl, ny / nl, nz / nl];
+    const o = f.centroid;
+    // planarity test: every group vertex must lie near the plane (o, n)
+    const diag = Math.hypot(f.max[0] - f.min[0], f.max[1] - f.min[1], f.max[2] - f.min[2]) || 1;
+    const tol = Math.max(0.05, diag * 0.02);
+    for (let i = f.group.start; i < f.group.start + f.group.count; i++) {
+      const v = indices[i] * 3;
+      const d = (vertices[v] - o[0]) * n[0] + (vertices[v + 1] - o[1]) * n[1] + (vertices[v + 2] - o[2]) * n[2];
+      if (Math.abs(d) > tol) return null; // curved face
+    }
+    // local +X: cross the world axis least aligned with n, then normalize
+    const ax = Math.abs(n[0]), ay = Math.abs(n[1]), az = Math.abs(n[2]);
+    const up: [number, number, number] = ax <= ay && ax <= az ? [1, 0, 0] : ay <= az ? [0, 1, 0] : [0, 0, 1];
+    let xx = up[1] * n[2] - up[2] * n[1], xy = up[2] * n[0] - up[0] * n[2], xz = up[0] * n[1] - up[1] * n[0];
+    const xl = Math.hypot(xx, xy, xz) || 1;
+    xx /= xl; xy /= xl; xz /= xl;
+    // reuse pickFace's highlight
+    this.pickFace(clientX, clientY);
+    return { origin: o, normal: n, xDir: [xx, xy, xz] };
+  }
+
+  /**
    * The picked face's outline, projected to its base plane's 2D coordinates —
    * to seed a "sketch on face" with reference geometry. Prefers the clean B-rep
    * edges; falls back to the face's triangle boundary for shapes whose edges

@@ -72,6 +72,13 @@ export interface SketchDoc {
   plane: "XY" | "XZ" | "YZ";
   /** signed offset of that plane along its normal (for sketching on a face) */
   planeOffset?: number;
+  /**
+   * Arbitrary (non-axis-aligned) placement frame. When present it overrides
+   * `plane`/`planeOffset`: the 2D sketch is laid on the plane through `origin`
+   * with the given `normal` (extrusion direction) and `xDir` (local +X axis).
+   * Set by "Sketch on face" when the picked face is a tilted flat face.
+   */
+  frame?: { origin: [number, number, number]; normal: [number, number, number]; xDir: [number, number, number] };
   points: SPoint[];
   entities: Entity[];
   constraints: Constraint[];
@@ -88,6 +95,7 @@ export function cloneDoc(d: SketchDoc): SketchDoc {
   return {
     plane: d.plane,
     planeOffset: d.planeOffset,
+    frame: d.frame ? { origin: [...d.frame.origin], normal: [...d.frame.normal], xDir: [...d.frame.xDir] } : undefined,
     seq: d.seq,
     points: d.points.map((p) => ({ ...p })),
     entities: d.entities.map((e) => ({ ...e }) as Entity),

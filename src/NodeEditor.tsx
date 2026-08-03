@@ -534,6 +534,8 @@ export interface EditorApi {
   /** create a new Sketch node on a base plane at an offset (with optional face
    * outline as reference geometry), and open the editor */
   addSketchOnPlane: (base: "XY" | "XZ" | "YZ", offset: number, reference?: [number, number][][]) => void;
+  /** create a new Sketch node on an arbitrary (tilted) face plane, and open it */
+  addSketchOnPlaneFrame: (frame: { origin: [number, number, number]; normal: [number, number, number]; xDir: [number, number, number] }) => void;
 }
 
 export interface NodeEditorProps {
@@ -1061,9 +1063,22 @@ export default function NodeEditor({
     setEditingSketchId(nid); // jump straight into the 2D editor
   }, [nodes, setNodes]);
 
+  const addSketchOnPlaneFrame = useCallback((frame: { origin: [number, number, number]; normal: [number, number, number]; xDir: [number, number, number] }) => {
+    // tilted face → local 2D frame; keep base plane "XY" (the frame overrides it)
+    const doc = starterRect();
+    doc.frame = frame;
+    const params: Record<string, unknown> = { plane: "XY", doc };
+    for (const dim of dimensions(doc)) params[dim.name] = dim.value;
+    const nid = newId("sketch");
+    const sel = nodes.find((n) => n.selected);
+    const position = sel ? { x: sel.position.x, y: sel.position.y + 200 } : { x: 80, y: 80 };
+    setNodes((prev) => [...prev.map((n) => ({ ...n, selected: false })), { id: nid, type: "geo", position, selected: true, data: { nodeType: "sketch", params } }]);
+    setEditingSketchId(nid);
+  }, [nodes, setNodes]);
+
   useEffect(() => {
-    onReady?.({ setParam, addFaceSelect, addEdgeSelect, addSketchOnPlane });
-  }, [onReady, setParam, addFaceSelect, addEdgeSelect, addSketchOnPlane]);
+    onReady?.({ setParam, addFaceSelect, addEdgeSelect, addSketchOnPlane, addSketchOnPlaneFrame });
+  }, [onReady, setParam, addFaceSelect, addEdgeSelect, addSketchOnPlane, addSketchOnPlaneFrame]);
 
   const onConnect = useCallback(
     (c: Connection) => {

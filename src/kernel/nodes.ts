@@ -33,6 +33,7 @@ import {
   makeCompound,
   getOC,
   cast,
+  Plane as RPlane,
 } from "replicad";
 import * as opentype from "opentype.js";
 import { svgPathToDrawing } from "./svgPath";
@@ -62,7 +63,7 @@ export type GraphValue =
   // `plane`/`planeOffset` (optional) record which base plane (and offset along
   // its normal) a Sketch was drawn on, so the 3D preview and Extrude/Revolve
   // place it there instead of always on XY z=0.
-  | { kind: "sketch2d"; drawing: Drawing; plane?: "XY" | "XZ" | "YZ"; planeOffset?: number }
+  | { kind: "sketch2d"; drawing: Drawing; plane?: "XY" | "XZ" | "YZ"; planeOffset?: number; frame?: SketchFrame }
   | { kind: "solid"; solid: Shape3D }
   | { kind: "mesh"; mesh: MeshData }
   | { kind: "number"; value: number }
@@ -389,6 +390,31 @@ function sketchPlane(v: GraphValue | undefined, def: "XY" | "XZ" | "YZ" = "XY"):
 /** Offset of that plane along its normal (for a sketch placed on a face). */
 function sketchOffset(v: GraphValue | undefined): number {
   return v && v.kind === "sketch2d" && v.planeOffset ? v.planeOffset : 0;
+}
+/** Arbitrary (non-axis-aligned) placement frame, if the sketch carries one. */
+function sketchFrame(v: GraphValue | undefined): SketchFrame | undefined {
+  return v && v.kind === "sketch2d" ? v.frame : undefined;
+}
+
+/** Non-axis-aligned placement: origin + normal (extrusion dir) + local +X. */
+type SketchFrame = { origin: [number, number, number]; normal: [number, number, number]; xDir: [number, number, number] };
+
+/**
+ * Lay a 2D drawing onto its target plane and return a Sketch ready to extrude.
+ * When `frame` is present we build a replicad Plane from it (tilted faces);
+ * otherwise we use the axis-aligned base plane + offset.
+ */
+function placeSketch(dr: Drawing, plane: "XY" | "XZ" | "YZ", offset: number, frame?: SketchFrame) {
+  if (frame) {
+    const pl = new RPlane(frame.origin, frame.xDir, frame.normal);
+    return dr.sketchOnPlane(pl);
+  }
+  return dr.sketchOnPlane(plane, offset);
+}
+
+/** Lay a sketch2d GraphValue on its plane/frame — shared by preview + export. */
+export function placeSketchValue(v: Extract<GraphValue, { kind: "sketch2d" }>) {
+  return placeSketch(v.drawing, v.plane ?? "XY", v.planeOffset ?? 0, v.frame);
 }
 
 function expectSolid(v: GraphValue | undefined, node: string): Shape3D {
@@ -757,7 +783,7 @@ const REGISTRY: Record<string, NodeImpl> = {
     const solved = cloneDoc(doc);
     if (params.plane && solved.plane !== params.plane) solved.plane = params.plane as SketchDoc["plane"];
     solveSketch(solved, { overrides });
-    return { kind: "sketch2d", drawing: buildDrawing(solved), plane: solved.plane, planeOffset: solved.planeOffset };
+    return { kind: "sketch2d", drawing: buildDrawing(solved), plane: solved.plane, planeOffset: solved.planeOffset, frame: solved.frame };
   },
   rect: (_inputs, params) => ({
     kind: "sketch2d",
@@ -1185,7 +1211,8 @@ const REGISTRY: Record<string, NodeImpl> = {
     const opts: { extrusionProfile?: { profile: "linear"; endFactor: number }; twistAngle?: number } = {};
     if (taper !== 1 && taper > 0) opts.extrusionProfile = { profile: "linear", endFactor: taper };
     if (twist !== 0) opts.twistAngle = twist;
-    const sk = dr.sketchOnPlane(plane, base) as unknown as { extrude: (d: number, o?: unknown) => Shape3D };
+    const frame = sketchFrame(inputs.in);
+    const sk = placeSketch(dr, plane, base, frame) as unknown as { extrude: (d: number, o?: unknown) => Shape3D };
     const solid = sk.extrude(h, Object.keys(opts).length ? opts : undefined) as Shape3D;
     return { kind: "solid", solid };
   },

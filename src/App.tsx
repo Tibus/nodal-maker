@@ -102,7 +102,16 @@ export default function App() {
       }
       if (pickMode === "sketchFace") {
         const pick = viewportRef.current?.pickFace(e.clientX, e.clientY);
-        if (!pick || pick.axis === "curved") { setStatus("sketch on face: pick a FLAT face"); return; }
+        if (!pick) { setStatus("sketch on face: no face under the cursor"); return; }
+        if (pick.axis === "curved") {
+          // not axis-aligned → try an arbitrary planar (tilted) face via a frame
+          const fr = viewportRef.current?.pickFacePlane(e.clientX, e.clientY);
+          if (!fr) { setStatus("sketch on face: pick a FLAT face (curved face has no plane)"); return; }
+          editorApi.current?.addSketchOnPlaneFrame(fr);
+          setStatus(`new Sketch on tilted face (normal ${fr.normal.map((v) => v.toFixed(2)).join(", ")})`);
+          setPickMode(null);
+          return;
+        }
         // face normal axis → base sketch plane: Z→XY, X→YZ, Y→XZ
         const base = pick.axis === "Z" ? "XY" : pick.axis === "X" ? "YZ" : "XZ";
         // project the face outline into the sketch as reference geometry
