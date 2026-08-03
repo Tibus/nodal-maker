@@ -120,6 +120,7 @@ export const NODE_DESCRIPTIONS: Record<string, string> = {
   fillet: "Round edges of a solid. Feed a selection to target specific edges.",
   bevel: "Chamfer edges of a solid. Feed a selection to target specific edges.",
   shell: "Hollow a solid, opening the selected face(s).",
+  hollow: "Resin hollowing: closed thin-walled shell + vertical drain holes through the bottom so uncured resin escapes (no sealed cavity).",
   boolean3d: "Combine two solids: union, difference (base − tool) or intersection.",
   assemble: "Assemble up to 4 solids into one compound (no Boolean). Use for a bolt (head + thread) where a real union would hang on the thread.",
   arrayLinear3d: "Repeat a solid in a line.",
@@ -145,7 +146,7 @@ export const NODE_CATEGORIES: { name: string; types: string[] }[] = [
   { name: "2D Op", types: ["offset2d", "kerf", "fillet2d", "bevel2d", "boolean2d", "mirror2d", "transform2d", "arrayLinear2d", "arrayRadial2d", "group", "scoreCut"] },
   { name: "3D Primitive", types: ["box", "cylinder", "sphere", "cone", "torus", "thread", "internalThread", "importSTEP"] },
   { name: "Sketch → Solid", types: ["extrude", "pocket", "hole", "revolve", "loft", "loftSections", "sweep", "bossOnCap"] },
-  { name: "3D Op", types: ["transform", "rotate3d", "scale3d", "mirror3d", "fillet", "bevel", "shell", "boolean3d", "assemble", "arrayLinear3d", "arrayRadial3d"] },
+  { name: "3D Op", types: ["transform", "rotate3d", "scale3d", "mirror3d", "fillet", "bevel", "shell", "hollow", "boolean3d", "assemble", "arrayLinear3d", "arrayRadial3d"] },
   { name: "Selector", types: ["edgeSelect", "faceSelect"] },
   { name: "Mesh", types: ["tessellate", "meshToSolid", "importSTL", "repair", "boolean", "transformMesh", "convexHull", "minkowski", "decimate", "subdivide"] },
 ];
@@ -747,6 +748,17 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     ],
     output: "solid",
     params: [{ name: "thickness", kind: "number", default: 2, min: 0.2, max: 50, step: 0.2 }],
+  },
+  hollow: {
+    type: "hollow",
+    label: "Hollow (resin)",
+    inputs: [{ name: "in", type: "solid" }],
+    output: "solid",
+    params: [
+      { name: "wall", kind: "number", label: "wall thickness", default: 2, min: 0.4, max: 20, step: 0.1 },
+      { name: "drainDia", kind: "number", label: "drain Ø", default: 3, min: 0, max: 30, step: 0.5 },
+      { name: "drainCount", kind: "number", label: "drain holes", default: 2, min: 0, max: 8, step: 1 },
+    ],
   },
   fillet2d: {
     type: "fillet2d",

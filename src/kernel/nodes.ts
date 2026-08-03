@@ -1337,6 +1337,34 @@ const REGISTRY: Record<string, NodeImpl> = {
       throw new Error("[shell] connect a Face Select (which face(s) to open)");
     return { kind: "solid", solid: solid.shell(t, (f) => sel.apply(f) as FaceFinder) as Shape3D };
   },
+  /**
+   * Resin hollowing: turn a solid into a CLOSED thin-walled shell (empty face
+   * finder → no opening) and drill N vertical drain holes up through the bottom
+   * wall so uncured resin can escape (avoids the suction/blowout of a sealed
+   * cavity). Wall + drain diameter are the two knobs that matter for resin.
+   */
+  hollow: (inputs, params) => {
+    const solid = expectSolid(inputs.in, "hollow");
+    const wall = Math.abs(Number(params.wall ?? 2));
+    const drainDia = Number(params.drainDia ?? 3);
+    const drainCount = Math.max(0, Math.round(Number(params.drainCount ?? 2)));
+    // closed hollow: shell inward, opening no face (finder matches nothing)
+    let out = solid.clone().shell(-wall, (f) => f.inPlane("XY", 1e9)) as Shape3D;
+    if (drainDia > 0 && drainCount > 0) {
+      const [lo, hi] = solid.boundingBox.bounds;
+      const cx = (lo[0] + hi[0]) / 2, cy = (lo[1] + hi[1]) / 2, zmin = lo[2];
+      const spread = Math.min(hi[0] - lo[0], hi[1] - lo[1]) * 0.25;
+      for (let i = 0; i < drainCount; i++) {
+        const ang = (2 * Math.PI * i) / drainCount;
+        const px = drainCount === 1 ? cx : cx + Math.cos(ang) * spread;
+        const py = drainCount === 1 ? cy : cy + Math.sin(ang) * spread;
+        // pierce from just below the bottom, up through the wall into the cavity
+        const cyl = makeCylinder(drainDia / 2, wall * 3, [px, py, zmin - wall], [0, 0, 1]) as Shape3D;
+        out = out.cut(cyl) as Shape3D;
+      }
+    }
+    return { kind: "solid", solid: out };
+  },
   /** Round the corners of a 2D profile (great for laser-cut parts). */
   fillet2d: (inputs, params) => {
     const dr = expectSketch(inputs.in, "fillet2d");
