@@ -1373,6 +1373,49 @@ const REGISTRY: Record<string, NodeImpl> = {
     return { kind: "solid", solid: out };
   },
   /**
+   * Auto-generate print supports: mesh the solid, find down-facing overhang
+   * triangles steeper than `angle` (and above the plate), snap their centroids
+   * to a `spacing` grid and drop a thin pillar from each to z=0. Output the
+   * model + pillars, or the pillars alone. A pragmatic first-pass support forest.
+   */
+  supports: (inputs, params) => {
+    const solid = expectSolid(inputs.in, "supports");
+    const angle = Number(params.angle ?? 45);
+    const spacing = Math.max(0.5, Number(params.spacing ?? 5));
+    const dia = Math.max(0.2, Number(params.pillarDia ?? 1.2));
+    const cosT = Math.cos((angle * Math.PI) / 180);
+    const m = meshAndTag(solid);
+    const V = m.vertices, T = m.indices;
+    const z0 = 0; // resin build plate — pillars always anchor to z=0
+    const eps = 0.2;
+    // grid cell → lowest overhang point in that cell (one pillar per cell)
+    const cells = new Map<string, [number, number, number]>();
+    for (let i = 0; i < T.length; i += 3) {
+      const a = T[i] * 3, b = T[i + 1] * 3, c = T[i + 2] * 3;
+      const ux = V[b] - V[a], uy = V[b + 1] - V[a + 1], uz = V[b + 2] - V[a + 2];
+      const vx = V[c] - V[a], vy = V[c + 1] - V[a + 1], vz = V[c + 2] - V[a + 2];
+      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
+      if (-nz <= cosT) continue; // not a down-facing overhang
+      const cx = (V[a] + V[b] + V[c]) / 3, cy = (V[a + 1] + V[b + 1] + V[c + 1]) / 3, cz = (V[a + 2] + V[b + 2] + V[c + 2]) / 3;
+      if (cz <= z0 + eps) continue; // already on the plate
+      const key = `${Math.round(cx / spacing)},${Math.round(cy / spacing)}`;
+      const prev = cells.get(key);
+      if (!prev || cz < prev[2]) cells.set(key, [cx, cy, cz]);
+    }
+    const pillars: Shape3D[] = [];
+    for (const [px, py, pz] of cells.values()) {
+      if (pillars.length >= 2000) break; // runaway guard
+      const h = pz - z0;
+      if (h <= eps) continue;
+      pillars.push(makeCylinder(dia / 2, h, [px, py, z0], [0, 0, 1]) as Shape3D);
+    }
+    const only = params.output === "supports";
+    const parts = only ? pillars : [solid, ...pillars];
+    if (!parts.length) return { kind: "solid", solid };
+    return { kind: "solid", solid: makeCompound(parts) as unknown as Shape3D };
+  },
+  /**
    * Split a solid by an axis-aligned plane (for parts too big for the build
    * plate). Keep the positive/negative side, or both halves as a compound
    * pushed apart by `gap` so the cut is visible.

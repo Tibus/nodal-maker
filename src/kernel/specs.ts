@@ -122,6 +122,7 @@ export const NODE_DESCRIPTIONS: Record<string, string> = {
   shell: "Hollow a solid, opening the selected face(s).",
   hollow: "Resin hollowing: closed thin-walled shell + vertical drain holes through the bottom so uncured resin escapes (no sealed cavity).",
   split: "Cut a solid by an axis-aligned plane (for parts bigger than the build plate). Keep one side or both halves (pushed apart by a gap).",
+  supports: "Auto-generate a resin support forest: thin pillars from every overhang steeper than the angle down to the build plate.",
   boolean3d: "Combine two solids: union, difference (base − tool) or intersection.",
   assemble: "Assemble up to 4 solids into one compound (no Boolean). Use for a bolt (head + thread) where a real union would hang on the thread.",
   arrayLinear3d: "Repeat a solid in a line.",
@@ -147,7 +148,7 @@ export const NODE_CATEGORIES: { name: string; types: string[] }[] = [
   { name: "2D Op", types: ["offset2d", "kerf", "fillet2d", "bevel2d", "boolean2d", "mirror2d", "transform2d", "arrayLinear2d", "arrayRadial2d", "group", "scoreCut"] },
   { name: "3D Primitive", types: ["box", "cylinder", "sphere", "cone", "torus", "thread", "internalThread", "importSTEP"] },
   { name: "Sketch → Solid", types: ["extrude", "pocket", "hole", "revolve", "loft", "loftSections", "sweep", "bossOnCap"] },
-  { name: "3D Op", types: ["transform", "rotate3d", "scale3d", "mirror3d", "fillet", "bevel", "shell", "hollow", "split", "boolean3d", "assemble", "arrayLinear3d", "arrayRadial3d"] },
+  { name: "3D Op", types: ["transform", "rotate3d", "scale3d", "mirror3d", "fillet", "bevel", "shell", "hollow", "split", "supports", "boolean3d", "assemble", "arrayLinear3d", "arrayRadial3d"] },
   { name: "Selector", types: ["edgeSelect", "faceSelect"] },
   { name: "Mesh", types: ["tessellate", "meshToSolid", "importSTL", "repair", "boolean", "transformMesh", "convexHull", "minkowski", "decimate", "subdivide"] },
 ];
@@ -751,6 +752,18 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     ],
     output: "solid",
     params: [{ name: "thickness", kind: "number", default: 2, min: 0.2, max: 50, step: 0.2 }],
+  },
+  supports: {
+    type: "supports",
+    label: "Supports (resin)",
+    inputs: [{ name: "in", type: "solid" }],
+    output: "solid",
+    params: [
+      { name: "angle", kind: "number", label: "overhang °", default: 45, min: 10, max: 80, step: 1 },
+      { name: "spacing", kind: "number", label: "spacing", default: 5, min: 1, max: 30, step: 0.5 },
+      { name: "pillarDia", kind: "number", label: "pillar Ø", default: 1.2, min: 0.3, max: 6, step: 0.1 },
+      { name: "output", kind: "select", default: "model+supports", options: ["model+supports", "supports"] },
+    ],
   },
   split: {
     type: "split",
