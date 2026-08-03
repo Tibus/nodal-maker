@@ -119,7 +119,7 @@ export const NODE_DESCRIPTIONS: Record<string, string> = {
   rotate3d: "Rotate a solid about an axis. Editable with the gizmo.",
   scale3d: "Uniformly scale a solid. Editable with the gizmo.",
   mirror3d: "Mirror a solid across the XY, XZ or YZ plane.",
-  fillet: "Round edges of a solid. Feed a selection to target specific edges.",
+  fillet: "Round edges of a solid. Feed a selection to target specific edges. Set an end radius for a variable-radius fillet (start→end).",
   bevel: "Chamfer edges of a solid. Feed a selection to target specific edges.",
   shell: "Hollow a solid, opening the selected face(s).",
   hollow: "Resin hollowing: closed thin-walled shell + vertical drain holes through the bottom so uncured resin escapes (no sealed cavity).",
@@ -765,7 +765,10 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
       { name: "sel", type: "selection" },
     ],
     output: "solid",
-    params: [{ name: "radius", kind: "number", default: 2, min: 0, max: 50, step: 0.5 }],
+    params: [
+      { name: "radius", kind: "number", default: 2, min: 0, max: 50, step: 0.5 },
+      { name: "radius2", kind: "number", label: "end radius (0=uniform)", default: 0, min: 0, max: 50, step: 0.5 },
+    ],
   },
   bevel: {
     type: "bevel",

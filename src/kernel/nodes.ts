@@ -1379,11 +1379,15 @@ const REGISTRY: Record<string, NodeImpl> = {
     const solid = expectSolid(inputs.in, "fillet");
     const r = Number(params.radius ?? 0);
     if (r <= 0) return { kind: "solid", solid };
+    // radius2 > 0 → variable-radius fillet: r at the edge start, radius2 at its
+    // end (replicad accepts a [start, end] tuple as the radius).
+    const r2 = Number(params.radius2 ?? 0);
+    const rad: number | [number, number] = r2 > 0 && r2 !== r ? [r, r2] : r;
     const sel = inputs.sel;
     if (sel && sel.kind === "selection" && sel.target === "edge") {
-      return { kind: "solid", solid: solid.fillet(r, (e) => sel.apply(e) as EdgeFinder) as Shape3D };
+      return { kind: "solid", solid: solid.fillet(rad, (e) => sel.apply(e) as EdgeFinder) as Shape3D };
     }
-    return { kind: "solid", solid: solid.fillet(r) as Shape3D };
+    return { kind: "solid", solid: solid.fillet(rad) as Shape3D };
   },
   /** Chamfer (bevel) edges of a solid. Optional `sel` targets specific edges. */
   bevel: (inputs, params) => {
