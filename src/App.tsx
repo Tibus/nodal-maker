@@ -4,6 +4,7 @@ import { Viewport } from "./viewport";
 import NodeEditor, { type EditorApi } from "./NodeEditor";
 import { kernel, type Graph } from "./kernel/client";
 import { DEFAULT_PARAMS } from "./kernel/model";
+import { meshMassProps, type MassProps } from "./massprops";
 
 // Seed graph shown on first load: star → offset → extrude → boss-on-cap.
 const SEED_NODES: Node<{ nodeType: string; params: Record<string, unknown> }>[] = [
@@ -33,6 +34,8 @@ function download(data: BlobPart, name: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
+const fmt = (n: number) => (Math.abs(n) >= 100 ? n.toFixed(0) : Math.abs(n) >= 1 ? n.toFixed(1) : n.toFixed(2));
+
 export default function App() {
   const mountRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<Viewport | null>(null);
@@ -43,6 +46,8 @@ export default function App() {
   const [graphValues, setGraphValues] = useState<Record<string, string>>({});
   const [pickMode, setPickMode] = useState<"face" | "edge" | "border" | "sketchFace" | null>(null);
   const [viewMode, setViewMode] = useState<"shaded" | "edges" | "wireframe">("shaded");
+  const [props, setProps] = useState<MassProps | null>(null);
+  const [showProps, setShowProps] = useState(false);
   const hoverRAF = useRef<number | undefined>(undefined);
   const lastHover = useRef<{ x: number; y: number } | null>(null);
 
@@ -134,6 +139,7 @@ export default function App() {
         viewportRef.current?.setGeometry(res.mesh);
         viewportRef.current?.setExtraBodies(res.extras ?? []);
         setStatus(`${res.mesh.stats.faceCount} regions · ${res.mesh.stats.triangleCount} triangles`);
+        setProps(res.outputKind === "solid" || res.outputKind === "mesh" ? meshMassProps(res.mesh.vertices, res.mesh.indices) : null);
 
         // gizmo bound to the displayed transform-family node
         const out = graph.find((n) => n.id === outputId);
@@ -272,7 +278,29 @@ export default function App() {
           >
             {viewMode === "shaded" ? "◧ Shaded" : viewMode === "edges" ? "◫ Edges" : "△ Wireframe"}
           </button>
+          <button
+            className={`vp-pick${showProps ? " vp-pick--on" : ""}`}
+            onClick={(e) => { e.stopPropagation(); setShowProps((v) => !v); }}
+            title="Show volume / surface area / bounding box of the current solid"
+            disabled={!props}
+          >
+            ⓘ Props
+          </button>
         </div>
+        {showProps && props && (
+          <div className="propspanel">
+            <div className="propspanel__hd">Properties</div>
+            <table>
+              <tbody>
+                <tr><td>Volume</td><td>{fmt(props.volume / 1000)} cm³</td></tr>
+                <tr><td>Surface</td><td>{fmt(props.area / 100)} cm²</td></tr>
+                <tr><td>Bounding box</td><td>{fmt(props.bbox.size[0])} × {fmt(props.bbox.size[1])} × {fmt(props.bbox.size[2])} mm</td></tr>
+                <tr><td>Centre of mass</td><td>{props.center.map((c) => fmt(c)).join(", ")}</td></tr>
+                <tr><td>Triangles</td><td>{props.triangles}</td></tr>
+              </tbody>
+            </table>
+          </div>
+        )}
         <div className="statusbar">{status}</div>
       </div>
     </div>
