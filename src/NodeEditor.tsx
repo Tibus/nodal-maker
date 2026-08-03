@@ -547,6 +547,7 @@ export interface NodeEditorProps {
   errorMessage?: string | null;
   values?: Record<string, string>;
   onExportSTL?: (graph: Graph, outputId: string) => void;
+  onExport3MF?: () => void;
   onExportSVG?: (graph: Graph, outputId: string) => void;
   onExportDXF?: (graph: Graph, outputId: string) => void;
   onExportSTEP?: (graph: Graph, outputId: string) => void;
@@ -684,6 +685,7 @@ export default function NodeEditor({
   errorMessage,
   values,
   onExportSTL,
+  onExport3MF,
   onExportSVG,
   onExportDXF,
   onExportSTEP,
@@ -1478,6 +1480,9 @@ export default function NodeEditor({
             </button>
             {outType === "sketch2d" && (
               <button onClick={() => onExportDXF?.(toGraph(nodes, edges), outputId)} title="Export DXF (laser)">⬇DXF</button>
+            )}
+            {outType !== "sketch2d" && (
+              <button onClick={() => onExport3MF?.()} title="Export 3MF (3D print)">⬇3MF</button>
             )}
             {outType === "solid" && (
               <button onClick={() => onExportSTEP?.(toGraph(nodes, edges), outputId)} title="Export STEP">⬇STEP</button>

@@ -5,6 +5,7 @@ import NodeEditor, { type EditorApi } from "./NodeEditor";
 import { kernel, type Graph } from "./kernel/client";
 import { DEFAULT_PARAMS } from "./kernel/model";
 import { meshMassProps, type MassProps } from "./massprops";
+import { build3MF } from "./export3mf";
 
 // Seed graph shown on first load: star → offset → extrude → boss-on-cap.
 const SEED_NODES: Node<{ nodeType: string; params: Record<string, unknown> }>[] = [
@@ -39,6 +40,7 @@ const fmt = (n: number) => (Math.abs(n) >= 100 ? n.toFixed(0) : Math.abs(n) >= 1
 export default function App() {
   const mountRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<Viewport | null>(null);
+  const lastMesh = useRef<{ vertices: Float32Array; indices: Uint32Array } | null>(null);
   const graphTimer = useRef<number | undefined>(undefined);
   const editorApi = useRef<EditorApi | null>(null);
   const [status, setStatus] = useState("initialising kernels…");
@@ -148,6 +150,7 @@ export default function App() {
         viewportRef.current?.setExtraBodies(res.extras ?? []);
         setStatus(`${res.mesh.stats.faceCount} regions · ${res.mesh.stats.triangleCount} triangles`);
         setProps(res.outputKind === "solid" || res.outputKind === "mesh" ? meshMassProps(res.mesh.vertices, res.mesh.indices) : null);
+        lastMesh.current = { vertices: res.mesh.vertices, indices: res.mesh.indices };
 
         // gizmo bound to the displayed transform-family node
         const out = graph.find((n) => n.id === outputId);
@@ -210,6 +213,15 @@ export default function App() {
             download(bytes as unknown as BlobPart, "maker-graph.stl", "model/stl");
           } catch (e) {
             setStatus("export error: " + (e instanceof Error ? e.message : String(e)));
+          }
+        }}
+        onExport3MF={() => {
+          const m = lastMesh.current;
+          if (!m) { setStatus("3MF: nothing to export"); return; }
+          try {
+            download(build3MF(m.vertices, m.indices) as unknown as BlobPart, "maker-model.3mf", "model/3mf");
+          } catch (e) {
+            setStatus("3MF export error: " + (e instanceof Error ? e.message : String(e)));
           }
         }}
         onExportSVG={async (graph, outputId) => {
