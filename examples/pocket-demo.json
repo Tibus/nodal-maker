@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "title": "Pocket / cut — box with a circular pocket carved from a sketch on its top face",
+  "outputId": "cut",
+  "nodes": [
+    {
+      "id": "body",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "box",
+        "params": {
+          "x": 40,
+          "y": 40,
+          "z": 20
+        }
+      }
+    },
+    {
+      "id": "sk",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "sketch",
+        "params": {
+          "doc": {
+            "plane": "XY",
+            "points": [
+              {
+                "id": "p1",
+                "x": 0,
+                "y": 0,
+                "fixed": true
+              }
+            ],
+            "entities": [
+              {
+                "id": "e2",
+                "kind": "circle",
+                "c": "p1",
+                "r": 10
+              }
+            ],
+            "constraints": [
+              {
+                "id": "c3",
+                "kind": "radius",
+                "ent": "e2",
+                "value": 10,
+                "name": "radius"
+              }
+            ],
+            "seq": 4,
+            "planeOffset": 20
+          },
+          "plane": "XY",
+          "radius": 10
+        }
+      }
+    },
+    {
+      "id": "cut",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "pocket",
+        "params": {
+          "depth": 12,
+          "mode": "blind",
+          "direction": "down"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "body",
+      "sourceHandle": "out",
+      "target": "cut",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "sk",
+      "sourceHandle": "out",
+      "target": "cut",
+      "targetHandle": "profile",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    }
+  ]
+}

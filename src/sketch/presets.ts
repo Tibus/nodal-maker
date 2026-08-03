@@ -35,6 +35,17 @@ export function starterRect(w = 40, h = 30): SketchDoc {
   return d;
 }
 
+/** A single circle at the origin with a driving radius — handy for holes. */
+export function circleDoc(r = 8, plane: SketchDoc["plane"] = "XY", offset = 0): SketchDoc {
+  const d = emptyDoc(plane);
+  d.planeOffset = offset;
+  const c = addPoint(d, 0, 0, true);
+  const circ: Entity = { id: nextId(d, "e"), kind: "circle", c: c.id, r };
+  d.entities.push(circ);
+  con(d, { kind: "radius", ent: circ.id, value: r, name: "radius" });
+  return d;
+}
+
 /**
  * Build a sketch seeded with reference (construction) geometry projected from a
  * picked face — its outline, so the user can snap to / dimension against it.

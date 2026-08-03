@@ -1171,6 +1171,25 @@ const REGISTRY: Record<string, NodeImpl> = {
     return { kind: "solid", solid };
   },
 
+  /** Cut a pocket / hole into a solid by extruding a profile and subtracting it.
+   * The perfect partner to "sketch on face": draw on a face → carve it out. */
+  pocket: (inputs, params) => {
+    const target = expectSolid(inputs.in, "pocket");
+    const dr = expectSketch(inputs.profile, "pocket");
+    const plane = sketchPlane(inputs.profile);
+    const off = sketchOffset(inputs.profile);
+    const depth = Math.max(0.01, Number(params.depth ?? 10));
+    const through = String(params.mode ?? "blind") === "through";
+    const dir = String(params.direction ?? "down");
+    // span of the cutting tool along the plane normal, relative to `off`
+    const d = through ? 1e4 : depth;
+    const lo = dir === "up" ? off : off - d;   // "down"/"both" extend below the face
+    const hi = dir === "down" ? off : off + d; // "up"/"both" extend above the face
+    const tool = dr.sketchOnPlane(plane, lo).extrude(hi - lo) as Shape3D;
+    const solid = target.cut(tool) as Shape3D;
+    return { kind: "solid", solid };
+  },
+
   /* --- criteria-based selectors (survive regeneration) --- */
   edgeSelect: (_inputs, params) => {
     const where = String(params.where ?? "all");

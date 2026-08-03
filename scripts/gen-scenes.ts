@@ -11,7 +11,7 @@ import { setOC } from "replicad";
 import { evalToPayload, type BuildResult } from "../src/kernel/model";
 import { NODE_SPECS, SOCKET_COLORS, type Graph, type NodeDescriptor } from "../src/kernel/nodes";
 import { setManifold } from "../src/kernel/manifold";
-import { plateWithHole } from "../src/sketch/presets";
+import { plateWithHole, circleDoc } from "../src/sketch/presets";
 import { dimensions } from "../src/sketch/model";
 
 // a Sketch node's params = the doc + its plane + a mirror of each driving dim
@@ -51,6 +51,17 @@ const scenes: Scene[] = [
     nodes: [
       { id: "sk", type: "sketch", params: sketchParams(plateWithHole(60, 40, 10)) },
       { id: "plate", type: "extrude", inputs: { in: "sk" }, params: { height: 6, mode: "up" } },
+    ],
+  },
+  {
+    name: "pocket-demo",
+    title: "Pocket / cut — box with a circular pocket carved from a sketch on its top face",
+    outputId: "cut",
+    expect: "solid",
+    nodes: [
+      { id: "body", type: "box", params: { x: 40, y: 40, z: 20 } },
+      { id: "sk", type: "sketch", params: sketchParams(circleDoc(10, "XY", 20)) },
+      { id: "cut", type: "pocket", inputs: { in: "body", profile: "sk" }, params: { depth: 12, mode: "blind", direction: "down" } },
     ],
   },
   {
