@@ -65,6 +65,16 @@ const scenes: Scene[] = [
     ],
   },
   {
+    name: "twisted-tower",
+    title: "Twisted tapered tower — extrude with taper + twist (draft-like)",
+    outputId: "tower",
+    expect: "solid",
+    nodes: [
+      { id: "sq", type: "rect", params: { width: 40, height: 40, radius: 4 } },
+      { id: "tower", type: "extrude", inputs: { in: "sq" }, params: { height: 60, mode: "up", taper: 0.4, twist: 90 } },
+    ],
+  },
+  {
     name: "hollow-tray",
     title: "Hollow tray (3D print) — box, shell open-top, rounded corners",
     outputId: "round",

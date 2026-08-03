@@ -1176,7 +1176,14 @@ const REGISTRY: Record<string, NodeImpl> = {
     const mode = String(params.mode ?? "up");
     // up: [0,h]  ·  down: [-h,0]  ·  symmetric: [-h/2, h/2]  (+ plane offset)
     const base = (mode === "down" ? -h : mode === "symmetric" ? -h / 2 : 0) + off;
-    const solid = dr.sketchOnPlane(plane, base).extrude(h) as Shape3D;
+    // taper (endFactor: top scaled vs bottom — a draft) + twist
+    const taper = Number(params.taper ?? 1);
+    const twist = Number(params.twist ?? 0);
+    const opts: { extrusionProfile?: { profile: "linear"; endFactor: number }; twistAngle?: number } = {};
+    if (taper !== 1 && taper > 0) opts.extrusionProfile = { profile: "linear", endFactor: taper };
+    if (twist !== 0) opts.twistAngle = twist;
+    const sk = dr.sketchOnPlane(plane, base) as unknown as { extrude: (d: number, o?: unknown) => Shape3D };
+    const solid = sk.extrude(h, Object.keys(opts).length ? opts : undefined) as Shape3D;
     return { kind: "solid", solid };
   },
 

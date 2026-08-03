@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "title": "Twisted tapered tower — extrude with taper + twist (draft-like)",
+  "outputId": "tower",
+  "nodes": [
+    {
+      "id": "sq",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "rect",
+        "params": {
+          "width": 40,
+          "height": 40,
+          "radius": 4
+        }
+      }
+    },
+    {
+      "id": "tower",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "extrude",
+        "params": {
+          "height": 60,
+          "mode": "up",
+          "taper": 0.4,
+          "twist": 90
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "sq",
+      "sourceHandle": "out",
+      "target": "tower",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    }
+  ]
+}

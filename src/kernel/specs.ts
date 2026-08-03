@@ -653,6 +653,8 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     params: [
       { name: "height", kind: "number", default: 10, min: 1, max: 100, step: 1 },
       { name: "mode", kind: "select", label: "direction", default: "up", options: ["up", "down", "symmetric"] },
+      { name: "taper", kind: "number", label: "taper (top scale)", default: 1, min: 0.1, max: 3, step: 0.05 },
+      { name: "twist", kind: "number", label: "twist (°)", default: 0, min: -360, max: 360, step: 5 },
     ],
     selectionOutputs: [
       { name: "cap", target: "face" },
