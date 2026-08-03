@@ -4,7 +4,7 @@
  * and circles/arcs (→ arc(s)). Pure geometry on the doc.
  */
 import type { SketchDoc, Entity, Id } from "./model";
-import { addPoint, nextId } from "./model";
+import { addPoint, nextId, entityPoints } from "./model";
 import { arcInfo, type Vec2 } from "./geometry";
 
 const EPS = 1e-4;
@@ -78,6 +78,87 @@ function crossingsOf(d: SketchDoc, E: Entity): Vec2[] {
     }
   }
   return pts;
+}
+
+/** Round the corner at `pointId` (shared by exactly 2 lines) with a tangent arc. */
+export function filletCorner(d: SketchDoc, pointId: Id, radius: number): boolean {
+  const pm = pmap(d);
+  const v = pm.get(pointId);
+  if (!v || radius <= 0) return false;
+  const lines = d.entities.filter((e): e is Extract<Entity, { kind: "line" }> => e.kind === "line" && (e.p1 === pointId || e.p2 === pointId));
+  if (lines.length !== 2) return false;
+  const otherId = (l: Extract<Entity, { kind: "line" }>) => (l.p1 === pointId ? l.p2 : l.p1);
+  const A = pm.get(otherId(lines[0]))!, B = pm.get(otherId(lines[1]))!;
+  const V: Vec2 = [v.x, v.y];
+  const d1: Vec2 = [A.x - V[0], A.y - V[1]], d2: Vec2 = [B.x - V[0], B.y - V[1]];
+  const l1 = Math.hypot(...d1) || 1, l2 = Math.hypot(...d2) || 1;
+  const u1: Vec2 = [d1[0] / l1, d1[1] / l1], u2: Vec2 = [d2[0] / l2, d2[1] / l2];
+  const dot = Math.max(-1, Math.min(1, u1[0] * u2[0] + u1[1] * u2[1]));
+  const theta = Math.acos(dot);
+  if (theta < 1e-3 || Math.PI - theta < 1e-3) return false; // collinear
+  const half = theta / 2;
+  const tanLen = Math.min(radius / Math.tan(half), l1 * 0.98, l2 * 0.98);
+  const r = tanLen * Math.tan(half); // effective radius after clamping
+  const t1: Vec2 = [V[0] + u1[0] * tanLen, V[1] + u1[1] * tanLen];
+  const t2: Vec2 = [V[0] + u2[0] * tanLen, V[1] + u2[1] * tanLen];
+  let bis: Vec2 = [u1[0] + u2[0], u1[1] + u2[1]];
+  const bl = Math.hypot(...bis) || 1; bis = [bis[0] / bl, bis[1] / bl];
+  const centerDist = r / Math.sin(half);
+  const C: Vec2 = [V[0] + bis[0] * centerDist, V[1] + bis[1] * centerDist];
+  // build the new geometry
+  const cId = addPoint(d, C[0], C[1]).id;
+  const p1 = addPoint(d, t1[0], t1[1]).id;
+  const p2 = addPoint(d, t2[0], t2[1]).id;
+  // shorten the two lines to the tangent points, drop the corner vertex
+  for (const l of lines) {
+    if (l.p1 === pointId) l.p1 = l === lines[0] ? p1 : p2;
+    else l.p2 = l === lines[0] ? p1 : p2;
+  }
+  const a1 = Math.atan2(t1[1] - C[1], t1[0] - C[0]);
+  const a2 = Math.atan2(t2[1] - C[1], t2[0] - C[0]);
+  let diff = a2 - a1; while (diff > Math.PI) diff -= 2 * Math.PI; while (diff < -Math.PI) diff += 2 * Math.PI;
+  d.entities.push({ id: nextId(d, "e"), kind: "arc", c: cId, p1, p2, ccw: diff > 0 });
+  if (!d.entities.some((e) => entityPoints(e).includes(pointId))) d.points = d.points.filter((p) => p.id !== pointId);
+  return true;
+}
+
+/** Split `entId` at the point nearest `click` into two entities. */
+export function splitAt(d: SketchDoc, entId: Id, click: Vec2): boolean {
+  const E = d.entities.find((e) => e.id === entId);
+  if (!E) return false;
+  const pm = pmap(d);
+  if (E.kind === "line") {
+    const a = pm.get(E.p1)!, b = pm.get(E.p2)!;
+    const A: Vec2 = [a.x, a.y], B: Vec2 = [b.x, b.y];
+    const L2 = (B[0] - A[0]) ** 2 + (B[1] - A[1]) ** 2 || 1;
+    const t = Math.max(0.02, Math.min(0.98, ((click[0] - A[0]) * (B[0] - A[0]) + (click[1] - A[1]) * (B[1] - A[1])) / L2));
+    const mid = addPoint(d, A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t).id;
+    d.entities = d.entities.filter((e) => e.id !== entId);
+    const con = E.construction ? { construction: true } : {};
+    d.entities.push({ id: nextId(d, "e"), kind: "line", p1: E.p1, p2: mid, ...con });
+    d.entities.push({ id: nextId(d, "e"), kind: "line", p1: mid, p2: E.p2, ...con });
+    return true;
+  }
+  if (E.kind === "arc" || E.kind === "circle") {
+    const cc = pm.get(E.c)!;
+    const C: Vec2 = [cc.x, cc.y];
+    const r = E.kind === "circle" ? E.r : Math.hypot(pm.get(E.p1)!.x - cc.x, pm.get(E.p1)!.y - cc.y);
+    const ang = Math.atan2(click[1] - C[1], click[0] - C[0]);
+    const midP = addPoint(d, C[0] + r * Math.cos(ang), C[1] + r * Math.sin(ang)).id;
+    const con = E.construction ? { construction: true } : {};
+    d.entities = d.entities.filter((e) => e.id !== entId);
+    if (E.kind === "circle") {
+      // split a circle into two half-ish arcs at the click and its antipode
+      const opp = addPoint(d, C[0] - r * Math.cos(ang), C[1] - r * Math.sin(ang)).id;
+      d.entities.push({ id: nextId(d, "e"), kind: "arc", c: E.c, p1: midP, p2: opp, ccw: true, ...con });
+      d.entities.push({ id: nextId(d, "e"), kind: "arc", c: E.c, p1: opp, p2: midP, ccw: true, ...con });
+    } else {
+      d.entities.push({ id: nextId(d, "e"), kind: "arc", c: E.c, p1: E.p1, p2: midP, ccw: E.ccw, ...con });
+      d.entities.push({ id: nextId(d, "e"), kind: "arc", c: E.c, p1: midP, p2: E.p2, ccw: E.ccw, ...con });
+    }
+    return true;
+  }
+  return false;
 }
 
 function circleCircle(c0: Vec2, r0: number, c1: Vec2, r1: number): Vec2[] {

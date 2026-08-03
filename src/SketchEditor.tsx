@@ -29,7 +29,7 @@ import {
 } from "./sketch/model";
 import { solve, degreesOfFreedom } from "./sketch/solver";
 import { tessellate, bbox, type Vec2 } from "./sketch/geometry";
-import { trimAt } from "./sketch/trim";
+import { trimAt, splitAt, filletCorner } from "./sketch/trim";
 
 type Tool = "select" | "line" | "rect" | "circle" | "arc" | "spline" | "polygon" | "slot" | "trim";
 interface View { ox: number; oy: number; scale: number }
@@ -47,6 +47,7 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
   const [tool, setToolState] = useState<Tool>("select");
   const [gridSnap, setGridSnap] = useState(true);
   const [polySides, setPolySides] = useState(6);
+  const [filletR, setFilletR] = useState(5);
   // inline dimension editor (double-click a dim label on the canvas)
   const [editDim, setEditDim] = useState<{ id: Id; sx: number; sy: number; value: number } | null>(null);
   const [sel, setSel] = useState<{ points: Set<Id>; entities: Set<Id> }>({ points: new Set(), entities: new Set() });
@@ -232,7 +233,7 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
 
     if (tool === "trim") {
       const ent = entityAt(sp);
-      if (ent) { snapshot(); applyDoc((d) => { trimAt(d, ent, toW(sp)); }); }
+      if (ent) { snapshot(); applyDoc((d) => { if (e.shiftKey) splitAt(d, ent, toW(sp)); else trimAt(d, ent, toW(sp)); }); }
       return;
     }
 
@@ -511,6 +512,52 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
   const setDimName = (id: Id, name: string) => applyDoc((d) => { const c = d.constraints.find((x) => x.id === id); if (c && isDim(c)) c.name = name; });
   const removeConstraint = (id: Id) => { snapshot(); applyDoc((d) => { d.constraints = d.constraints.filter((c) => c.id !== id); }); };
 
+  /** round the selected corner point(s) with a tangent arc */
+  const filletSelection = () => {
+    const pts = [...sel.points];
+    if (!pts.length) { setStatus("fillet: select a corner point first"); return; }
+    snapshot();
+    applyDoc((d) => { for (const p of pts) filletCorner(d, p, filletR); });
+    setSel({ points: new Set(), entities: new Set() });
+  };
+
+  /** mirror the selected entities across a selected (construction) line */
+  const mirrorSelection = () => {
+    const ents = [...sel.entities];
+    const line = doc.entities.find((e) => e.kind === "line" && sel.entities.has(e.id)) as Extract<Entity, { kind: "line" }> | undefined;
+    const toMirror = ents.filter((id) => id !== line?.id);
+    if (!line || !toMirror.length) { setStatus("mirror: select entities + one line to mirror across"); return; }
+    snapshot();
+    applyDoc((d) => {
+      const pm = new Map(d.points.map((p) => [p.id, p] as const));
+      const a = pm.get(line.p1)!, b = pm.get(line.p2)!;
+      const dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy || 1;
+      const reflect = (x: number, y: number): [number, number] => {
+        const t = ((x - a.x) * dx + (y - a.y) * dy) / L2;
+        const px = a.x + t * dx, py = a.y + t * dy;
+        return [2 * px - x, 2 * py - y];
+      };
+      const map = new Map<Id, Id>();
+      const mp = (id: Id): Id => {
+        if (map.has(id)) return map.get(id)!;
+        const p = pm.get(id)!;
+        const [rx, ry] = reflect(p.x, p.y);
+        const np = addPoint(d, rx, ry);
+        map.set(id, np.id);
+        return np.id;
+      };
+      for (const id of toMirror) {
+        const e = d.entities.find((x) => x.id === id);
+        if (!e) continue;
+        if (e.kind === "line") d.entities.push({ id: nextId(d, "e"), kind: "line", p1: mp(e.p1), p2: mp(e.p2), ...(e.construction ? { construction: true } : {}) });
+        else if (e.kind === "circle") d.entities.push({ id: nextId(d, "e"), kind: "circle", c: mp(e.c), r: e.r, ...(e.construction ? { construction: true } : {}) });
+        else if (e.kind === "arc") d.entities.push({ id: nextId(d, "e"), kind: "arc", c: mp(e.c), p1: mp(e.p2), p2: mp(e.p1), ccw: e.ccw, ...(e.construction ? { construction: true } : {}) });
+        else if (e.kind === "spline") d.entities.push({ id: nextId(d, "e"), kind: "spline", pts: e.pts.map(mp), ...(e.construction ? { construction: true } : {}) });
+      }
+    });
+    setSel({ points: new Set(), entities: new Set() });
+  };
+
   /** flip construction (reference) flag on the selected entities */
   const toggleConstruction = () => {
     if (!sel.entities.size) return;
@@ -586,6 +633,12 @@ export default function SketchEditor({ initialDoc, onCommit, onCancel }: Props) 
             <button key={c.k} className="ske__con" onClick={() => addConstraint(c.k)} title={c.t}>{c.g}</button>
           ))}
           <button className="ske__con ske__con--dim" onClick={addDimension} title="Dimension (distance / radius / angle) from the selection">⟺</button>
+        </div>
+        <div className="ske__cons">
+          <button className="ske__con" onClick={filletSelection} title="Fillet the selected corner point(s) with a tangent arc">⌒</button>
+          <input className="ske__sides" type="number" min={0.5} step={0.5} value={filletR} title="Fillet radius"
+            onChange={(e) => setFilletR(Math.max(0.5, Number(e.target.value) || 0.5))} />
+          <button className="ske__con" onClick={mirrorSelection} title="Mirror selected entities across a selected line">⋔</button>
         </div>
         <div className="ske__spacer" />
         <label className="ske__plane">plane
@@ -812,7 +865,7 @@ const TOOL_HINT: Record<Tool, string> = {
   rect: "Rectangle — two corners, or Alt+click for a centred rectangle (R)", circle: "Circle — centre then radius (C)",
   arc: "Arc — start, end, then a point on the arc (A)", spline: "Spline — click points, Enter to finish (S)",
   polygon: "Polygon — centre then a vertex (P)", slot: "Slot — two centres then the width",
-  trim: "Trim — click the part of an entity to remove (T)",
+  trim: "Trim — click a part to remove it; Shift+click to split at that point (T)",
 };
 const CONSTRAINTS = [
   { k: "coincident", g: "•", t: "Coincident — weld 2 points" },
