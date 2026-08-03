@@ -1115,11 +1115,18 @@ const REGISTRY: Record<string, NodeImpl> = {
     const solid = expectSolid(inputs.in, "arrayRadial3d");
     const count = Math.max(1, Math.round(Number(params.count ?? 6)));
     const total = Number(params.angle ?? 360);
+    const ax = String(params.axis ?? "Z");
+    const dir: Vec3 = ax === "X" ? [1, 0, 0] : ax === "Y" ? [0, 1, 0] : [0, 0, 1];
     const denom = Math.abs(total) >= 360 ? count : Math.max(1, count - 1);
-    let out: Shape3D = solid;
+    const copies: Shape3D[] = [solid];
     for (let i = 1; i < count; i++) {
-      out = out.fuse(solid.clone().rotate((total / denom) * i, [0, 0, 0], [0, 0, 1]) as Shape3D) as Shape3D;
+      copies.push(solid.clone().rotate((total / denom) * i, [0, 0, 0], dir) as Shape3D);
     }
+    // fuse into one body, or keep the copies as a (cheaper) compound
+    const merge = params.merge !== "no";
+    let out: Shape3D = copies[0];
+    if (merge) for (let i = 1; i < copies.length; i++) out = out.fuse(copies[i]) as Shape3D;
+    else out = makeCompound(copies) as unknown as Shape3D;
     return { kind: "solid", solid: out };
   },
 
@@ -1364,6 +1371,35 @@ const REGISTRY: Record<string, NodeImpl> = {
       }
     }
     return { kind: "solid", solid: out };
+  },
+  /**
+   * Split a solid by an axis-aligned plane (for parts too big for the build
+   * plate). Keep the positive/negative side, or both halves as a compound
+   * pushed apart by `gap` so the cut is visible.
+   */
+  split: (inputs, params) => {
+    const solid = expectSolid(inputs.in, "split");
+    const axis = String(params.axis ?? "Z");
+    const off = Number(params.offset ?? 0);
+    const keep = String(params.keep ?? "positive");
+    const gap = Number(params.gap ?? 0);
+    const [lo, hi] = solid.boundingBox.bounds;
+    const ai = axis === "X" ? 0 : axis === "Y" ? 1 : 2;
+    const dir: Vec3 = ai === 0 ? [1, 0, 0] : ai === 1 ? [0, 1, 0] : [0, 0, 1];
+    const half = (positive: boolean): Shape3D => {
+      const pad = 10;
+      const r: [number, number][] = [[lo[0] - pad, hi[0] + pad], [lo[1] - pad, hi[1] + pad], [lo[2] - pad, hi[2] + pad]];
+      if (positive) r[ai][0] = off; else r[ai][1] = off;
+      const w = r[0][1] - r[0][0], d = r[1][1] - r[1][0], h = r[2][1] - r[2][0];
+      const cutter = (makeBaseBox(w, d, h) as Shape3D).translate([(r[0][0] + r[0][1]) / 2, (r[1][0] + r[1][1]) / 2, r[2][0]]) as Shape3D;
+      return solid.clone().intersect(cutter) as Shape3D;
+    };
+    if (keep === "both") {
+      const pos = gap ? (half(true).translate(dir.map((c) => c * gap) as Vec3) as Shape3D) : half(true);
+      const neg = half(false);
+      return { kind: "solid", solid: makeCompound([pos, neg]) as unknown as Shape3D };
+    }
+    return { kind: "solid", solid: half(keep === "positive") };
   },
   /** Round the corners of a 2D profile (great for laser-cut parts). */
   fillet2d: (inputs, params) => {
