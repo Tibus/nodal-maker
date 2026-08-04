@@ -130,6 +130,7 @@ export const NODE_DESCRIPTIONS: Record<string, string> = {
   supports: "Auto-generate a resin support forest: thin pillars from every overhang steeper than the angle down to the build plate.",
   collision: "Interference check: outputs the overlap region between two bodies (empty = no clash). Read its volume in Props.",
   dogbone: "Relieve inside corners of a pocket so a round router bit can reach them (CNC): dogbone (diagonal) or T-bone (along a wall).",
+  tabs: "Hold-in-sheet micro-joints: keep a laser part attached to the surrounding stock by tabs until you pop it out.",
   arrayPath: "Repeat a solid along a 2D path at even spacing, optionally rotating each copy to follow the path tangent.",
   boolean3d: "Combine two solids: union, difference (base − tool) or intersection.",
   assemble: "Assemble up to 4 solids into one compound (no Boolean). Use for a bolt (head + thread) where a real union would hang on the thread.",
@@ -153,7 +154,7 @@ export const NODE_DESCRIPTIONS: Record<string, string> = {
 export const NODE_CATEGORIES: { name: string; types: string[] }[] = [
   { name: "Value", types: ["numberValue", "textValue", "math", "mathUnary", "clamp", "remap", "random"] },
   { name: "2D Primitive", types: ["sketch", "rect", "circle", "ellipse", "polygon", "star", "slot", "gear", "fingerBox", "livingHinge", "svgInput", "importDXF", "textToSvg"] },
-  { name: "2D Op", types: ["offset2d", "kerf", "fillet2d", "bevel2d", "boolean2d", "mirror2d", "transform2d", "arrayLinear2d", "arrayRadial2d", "nest", "dogbone", "group", "scoreCut"] },
+  { name: "2D Op", types: ["offset2d", "kerf", "fillet2d", "bevel2d", "boolean2d", "mirror2d", "transform2d", "arrayLinear2d", "arrayRadial2d", "nest", "dogbone", "tabs", "group", "scoreCut"] },
   { name: "3D Primitive", types: ["box", "cylinder", "sphere", "cone", "torus", "thread", "internalThread", "importSTEP"] },
   { name: "Sketch → Solid", types: ["extrude", "pocket", "hole", "revolve", "loft", "loftSections", "sweep", "bossOnCap", "textOnFace"] },
   { name: "3D Op", types: ["transform", "rotate3d", "scale3d", "mirror3d", "fillet", "bevel", "shell", "hollow", "infill", "split", "supports", "boolean3d", "collision", "assemble", "arrayLinear3d", "arrayRadial3d", "arrayPath"] },
@@ -819,6 +820,18 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     ],
     output: "solid",
     params: [{ name: "thickness", kind: "number", default: 2, min: 0.2, max: 50, step: 0.2 }],
+  },
+  tabs: {
+    type: "tabs",
+    label: "Hold-in tabs",
+    inputs: [{ name: "in", type: "sketch2d" }],
+    output: "sketch2d",
+    params: [
+      { name: "margin", kind: "number", label: "frame margin", default: 8, min: 1, max: 60, step: 0.5 },
+      { name: "kerf", kind: "number", label: "cut width", default: 0.6, min: 0.1, max: 5, step: 0.1 },
+      { name: "tabs", kind: "number", label: "tab count", default: 4, min: 1, max: 40, step: 1 },
+      { name: "tabLen", kind: "number", label: "tab width", default: 3, min: 0.3, max: 20, step: 0.1 },
+    ],
   },
   dogbone: {
     type: "dogbone",

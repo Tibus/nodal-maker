@@ -1314,6 +1314,38 @@ const REGISTRY: Record<string, NodeImpl> = {
     return { kind: "sketch2d", drawing: drs.reduce((acc, d) => acc.fuse(d)) };
   },
 
+  /**
+   * Hold-in-sheet micro-joints: place a part inside a surrounding frame and cut
+   * a thin ring around it, EXCEPT at N tab bridges — so the laser-cut part stays
+   * attached to the stock until you pop it out. Output is one connected profile.
+   */
+  tabs: (inputs, params) => {
+    const part = expectSketch(inputs.in, "tabs");
+    const margin = Math.max(1, Number(params.margin ?? 8));
+    const kerf = Math.max(0.1, Number(params.kerf ?? 0.6));
+    const tabCount = Math.max(1, Math.round(Number(params.tabs ?? 4)));
+    const tabLen = Math.max(0.3, Number(params.tabLen ?? 3));
+    const [lo, hi] = part.boundingBox.bounds;
+    const frame = drawRectangle(hi[0] - lo[0] + 2 * margin, hi[1] - lo[1] + 2 * margin).translate((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2);
+    let ring = part.offset(kerf).cut(part); // thin annulus = the laser kerf path
+    // punch a disc out of the ring at evenly-spaced outline points → tab bridges
+    let poly: Vec2[] = [];
+    for (const p of drawingPolylines(part)) if (p.length > poly.length) poly = p;
+    if (poly.length >= 2) {
+      const cum = [0];
+      for (let i = 1; i < poly.length; i++) cum.push(cum[i - 1] + Math.hypot(poly[i][0] - poly[i - 1][0], poly[i][1] - poly[i - 1][1]));
+      const total = cum[cum.length - 1] || 1;
+      const r = kerf + tabLen / 2;
+      for (let k = 0; k < tabCount; k++) {
+        const s = (total * k) / tabCount;
+        let i = 1; while (i < cum.length && cum[i] < s) i++;
+        const a = poly[i - 1], b = poly[Math.min(poly.length - 1, i)];
+        const seg = cum[i] - cum[i - 1] || 1, f = (s - cum[i - 1]) / seg;
+        ring = ring.cut(drawCircle(r).translate(a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f));
+      }
+    }
+    return { kind: "sketch2d", drawing: frame.cut(ring) };
+  },
   /** SVG input: parse an SVG path `d` string into a 2D drawing. */
   svgInput: (_inputs, params) => {
     const d = String(params.d ?? "");
