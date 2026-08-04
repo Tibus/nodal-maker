@@ -125,6 +125,9 @@ export const NODE_DESCRIPTIONS: Record<string, string> = {
   hollow: "Resin hollowing: closed thin-walled shell + vertical drain holes through the bottom so uncured resin escapes (no sealed cavity).",
   split: "Cut a solid by an axis-aligned plane (for parts bigger than the build plate). Keep one side or both halves (pushed apart by a gap).",
   supports: "Auto-generate a resin support forest: thin pillars from every overhang steeper than the angle down to the build plate.",
+  collision: "Interference check: outputs the overlap region between two bodies (empty = no clash). Read its volume in Props.",
+  dogbone: "Relieve inside corners of a pocket so a round router bit can reach them (CNC): dogbone (diagonal) or T-bone (along a wall).",
+  arrayPath: "Repeat a solid along a 2D path at even spacing, optionally rotating each copy to follow the path tangent.",
   boolean3d: "Combine two solids: union, difference (base − tool) or intersection.",
   assemble: "Assemble up to 4 solids into one compound (no Boolean). Use for a bolt (head + thread) where a real union would hang on the thread.",
   arrayLinear3d: "Repeat a solid in a line.",
@@ -147,10 +150,10 @@ export const NODE_DESCRIPTIONS: Record<string, string> = {
 export const NODE_CATEGORIES: { name: string; types: string[] }[] = [
   { name: "Value", types: ["numberValue", "textValue", "math", "mathUnary", "clamp", "remap", "random"] },
   { name: "2D Primitive", types: ["sketch", "rect", "circle", "ellipse", "polygon", "star", "slot", "gear", "fingerBox", "livingHinge", "svgInput", "textToSvg"] },
-  { name: "2D Op", types: ["offset2d", "kerf", "fillet2d", "bevel2d", "boolean2d", "mirror2d", "transform2d", "arrayLinear2d", "arrayRadial2d", "nest", "group", "scoreCut"] },
+  { name: "2D Op", types: ["offset2d", "kerf", "fillet2d", "bevel2d", "boolean2d", "mirror2d", "transform2d", "arrayLinear2d", "arrayRadial2d", "nest", "dogbone", "group", "scoreCut"] },
   { name: "3D Primitive", types: ["box", "cylinder", "sphere", "cone", "torus", "thread", "internalThread", "importSTEP"] },
   { name: "Sketch → Solid", types: ["extrude", "pocket", "hole", "revolve", "loft", "loftSections", "sweep", "bossOnCap"] },
-  { name: "3D Op", types: ["transform", "rotate3d", "scale3d", "mirror3d", "fillet", "bevel", "shell", "hollow", "split", "supports", "boolean3d", "assemble", "arrayLinear3d", "arrayRadial3d"] },
+  { name: "3D Op", types: ["transform", "rotate3d", "scale3d", "mirror3d", "fillet", "bevel", "shell", "hollow", "split", "supports", "boolean3d", "collision", "assemble", "arrayLinear3d", "arrayRadial3d", "arrayPath"] },
   { name: "Selector", types: ["edgeSelect", "faceSelect"] },
   { name: "Mesh", types: ["tessellate", "meshToSolid", "importSTL", "repair", "boolean", "transformMesh", "convexHull", "minkowski", "decimate", "subdivide"] },
 ];
@@ -789,6 +792,40 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     ],
     output: "solid",
     params: [{ name: "thickness", kind: "number", default: 2, min: 0.2, max: 50, step: 0.2 }],
+  },
+  dogbone: {
+    type: "dogbone",
+    label: "Dogbone corners",
+    inputs: [{ name: "in", type: "sketch2d" }],
+    output: "sketch2d",
+    params: [
+      { name: "bitDia", kind: "number", label: "bit Ø", default: 3, min: 0.5, max: 20, step: 0.1 },
+      { name: "style", kind: "select", default: "dogbone", options: ["dogbone", "tbone"] },
+    ],
+  },
+  arrayPath: {
+    type: "arrayPath",
+    label: "Array on path",
+    inputs: [
+      { name: "in", type: "solid" },
+      { name: "path", type: "sketch2d" },
+    ],
+    output: "solid",
+    params: [
+      { name: "count", kind: "number", default: 5, min: 1, max: 200, step: 1 },
+      { name: "orient", kind: "select", label: "follow tangent", default: "yes", options: ["yes", "no"] },
+      { name: "merge", kind: "select", label: "fuse", default: "no", options: ["yes", "no"] },
+    ],
+  },
+  collision: {
+    type: "collision",
+    label: "Collision check",
+    inputs: [
+      { name: "a", type: "solid" },
+      { name: "b", type: "solid" },
+    ],
+    output: "mesh",
+    params: [],
   },
   supports: {
     type: "supports",

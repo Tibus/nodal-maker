@@ -667,6 +667,36 @@ function expectMesh(v: GraphValue | undefined, node: string): MeshData {
   return v.mesh;
 }
 
+/** Coerce a solid OR mesh input to MeshData (solids are tessellated). */
+function asMeshData(v: GraphValue | undefined, node: string): MeshData {
+  if (v?.kind === "mesh") return v.mesh;
+  if (v?.kind === "solid") return solidToMeshData(v.solid);
+  throw new Error(`[${node}] expected a solid or mesh, got ${v?.kind ?? "nothing"}`);
+}
+
+/** Sample a Drawing's outline(s) into flat closed polylines (lines kept exact,
+ * curves discretised). Duck-typed to avoid importing the concrete curve classes. */
+function drawingPolylines(d: Drawing): Vec2[][] {
+  const out: Vec2[][] = [];
+  const flatten = (bp: { curves: { firstParameter: number; lastParameter: number; geomType: string; value: (t: number) => Vec2 }[] }): Vec2[] => {
+    const pts: Vec2[] = [];
+    for (const c of bp.curves) {
+      const t0 = c.firstParameter, t1 = c.lastParameter;
+      const steps = c.geomType === "LINE" ? 1 : 24;
+      for (let i = 0; i < steps; i++) pts.push(c.value(t0 + (t1 - t0) * (i / steps)));
+    }
+    return pts;
+  };
+  const visit = (shape: unknown): void => {
+    if (!shape || typeof shape !== "object") return;
+    const s = shape as { curves?: unknown; blueprints?: unknown[] };
+    if (Array.isArray(s.curves)) out.push(flatten(s as never));
+    else if (Array.isArray(s.blueprints)) for (const b of s.blueprints) visit(b);
+  };
+  visit((d as unknown as { innerShape?: unknown }).innerShape);
+  return out;
+}
+
 let stlCounter = 0;
 /** Sew a triangle mesh into a B-rep solid (via OCCT's STL reader, like replicad's
  * importSTL). The result is a FACETED solid — one face per triangle after merging
@@ -1128,6 +1158,56 @@ const REGISTRY: Record<string, NodeImpl> = {
     const out = op === "difference" ? a.cut(b) : op === "intersection" ? a.intersect(b) : a.fuse(b);
     return { kind: "solid", solid: out as Shape3D };
   },
+  /**
+   * Interference check between two bodies: outputs the OVERLAP region (via a
+   * robust Manifold intersection). Empty = no collision; otherwise its volume
+   * (read it in the Props panel) tells you how much the parts clash.
+   */
+  collision: (inputs) => {
+    const a = asMeshData(inputs.a, "collision");
+    const b = asMeshData(inputs.b, "collision");
+    return { kind: "mesh", mesh: booleanMesh(a, b, "intersection") };
+  },
+  /**
+   * Repeat a solid along a 2D path (XY): copies are dropped at even arc-length
+   * intervals and, unless orient="no", rotated about Z to follow the tangent.
+   * Great for chain links, fence posts along a curve, teeth along a spline.
+   */
+  arrayPath: (inputs, params) => {
+    const solid = expectSolid(inputs.in, "arrayPath");
+    const path = expectSketch(inputs.path, "arrayPath");
+    const count = Math.max(1, Math.round(Number(params.count ?? 5)));
+    const orient = params.orient !== "no";
+    // pick the longest sampled outline as the path spine
+    const polys = drawingPolylines(path);
+    if (!polys.length) throw new Error("[arrayPath] the path has no geometry");
+    let pts = polys[0];
+    for (const p of polys) if (p.length > pts.length) pts = p;
+    const cum = [0];
+    for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+    const total = cum[cum.length - 1] || 1;
+    const at = (s: number): { x: number; y: number; ang: number } => {
+      let i = 1;
+      while (i < cum.length && cum[i] < s) i++;
+      const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i)];
+      const seg = cum[i] - cum[i - 1] || 1;
+      const f = (s - cum[i - 1]) / seg;
+      return { x: a[0] + (b[0] - a[0]) * f, y: a[1] + (b[1] - a[1]) * f, ang: (Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI };
+    };
+    const copies: Shape3D[] = [];
+    for (let k = 0; k < count; k++) {
+      const s = count === 1 ? 0 : (total * k) / (count - 1);
+      const { x, y, ang } = at(s);
+      let c = solid.clone() as Shape3D;
+      if (orient) c = c.rotate(ang, [0, 0, 0], [0, 0, 1]) as Shape3D;
+      copies.push(c.translate([x, y, 0]) as Shape3D);
+    }
+    const merge = params.merge !== "no";
+    let out: Shape3D = copies[0];
+    if (merge) for (let i = 1; i < copies.length; i++) out = out.fuse(copies[i]) as Shape3D;
+    else out = makeCompound(copies) as unknown as Shape3D;
+    return { kind: "solid", solid: out };
+  },
   /** Assemble up to four solids into one COMPOUND — no boolean, so it works with
    * bodies that OCCT booleans choke on (e.g. a Thread). Great for a bolt = head +
    * thread. The bodies keep their own faces (B-rep) and STEP-export as one part. */
@@ -1252,6 +1332,47 @@ const REGISTRY: Record<string, NodeImpl> = {
     const dr = expectSketch(inputs.in, "offset2d");
     const r = Number(params.distance ?? 0);
     return { kind: "sketch2d", drawing: r === 0 ? dr : dr.offset(r) };
+  },
+  /**
+   * Relieve the inside corners of a pocket profile so a round router bit can
+   * reach them (CNC). At every convex corner of the region, fuse a bit-radius
+   * circle: "dogbone" places it on the diagonal, "tbone" along the longer wall.
+   */
+  dogbone: (inputs, params) => {
+    const dr = expectSketch(inputs.in, "dogbone");
+    const bitR = Math.max(0.1, Number(params.bitDia ?? 3) / 2);
+    const tbone = String(params.style ?? "dogbone") === "tbone";
+    const norm = (v: Vec2): Vec2 => { const l = Math.hypot(v[0], v[1]) || 1; return [v[0] / l, v[1] / l]; };
+    let out = dr;
+    for (const poly of drawingPolylines(dr)) {
+      const n = poly.length;
+      if (n < 3) continue;
+      let area = 0;
+      for (let i = 0; i < n; i++) { const a = poly[i], b = poly[(i + 1) % n]; area += a[0] * b[1] - b[0] * a[1]; }
+      const ccw = area > 0;
+      for (let i = 0; i < n; i++) {
+        const a = poly[(i - 1 + n) % n], b = poly[i], c = poly[(i + 1) % n];
+        const e1: Vec2 = [b[0] - a[0], b[1] - a[1]];
+        const e2: Vec2 = [c[0] - b[0], c[1] - b[1]];
+        const cross = e1[0] * e2[1] - e1[1] * e2[0];
+        const convex = ccw ? cross > 0 : cross < 0; // corner where the bit leaves material
+        if (!convex || Math.abs(cross) < 1e-6) continue;
+        // outward direction = away from the region interior (opposite the bisector)
+        const ba = norm([a[0] - b[0], a[1] - b[1]]), bc = norm([c[0] - b[0], c[1] - b[1]]);
+        const outward = norm([-(ba[0] + bc[0]), -(ba[1] + bc[1])]);
+        let cx: number, cy: number;
+        if (tbone) {
+          // extend along the longer adjacent wall (outward normal of that edge)
+          const long = Math.hypot(e1[0], e1[1]) >= Math.hypot(e2[0], e2[1]) ? ba : bc;
+          const dir = long[0] * outward[0] + long[1] * outward[1] >= 0 ? long : [-long[0], -long[1]] as Vec2;
+          cx = b[0] + dir[0] * bitR; cy = b[1] + dir[1] * bitR;
+        } else {
+          cx = b[0] + outward[0] * bitR; cy = b[1] + outward[1] * bitR;
+        }
+        out = out.fuse(drawCircle(bitR).translate(cx, cy));
+      }
+    }
+    return { kind: "sketch2d", drawing: out };
   },
   kerf: (inputs, params) => {
     // Laser kerf compensation: the beam removes ~kerf width of material, so an
