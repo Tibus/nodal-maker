@@ -910,9 +910,48 @@ export class Viewport {
     this.renderer.setSize(container.clientWidth, container.clientHeight);
   }
 
+  private turntable: { start: THREE.Vector3; target: THREE.Vector3; up: THREE.Vector3; t0: number; dur: number; onEnd: () => void } | null = null;
+
   private animate = () => {
     requestAnimationFrame(this.animate);
-    this.controls.update();
+    if (this.turntable) {
+      const tt = this.turntable;
+      const t = (performance.now() - tt.t0) / 1000;
+      const ang = Math.min(1, t / tt.dur) * Math.PI * 2;
+      const off = tt.start.clone().sub(tt.target).applyAxisAngle(tt.up, ang);
+      this.camera.position.copy(tt.target).add(off);
+      this.camera.lookAt(tt.target);
+      if (t >= tt.dur) { const end = tt.onEnd; this.turntable = null; end(); }
+    } else {
+      this.controls.update();
+    }
     this.renderer.render(this.scene, this.camera);
   };
+
+  /**
+   * Record a turntable of the current model as a WebM video: spin the camera a
+   * full turn around the orbit target over `durationSec`, capturing the canvas
+   * via MediaRecorder. Resolves with the video Blob.
+   */
+  recordTurntable(durationSec = 5, fps = 30): Promise<Blob> {
+    const canvas = this.renderer.domElement;
+    const stream = canvas.captureStream(fps);
+    const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
+    const rec = new MediaRecorder(stream, { mimeType: mime });
+    const chunks: Blob[] = [];
+    rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+    return new Promise((resolve, reject) => {
+      rec.onstop = () => resolve(new Blob(chunks, { type: mime }));
+      rec.onerror = () => reject(new Error("recording failed"));
+      rec.start();
+      this.turntable = {
+        start: this.camera.position.clone(),
+        target: this.controls.target.clone(),
+        up: this.camera.up.clone().normalize(),
+        t0: performance.now(),
+        dur: durationSec,
+        onEnd: () => rec.stop(),
+      };
+    });
+  }
 }

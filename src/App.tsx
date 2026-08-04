@@ -50,6 +50,7 @@ export default function App() {
   const measureA = useRef<[number, number, number] | null>(null);
   const [viewMode, setViewMode] = useState<"shaded" | "edges" | "wireframe">("shaded");
   const [analysis, setAnalysis] = useState<"overhang" | "thickness" | null>(null);
+  const [recording, setRecording] = useState(false);
   const [props, setProps] = useState<MassProps | null>(null);
   const [manifold, setManifold] = useState<ManifoldStats | null>(null);
   const [showProps, setShowProps] = useState(false);
@@ -373,6 +374,27 @@ export default function App() {
             title="Section view — clip the model along an axis to see inside"
           >
             ✂ {clipAxis ? `Section ${clipAxis}` : "Section"}
+          </button>
+          <button
+            className={`vp-pick${recording ? " vp-pick--on" : ""}`}
+            disabled={recording}
+            onClick={async (e) => {
+              e.stopPropagation();
+              setRecording(true);
+              setStatus("enregistrement du turntable… (5 s)");
+              try {
+                const blob = await viewportRef.current!.recordTurntable(5, 30);
+                download(blob, "turntable.webm", "video/webm");
+                setStatus(`turntable exporté (${(blob.size / 1024).toFixed(0)} Ko)`);
+              } catch {
+                setStatus("échec de l'enregistrement (navigateur non compatible ?)");
+              } finally {
+                setRecording(false);
+              }
+            }}
+            title="Enregistrer un tour complet du modèle en vidéo WebM"
+          >
+            🎥 {recording ? "Recording…" : "Turntable"}
           </button>
         </div>
         {clipAxis && props && (() => {
