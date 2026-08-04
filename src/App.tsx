@@ -4,7 +4,7 @@ import { Viewport } from "./viewport";
 import NodeEditor, { type EditorApi } from "./NodeEditor";
 import { kernel, type Graph } from "./kernel/client";
 import { DEFAULT_PARAMS } from "./kernel/model";
-import { meshMassProps, type MassProps } from "./massprops";
+import { meshMassProps, manifoldStats, type MassProps, type ManifoldStats } from "./massprops";
 import { build3MF } from "./export3mf";
 
 // Seed graph shown on first load: star → offset → extrude → boss-on-cap.
@@ -51,6 +51,7 @@ export default function App() {
   const [viewMode, setViewMode] = useState<"shaded" | "edges" | "wireframe">("shaded");
   const [analysis, setAnalysis] = useState<"overhang" | "thickness" | null>(null);
   const [props, setProps] = useState<MassProps | null>(null);
+  const [manifold, setManifold] = useState<ManifoldStats | null>(null);
   const [showProps, setShowProps] = useState(false);
   const [clipAxis, setClipAxis] = useState<"X" | "Y" | "Z" | null>(null);
   const [clipPos, setClipPos] = useState(0);
@@ -177,7 +178,9 @@ export default function App() {
         viewportRef.current?.setGeometry(res.mesh);
         viewportRef.current?.setExtraBodies(res.extras ?? []);
         setStatus(`${res.mesh.stats.faceCount} regions · ${res.mesh.stats.triangleCount} triangles`);
-        setProps(res.outputKind === "solid" || res.outputKind === "mesh" ? meshMassProps(res.mesh.vertices, res.mesh.indices) : null);
+        const solidLike = res.outputKind === "solid" || res.outputKind === "mesh";
+        setProps(solidLike ? meshMassProps(res.mesh.vertices, res.mesh.indices) : null);
+        setManifold(solidLike ? manifoldStats(res.mesh.vertices, res.mesh.indices) : null);
         lastMesh.current = { vertices: res.mesh.vertices, indices: res.mesh.indices };
 
         // gizmo bound to the displayed transform-family node
@@ -391,6 +394,14 @@ export default function App() {
                 <tr><td>Bounding box</td><td>{fmt(props.bbox.size[0])} × {fmt(props.bbox.size[1])} × {fmt(props.bbox.size[2])} mm</td></tr>
                 <tr><td>Centre of mass</td><td>{props.center.map((c) => fmt(c)).join(", ")}</td></tr>
                 <tr><td>Triangles</td><td>{props.triangles}</td></tr>
+                {manifold && (
+                  <tr>
+                    <td>Watertight</td>
+                    <td style={{ color: manifold.watertight ? "#39d98a" : "#ff5c5c" }}>
+                      {manifold.watertight ? "✓ yes" : `✗ ${manifold.boundaryEdges} open${manifold.nonManifold ? ` · ${manifold.nonManifold} non-mfd` : ""}`}
+                    </td>
+                  </tr>
+                )}
                 {(() => {
                   // resin estimates (assumptions: 1.1 g/mL, €50/L, 0.05 mm layers, 7 s/layer)
                   const mL = props.volume / 1000;
