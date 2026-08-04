@@ -1622,6 +1622,38 @@ const REGISTRY: Record<string, NodeImpl> = {
     return { kind: "solid", solid: out };
   },
   /**
+   * Auto-orient for printing: try the six axis-aligned "face-down" orientations,
+   * score each by (overhang area + heightWeight·height) and keep the lowest —
+   * fewer supports, shorter print. The winner is dropped onto the plate (z=0).
+   */
+  autoOrient: (inputs, params) => {
+    const solid = expectSolid(inputs.in, "autoOrient");
+    const hw = Number(params.heightWeight ?? 1);
+    const cosT = Math.cos((45 * Math.PI) / 180);
+    const cands: [number, number][] = [[0, 0], [180, 0], [90, 0], [-90, 0], [0, 90], [0, -90]];
+    let best: { s: Shape3D; score: number } | null = null;
+    for (const [rx, ry] of cands) {
+      let s = solid.clone() as Shape3D;
+      if (rx) s = s.rotate(rx, [0, 0, 0], [1, 0, 0]) as Shape3D;
+      if (ry) s = s.rotate(ry, [0, 0, 0], [0, 1, 0]) as Shape3D;
+      const [lo, hi] = s.boundingBox.bounds;
+      s = s.translate([0, 0, -lo[2]]) as Shape3D; // rest on the plate
+      const m = meshAndTag(s), V = m.vertices, T = m.indices;
+      let area = 0;
+      for (let i = 0; i < T.length; i += 3) {
+        const a = T[i] * 3, b = T[i + 1] * 3, c = T[i + 2] * 3;
+        const ux = V[b] - V[a], uy = V[b + 1] - V[a + 1], uz = V[b + 2] - V[a + 2];
+        const vx = V[c] - V[a], vy = V[c + 1] - V[a + 1], vz = V[c + 2] - V[a + 2];
+        const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+        const twice = Math.hypot(nx, ny, nz) || 1;
+        if (-nz / twice > cosT && (V[a + 2] + V[b + 2] + V[c + 2]) / 3 > 0.2) area += twice / 2;
+      }
+      const score = area + hw * (hi[2] - lo[2]);
+      if (!best || score < best.score) best = { s, score };
+    }
+    return { kind: "solid", solid: best!.s };
+  },
+  /**
    * Auto-generate print supports: mesh the solid, find down-facing overhang
    * triangles steeper than `angle` (and above the plate), snap their centroids
    * to a `spacing` grid and drop a thin pillar from each to z=0. Output the
