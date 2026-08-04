@@ -38,6 +38,7 @@ import {
 import * as opentype from "opentype.js";
 import { svgPathToDrawing } from "./svgPath";
 import { importDXF } from "./dxfImport";
+import { marchingCubes } from "./marchingCubes";
 import {
   booleanMesh,
   repairMesh,
@@ -1726,6 +1727,33 @@ const REGISTRY: Record<string, NodeImpl> = {
     for (let i = 1; i < walls.length; i++) lattice = lattice.fuse(walls[i]) as Shape3D;
     const inner = solid.clone().intersect(lattice) as Shape3D; // clip lattice to the shape
     return { kind: "solid", solid: shell.fuse(inner) as Shape3D };
+  },
+  /**
+   * Gyroid infill (a triply-periodic minimal surface). Marches the closed
+   * region { |gyroid| < iso } ∩ bbox and intersects it with the shape. Outputs
+   * the clipped gyroid walls (a clean, watertight mesh) — union your own shell
+   * around it via a mesh Boolean if you want an outer skin.
+   */
+  gyroid: (inputs, params) => {
+    const solid = expectSolid(inputs.in, "gyroid");
+    const period = Math.max(3, Number(params.period ?? 12));
+    const wall = Math.max(0.3, Number(params.wall ?? 1.2));
+    const res = Math.max(16, Math.min(96, Math.round(Number(params.res ?? 56))));
+    const [lo, hi] = solid.boundingBox.bounds;
+    const f = (2 * Math.PI) / period;
+    const iso = Math.min(1.4, wall * f * 0.5); // period→wall-thickness mapping
+    const bd = (x: number, y: number, z: number) => Math.min(x - lo[0], hi[0] - x, y - lo[1], hi[1] - y, z - lo[2], hi[2] - z);
+    // walls = { |gyroid| < iso } ∩ bbox. MC treats field<0 as the solid interior,
+    // so negate: solid where |g|<iso AND inside the box.
+    const field = (x: number, y: number, z: number) => {
+      const g = Math.sin(f * x) * Math.cos(f * y) + Math.sin(f * y) * Math.cos(f * z) + Math.sin(f * z) * Math.cos(f * x);
+      return -Math.min(iso - Math.abs(g), bd(x, y, z));
+    };
+    const m = 1.0; // sample a touch beyond the bbox so the box faces close cleanly
+    const gy = marchingCubes(field, [lo[0] - m, lo[1] - m, lo[2] - m], [hi[0] + m, hi[1] + m, hi[2] + m], res);
+    // clip the gyroid walls to the shape. Union a closed shell around them with
+    // a mesh Boolean node if you want an outer skin (Gyroid → Boolean(union)).
+    return { kind: "mesh", mesh: booleanMesh(gy, solidToMeshData(solid), "intersection") };
   },
   /**
    * Split a solid by an axis-aligned plane (for parts too big for the build
