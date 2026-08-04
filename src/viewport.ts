@@ -25,7 +25,7 @@ export class Viewport {
   private payload: MeshPayload | null = null;
   private raycaster = new THREE.Raycaster();
   private pickHighlight: THREE.Object3D | null = null;
-  private measureObj: THREE.Object3D | null = null;
+  private measures: THREE.Object3D[] = [];
   private edgesObj: THREE.LineSegments | null = null;
   private modelDiag = 100;
   // Fusion-style display: shaded / shaded+edges / wireframe (edges only)
@@ -545,21 +545,44 @@ export class Viewport {
     return [hit.point.x, hit.point.y, hit.point.z];
   }
 
-  /** Remove the measurement overlay (line + endpoint markers). */
+  /** Remove ALL measurement overlays (lines, markers, labels). */
   clearMeasure() {
-    if (this.measureObj) {
-      this.scene.remove(this.measureObj);
-      this.measureObj.traverse((o) => {
-        const g = (o as THREE.Mesh).geometry;
-        if (g) g.dispose();
+    for (const m of this.measures) {
+      this.scene.remove(m);
+      m.traverse((o) => {
+        const g = (o as THREE.Mesh).geometry; if (g) g.dispose();
+        const sp = o as THREE.Sprite;
+        if (sp.isSprite) (sp.material.map as THREE.Texture | null)?.dispose();
       });
-      this.measureObj = null;
     }
+    this.measures = [];
   }
 
-  /** Draw a measurement line between two world points; returns their distance. */
+  /** A canvas-textured sprite showing the dimension text, sized in world units. */
+  private dimLabel(text: string, at: THREE.Vector3): THREE.Sprite {
+    const pad = 8, fs = 48;
+    const cv = document.createElement("canvas");
+    const ctx = cv.getContext("2d")!;
+    ctx.font = `bold ${fs}px sans-serif`;
+    const w = Math.ceil(ctx.measureText(text).width) + pad * 2;
+    cv.width = w; cv.height = fs + pad * 2;
+    ctx.font = `bold ${fs}px sans-serif`;
+    ctx.fillStyle = "rgba(20,22,28,0.85)";
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.fillStyle = "#ffcc00";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, pad, cv.height / 2);
+    const tex = new THREE.CanvasTexture(cv);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
+    const scale = this.modelDiag * 0.06;
+    sp.scale.set((scale * cv.width) / cv.height, scale, 1);
+    sp.position.copy(at);
+    sp.renderOrder = 1000;
+    return sp;
+  }
+
+  /** Add a persistent measurement (line + endpoint markers + distance label). */
   showMeasure(a: [number, number, number], b: [number, number, number]): number {
-    this.clearMeasure();
     const grp = new THREE.Group();
     const va = new THREE.Vector3(...a), vb = new THREE.Vector3(...b);
     const geo = new THREE.BufferGeometry().setFromPoints([va, vb]);
@@ -574,9 +597,11 @@ export class Viewport {
       dot.renderOrder = 999;
       grp.add(dot);
     }
+    const dist = va.distanceTo(vb);
+    grp.add(this.dimLabel(`${dist.toFixed(2)} mm`, va.clone().add(vb).multiplyScalar(0.5)));
     this.scene.add(grp);
-    this.measureObj = grp;
-    return va.distanceTo(vb);
+    this.measures.push(grp);
+    return dist;
   }
 
   /**

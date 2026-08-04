@@ -79,7 +79,10 @@ export default function App() {
   const clearHover = useCallback(() => viewportRef.current?.clearPick(), []);
   useEffect(() => {
     if (!pickMode) viewportRef.current?.clearPick();
-    if (pickMode !== "measure") { measureA.current = null; viewportRef.current?.clearMeasure(); }
+    // entering measure mode starts a fresh set; exiting keeps the annotations
+    // on screen so you can orbit and read them.
+    if (pickMode === "measure") viewportRef.current?.clearMeasure();
+    measureA.current = null;
   }, [pickMode]);
 
   // click in the viewport (pick mode) → a preconfigured Face/Edge Select node
@@ -91,7 +94,6 @@ export default function App() {
         if (!p) { setStatus("mesure : vise la surface du modèle"); return; }
         if (!measureA.current) {
           measureA.current = p;
-          viewportRef.current?.clearMeasure();
           setStatus(`mesure : point A posé (${p.map((v) => v.toFixed(1)).join(", ")}) — clique le point B`);
         } else {
           const a = measureA.current;
