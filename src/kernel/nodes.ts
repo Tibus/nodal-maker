@@ -675,6 +675,20 @@ function asMeshData(v: GraphValue | undefined, node: string): MeshData {
   throw new Error(`[${node}] expected a solid or mesh, got ${v?.kind ?? "nothing"}`);
 }
 
+/** Build a 2D Drawing of `params.text` in `params.font` (.ttf/.otf ArrayBuffer). */
+function buildTextDrawing(params: Record<string, unknown>, node: string, defSize: number): Drawing {
+  const text = String(params.text ?? "");
+  const size = Number(params.size ?? defSize);
+  const fontBuf = params.font;
+  if (!(fontBuf instanceof ArrayBuffer)) throw new Error(`[${node}] a font file (.ttf/.otf) is required`);
+  if (!text) throw new Error(`[${node}] empty text`);
+  const font = opentype.parse(fontBuf);
+  const path = font.getPath(text, 0, 0, size); // baseline y=0; parser flips y-up
+  const d = path.toPathData(3);
+  if (!d.trim()) throw new Error(`[${node}] font produced no outlines for this text`);
+  return svgPathToDrawing(d);
+}
+
 /** Sample a Drawing's outline(s) into flat closed polylines (lines kept exact,
  * curves discretised). Duck-typed to avoid importing the concrete curve classes. */
 function drawingPolylines(d: Drawing): Vec2[][] {
@@ -1321,18 +1335,27 @@ const REGISTRY: Record<string, NodeImpl> = {
    * `params.font` is a .ttf/.otf ArrayBuffer.
    */
   textToSvg: (_inputs, params) => {
-    const text = String(params.text ?? "");
-    const size = Number(params.size ?? 72);
-    const fontBuf = params.font;
-    if (!(fontBuf instanceof ArrayBuffer))
-      throw new Error("[textToSvg] a font file (.ttf/.otf) is required");
-    if (!text) throw new Error("[textToSvg] empty text");
-    const font = opentype.parse(fontBuf);
-    // baseline at y=0; opentype uses y-down, svgPathToDrawing flips to y-up.
-    const path = font.getPath(text, 0, 0, size);
-    const d = path.toPathData(3);
-    if (!d.trim()) throw new Error("[textToSvg] font produced no outlines for this text");
-    return { kind: "sketch2d", drawing: svgPathToDrawing(d) };
+    return { kind: "sketch2d", drawing: buildTextDrawing(params, "textToSvg", 72) };
+  },
+
+  /**
+   * Engrave or emboss text on a solid's face. The text is placed on a base
+   * plane at an offset (x/y position it), extruded by `depth`, then cut into
+   * (engrave) or fused onto (emboss) the body. `params.font` is a .ttf/.otf.
+   */
+  textOnFace: (inputs, params) => {
+    const solid = expectSolid(inputs.in, "textOnFace");
+    const depth = Math.max(0.1, Number(params.depth ?? 1));
+    const plane = String(params.plane ?? "XY") as "XY" | "XZ" | "YZ";
+    const off = Number(params.offset ?? 0);
+    const x = Number(params.x ?? 0), y = Number(params.y ?? 0);
+    const emboss = String(params.mode ?? "engrave") === "emboss";
+    const dr = buildTextDrawing(params, "textOnFace", 10).translate(x, y);
+    // engrave: stamp sits just below the surface (off-depth … off) then cut;
+    // emboss: stamp rises from the surface (off … off+depth) then fuse.
+    const base = emboss ? off : off - depth;
+    const stamp = dr.sketchOnPlane(plane, base).extrude(depth) as Shape3D;
+    return { kind: "solid", solid: (emboss ? solid.fuse(stamp) : solid.cut(stamp)) as Shape3D };
   },
 
   /** 2D offset (inflate / deflate a profile). OCCT BRepOffsetAPI under the hood. */
