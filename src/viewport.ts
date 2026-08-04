@@ -40,6 +40,7 @@ export class Viewport {
   // print-analysis overlay (overhang / wall-thickness) as vertex colours
   private analysis: { mode: "overhang" | "thickness"; angle: number; minWall: number } | null = null;
   private analysisMat: THREE.MeshStandardMaterial | null = null;
+  private tintMat: THREE.MeshStandardMaterial | null = null;
   // 3D translation gizmo (edits a Transform node's tx/ty/tz)
   private gizmo: TransformControls | null = null;
   private gizmoProxy: THREE.Object3D | null = null;
@@ -127,7 +128,10 @@ export class Viewport {
       geom.addGroup(g.start, g.count, this.matIndexFor(g.tag));
     }
 
-    const mesh = new THREE.Mesh(geom, this.materials);
+    // whole-body tint from a Color node overrides the per-tag materials
+    if (this.tintMat) { this.tintMat.dispose(); this.tintMat = null; }
+    if (payload.tint) this.tintMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(payload.tint), roughness: 0.55, metalness: 0.1 });
+    const mesh = new THREE.Mesh(geom, this.tintMat ?? this.materials);
     this.scene.add(mesh);
     this.mesh = mesh;
 
@@ -239,7 +243,7 @@ export class Viewport {
     const geom = this.mesh.geometry;
     if (!this.analysis) {
       geom.deleteAttribute("color");
-      this.mesh.material = this.materials; // restore per-tag materials + groups
+      this.mesh.material = this.tintMat ?? this.materials; // restore tint or per-tag materials
       return;
     }
     const colors = this.analysis.mode === "overhang" ? this.overhangColors(this.analysis.angle) : this.thicknessColors(this.analysis.minWall);
@@ -364,6 +368,7 @@ export class Viewport {
     const planes = this.clip;
     for (const m of this.materials) (m as THREE.Material).clippingPlanes = planes;
     if (this.analysisMat) this.analysisMat.clippingPlanes = planes.length ? planes : null;
+    if (this.tintMat) this.tintMat.clippingPlanes = planes.length ? planes : null;
     if (this.brepEdges) (this.brepEdges.material as THREE.Material).clippingPlanes = planes;
     if (this.extraGroup) this.extraGroup.traverse((o) => {
       if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) (o.material as THREE.Material).clippingPlanes = planes;

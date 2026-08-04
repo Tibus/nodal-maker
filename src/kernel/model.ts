@@ -223,7 +223,7 @@ export function evalToPayload(
     } catch {
       /* not every solid has a resolvable top cap — fine */
     }
-    return { mesh: meshAndTag(v.solid), topCapFaceId, topCapZ, outputKind: "solid", values, extras };
+    return { mesh: { ...meshAndTag(v.solid), tint: v.color }, topCapFaceId, topCapZ, outputKind: "solid", values, extras };
   }
   if (v.kind === "mesh") {
     return { mesh: meshToPayload(v.mesh), topCapFaceId: null, topCapZ: 0, outputKind: "mesh", values, extras };

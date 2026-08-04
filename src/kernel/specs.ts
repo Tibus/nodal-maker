@@ -130,6 +130,7 @@ export const NODE_DESCRIPTIONS: Record<string, string> = {
   autoOrient: "Rotate the part to the axis-aligned orientation with the least overhang + height (fewer supports, shorter print), resting on the plate.",
   supports: "Auto-generate a resin support forest: thin pillars from every overhang steeper than the angle down to the build plate.",
   collision: "Interference check: outputs the overlap region between two bodies (empty = no clash). Read its volume in Props.",
+  color: "Tint a solid for display (hex) to tell bodies apart in an assembly. Geometry passes through unchanged.",
   dogbone: "Relieve inside corners of a pocket so a round router bit can reach them (CNC): dogbone (diagonal) or T-bone (along a wall).",
   tabs: "Hold-in-sheet micro-joints: keep a laser part attached to the surrounding stock by tabs until you pop it out.",
   arrayPath: "Repeat a solid along a 2D path at even spacing, optionally rotating each copy to follow the path tangent.",
@@ -158,7 +159,7 @@ export const NODE_CATEGORIES: { name: string; types: string[] }[] = [
   { name: "2D Op", types: ["offset2d", "kerf", "fillet2d", "bevel2d", "boolean2d", "mirror2d", "transform2d", "arrayLinear2d", "arrayRadial2d", "nest", "dogbone", "tabs", "group", "scoreCut"] },
   { name: "3D Primitive", types: ["box", "cylinder", "sphere", "cone", "torus", "thread", "internalThread", "importSTEP"] },
   { name: "Sketch → Solid", types: ["extrude", "pocket", "hole", "revolve", "loft", "loftSections", "sweep", "bossOnCap", "textOnFace"] },
-  { name: "3D Op", types: ["transform", "rotate3d", "scale3d", "mirror3d", "fillet", "bevel", "shell", "hollow", "infill", "split", "autoOrient", "supports", "boolean3d", "collision", "assemble", "arrayLinear3d", "arrayRadial3d", "arrayPath"] },
+  { name: "3D Op", types: ["transform", "rotate3d", "scale3d", "mirror3d", "fillet", "bevel", "shell", "hollow", "infill", "split", "autoOrient", "supports", "boolean3d", "collision", "color", "assemble", "arrayLinear3d", "arrayRadial3d", "arrayPath"] },
   { name: "Selector", types: ["edgeSelect", "faceSelect"] },
   { name: "Mesh", types: ["tessellate", "meshToSolid", "importSTL", "repair", "boolean", "transformMesh", "convexHull", "minkowski", "decimate", "subdivide"] },
 ];
@@ -857,6 +858,13 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
       { name: "orient", kind: "select", label: "follow tangent", default: "yes", options: ["yes", "no"] },
       { name: "merge", kind: "select", label: "fuse", default: "no", options: ["yes", "no"] },
     ],
+  },
+  color: {
+    type: "color",
+    label: "Color",
+    inputs: [{ name: "in", type: "solid" }],
+    output: "solid",
+    params: [{ name: "color", kind: "text", label: "hex", default: "#e0834a" }],
   },
   collision: {
     type: "collision",

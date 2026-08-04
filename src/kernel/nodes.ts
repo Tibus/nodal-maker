@@ -65,7 +65,7 @@ export type GraphValue =
   // its normal) a Sketch was drawn on, so the 3D preview and Extrude/Revolve
   // place it there instead of always on XY z=0.
   | { kind: "sketch2d"; drawing: Drawing; plane?: "XY" | "XZ" | "YZ"; planeOffset?: number; frame?: SketchFrame }
-  | { kind: "solid"; solid: Shape3D }
+  | { kind: "solid"; solid: Shape3D; color?: string }
   | { kind: "mesh"; mesh: MeshData }
   | { kind: "number"; value: number }
   | { kind: "text"; value: string }
@@ -1173,6 +1173,11 @@ const REGISTRY: Record<string, NodeImpl> = {
     const out = op === "difference" ? a.cut(b) : op === "intersection" ? a.intersect(b) : a.fuse(b);
     return { kind: "solid", solid: out as Shape3D };
   },
+  /** Tint a solid for display (distinguish bodies in an assembly). Pass-through geometry. */
+  color: (inputs, params) => {
+    const solid = expectSolid(inputs.in, "color");
+    return { kind: "solid", solid, color: String(params.color ?? "#e0834a") };
+  },
   /**
    * Interference check between two bodies: outputs the OVERLAP region (via a
    * robust Manifold intersection). Empty = no collision; otherwise its volume
@@ -2082,6 +2087,8 @@ export interface MeshPayload {
   edges?: Float32Array;
   /** this payload is a 2D sketch preview → render as line-work on its plane */
   isSketch?: boolean;
+  /** optional whole-body tint (hex) set by a Color node — overrides tag shading */
+  tint?: string;
   stats: {
     faceCount: number;
     triangleCount: number;
