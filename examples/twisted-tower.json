@@ -46,5 +46,27 @@
         "stroke": "#c678dd"
       }
     }
+  ],
+  "exposed": [
+    {
+      "nodeId": "sq",
+      "param": "width",
+      "label": "Côté de la base"
+    },
+    {
+      "nodeId": "tower",
+      "param": "height",
+      "label": "Hauteur"
+    },
+    {
+      "nodeId": "tower",
+      "param": "taper",
+      "label": "Effilement (haut)"
+    },
+    {
+      "nodeId": "tower",
+      "param": "twist",
+      "label": "Torsion (°)"
+    }
   ]
 }

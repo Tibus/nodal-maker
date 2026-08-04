@@ -110,6 +110,9 @@ interface EditorCtx {
   toggleVisible: (nodeId: string) => void;
   /** open the 2D sketch editor overlay for a Sketch node */
   editSketch: (nodeId: string) => void;
+  /** is this node param surfaced to the Simple form? toggle it */
+  isExposed: (nodeId: string, param: string) => boolean;
+  toggleExpose: (nodeId: string, param: string) => void;
 }
 const Ctx = createContext<EditorCtx | null>(null);
 
@@ -266,11 +269,20 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
                   <em style={{ color: SOCKET_COLORS[pt!] }}>◀ linked</em>
                 </div>
               ) : (
-                <ParamField
-                  spec={ps}
-                  value={data.params[ps.name]}
-                  onChange={(v) => ctx.setParam(id, ps.name, v)}
-                />
+                <div className="pf__wrap">
+                  <ParamField
+                    spec={ps}
+                    value={data.params[ps.name]}
+                    onChange={(v) => ctx.setParam(id, ps.name, v)}
+                  />
+                  <button
+                    className={`pf__expose${ctx.isExposed(id, ps.name) ? " pf__expose--on" : ""}`}
+                    title={ctx.isExposed(id, ps.name) ? "Exposé au mode Simple — cliquer pour retirer" : "Exposer ce paramètre au mode Simple"}
+                    onClick={(e) => { e.stopPropagation(); ctx.toggleExpose(id, ps.name); }}
+                  >
+                    {ctx.isExposed(id, ps.name) ? "★" : "☆"}
+                  </button>
+                </div>
               )}
             </div>
           );
@@ -617,6 +629,9 @@ interface SceneDoc {
   title?: string;
   outputId: string;
   components?: Record<string, ComponentDef>;
+  /** author-defined global parameters + which node params to surface in Simple mode */
+  userParams?: UserParam[];
+  exposed?: ExposedParam[];
   nodes: {
     id: string;
     type?: string; // React Flow node type ("geo" | "note"); defaults to "geo"
@@ -643,8 +658,11 @@ const EXAMPLES = Object.entries(
 /* Graph persistence — survive a page reload (localStorage)                    */
 /* -------------------------------------------------------------------------- */
 const STORAGE_KEY = "nodal-maker-graph-v1";
+const MODE_KEY = "nodal-maker-mode-v1";
 interface UserParam { id: string; name: string; expr: string }
-interface SavedGraph { nodes: GeoNode[]; edges: Edge[]; outputId: string; userParams?: UserParam[] }
+/** A node param the author surfaced to the Simple (form) view. */
+interface ExposedParam { nodeId: string; param: string; label?: string }
+interface SavedGraph { nodes: GeoNode[]; edges: Edge[]; outputId: string; userParams?: UserParam[]; exposed?: ExposedParam[] }
 
 /** Resolve user parameters (in order, later ones may reference earlier) into a
  * flat name→number map for the evaluator. Bad expressions resolve to 0. */
@@ -668,14 +686,103 @@ function loadSavedGraph(): SavedGraph | null {
     return null;
   }
 }
-function persistGraph(nodes: GeoNode[], edges: Edge[], outputId: string, userParams: UserParam[]) {
+function persistGraph(nodes: GeoNode[], edges: Edge[], outputId: string, userParams: UserParam[], exposed: ExposedParam[]) {
   try {
     // drop transient interaction flags so saves stay stable/small
     const clean = nodes.map((n) => ({ ...n, selected: false, dragging: false }));
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ nodes: clean, edges, outputId, userParams }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ nodes: clean, edges, outputId, userParams, exposed }));
   } catch {
     /* quota / serialization issues — non-fatal, just skip persistence */
   }
+}
+
+/** Resolve the ParamSpec for a node param (built-in node or component). */
+function paramSpecOf(node: GeoNode, components: Record<string, ComponentDef>, name: string): ParamSpec | null {
+  if (node.data.component) {
+    const def = components[node.data.component];
+    const p = def?.params.find((x) => x.name === name);
+    return p ? ({ ...p.spec, name: p.name, label: p.label } as ParamSpec) : null;
+  }
+  return NODE_SPECS[node.data.nodeType]?.params.find((p) => p.name === name) ?? null;
+}
+function nodeDisplayLabel(node: GeoNode, components: Record<string, ComponentDef>): string {
+  if (node.data.component) return components[node.data.component]?.name ?? "Component";
+  return NODE_SPECS[node.data.nodeType]?.label ?? node.data.nodeType;
+}
+
+/**
+ * The Simple (form) view: pick a model and tweak only the parameters the author
+ * surfaced — global parameters + starred node params — with the live model on
+ * the right. No nodes, no wiring. Expert mode reveals the full graph.
+ */
+function SimpleView({
+  nodes, components, exposed, userParams, userVars, setParam, setUserParams, setExposed, applyDoc,
+}: {
+  nodes: GeoNode[];
+  components: Record<string, ComponentDef>;
+  exposed: ExposedParam[];
+  userParams: UserParam[];
+  userVars: Record<string, number>;
+  setParam: (id: string, name: string, value: unknown) => void;
+  setUserParams: React.Dispatch<React.SetStateAction<UserParam[]>>;
+  setExposed: React.Dispatch<React.SetStateAction<ExposedParam[]>>;
+  applyDoc: (doc: SceneDoc) => void;
+}) {
+  const empty = userParams.length === 0 && exposed.length === 0;
+  return (
+    <div className="simple">
+      <div className="simple__card">
+        <div className="simple__hd">⚙︎ Configurateur</div>
+        <label className="simple__pick">
+          <span>Modèle</span>
+          <select
+            defaultValue=""
+            onChange={(e) => { const ex = EXAMPLES.find((x) => x.name === e.target.value); if (ex) applyDoc(ex.doc); }}
+          >
+            <option value="" disabled>📚 choisir un exemple…</option>
+            {EXAMPLES.map((ex) => (<option key={ex.name} value={ex.name}>{ex.title}</option>))}
+          </select>
+        </label>
+
+        {empty ? (
+          <div className="simple__empty">
+            Ce modèle n'expose aucun paramètre.<br />
+            Passe en <b>Expert</b> et clique l'étoile <span className="simple__star">☆</span> à côté d'un paramètre pour l'ajouter ici,
+            ou ajoute des paramètres globaux (ƒ).
+          </div>
+        ) : (
+          <div className="simple__params">
+            {userParams.map((up) => (
+              <label className="pf" key={up.id}>
+                <span>{up.name}</span>
+                <input
+                  type="text" spellCheck={false} value={up.expr}
+                  className={up.name in userVars ? undefined : "pf__expr"}
+                  onChange={(e) => setUserParams((p) => p.map((x) => (x.id === up.id ? { ...x, expr: e.target.value } : x)))}
+                />
+              </label>
+            ))}
+            {exposed.map((ex) => {
+              const node = nodes.find((n) => n.id === ex.nodeId);
+              if (!node) return null;
+              const spec = paramSpecOf(node, components, ex.param);
+              if (!spec) return null;
+              const label = ex.label ?? `${nodeDisplayLabel(node, components)} · ${spec.label ?? spec.name}`;
+              return (
+                <div className="simple__row" key={`${ex.nodeId}.${ex.param}`}>
+                  <ParamField spec={{ ...spec, label }} value={node.data.params[ex.param]} onChange={(v) => setParam(ex.nodeId, ex.param, v)} />
+                  <button
+                    className="simple__rm" title="Retirer du formulaire"
+                    onClick={() => setExposed((prev) => prev.filter((e) => !(e.nodeId === ex.nodeId && e.param === ex.param)))}
+                  >×</button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function NodeEditor({
@@ -705,14 +812,26 @@ export default function NodeEditor({
   const [outputId, setOutputId] = useState(saved?.outputId ?? initialOutputId);
   const [userParams, setUserParams] = useState<UserParam[]>(saved?.userParams ?? []);
   const userVars = useMemo(() => resolveUserParams(userParams), [userParams]);
+  // author-exposed node params (drive the Simple form) + Simple/Expert view mode
+  const [exposed, setExposed] = useState<ExposedParam[]>(saved?.exposed ?? []);
+  const [mode, setMode] = useState<"simple" | "expert">(() => {
+    try { return localStorage.getItem(MODE_KEY) === "simple" ? "simple" : "expert"; } catch { return "expert"; }
+  });
+  useEffect(() => { try { localStorage.setItem(MODE_KEY, mode); } catch { /* ignore */ } }, [mode]);
+  const isExposed = useCallback((nodeId: string, param: string) => exposed.some((e) => e.nodeId === nodeId && e.param === param), [exposed]);
+  const toggleExpose = useCallback((nodeId: string, param: string) => {
+    setExposed((prev) => prev.some((e) => e.nodeId === nodeId && e.param === param)
+      ? prev.filter((e) => !(e.nodeId === nodeId && e.param === param))
+      : [...prev, { nodeId, param }]);
+  }, []);
 
   // persist the graph on change (debounced) so a reload keeps the work
   const saveTimer = useRef<number | undefined>(undefined);
   useEffect(() => {
     window.clearTimeout(saveTimer.current);
-    saveTimer.current = window.setTimeout(() => persistGraph(nodes, edges, outputId, userParams), 400);
+    saveTimer.current = window.setTimeout(() => persistGraph(nodes, edges, outputId, userParams, exposed), 400);
     return () => window.clearTimeout(saveTimer.current);
-  }, [nodes, edges, outputId, userParams]);
+  }, [nodes, edges, outputId, userParams, exposed]);
 
   // Visibility is opt-OUT: every body is shown by default. Independent bodies
   // (not in the viewed node's own build chain) render translucent alongside the
@@ -1333,6 +1452,9 @@ export default function NodeEditor({
       setNodes(loadedNodes);
       setEdges(doc.edges as Edge[]);
       setOutputId(doc.outputId);
+      // adopt the example's exposed form (falls back to empty)
+      setUserParams(doc.userParams ?? []);
+      setExposed(doc.exposed ?? []);
     },
     [setNodes, setEdges],
   );
@@ -1442,8 +1564,10 @@ export default function NodeEditor({
       isVisible: (nodeId) => !hidden.has(nodeId),
       toggleVisible,
       editSketch,
+      isExposed,
+      toggleExpose,
     }),
-    [outputId, setOutput, setParam, linkedSet, sourceLinkedSet, errorNodeId, errorMessage, values, components, selOutputsMap, hidden, toggleVisible, editSketch],
+    [outputId, setOutput, setParam, linkedSet, sourceLinkedSet, errorNodeId, errorMessage, values, components, selOutputsMap, hidden, toggleVisible, editSketch, isExposed, toggleExpose],
   );
 
   const outType = NODE_SPECS[nodes.find((n) => n.id === outputId)?.data.nodeType ?? ""]?.output;
@@ -1736,6 +1860,28 @@ export default function NodeEditor({
             })}
         </div>
       </div>
+
+      {/* Simple / Expert view switch — a floating pill, always visible */}
+      <div className="modetabs">
+        <button className={mode === "simple" ? "on" : ""} onClick={() => setMode("simple")} title="Formulaire de paramètres (sans nœuds)">◧ Simple</button>
+        <button className={mode === "expert" ? "on" : ""} onClick={() => setMode("expert")} title="Éditeur de nœuds complet">⚙ Expert</button>
+      </div>
+
+      {/* Simple mode overlays the node editor with a clean parameter form; the
+          node graph keeps running underneath so the 3D view stays live. */}
+      {mode === "simple" && (
+        <SimpleView
+          nodes={nodes}
+          components={components}
+          exposed={exposed}
+          userParams={userParams}
+          userVars={userVars}
+          setParam={setParam}
+          setUserParams={setUserParams}
+          setExposed={setExposed}
+          applyDoc={applyDoc}
+        />
+      )}
 
       {/* full-screen 2D constraint sketch editor */}
       {editingSketchId && (() => {

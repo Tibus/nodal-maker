@@ -43,5 +43,27 @@
         "stroke": "#ff8c42"
       }
     }
+  ],
+  "exposed": [
+    {
+      "nodeId": "b",
+      "param": "x",
+      "label": "Largeur"
+    },
+    {
+      "nodeId": "b",
+      "param": "y",
+      "label": "Profondeur"
+    },
+    {
+      "nodeId": "b",
+      "param": "z",
+      "label": "Hauteur"
+    },
+    {
+      "nodeId": "r",
+      "param": "radius",
+      "label": "Rayon des coins"
+    }
   ]
 }

@@ -114,5 +114,22 @@
         "stroke": "#ff8c42"
       }
     }
+  ],
+  "exposed": [
+    {
+      "nodeId": "hex",
+      "param": "radius",
+      "label": "Rayon hex"
+    },
+    {
+      "nodeId": "prism",
+      "param": "height",
+      "label": "Hauteur"
+    },
+    {
+      "nodeId": "bore",
+      "param": "radius",
+      "label": "Rayon perçage"
+    }
   ]
 }
