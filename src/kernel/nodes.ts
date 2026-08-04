@@ -37,6 +37,7 @@ import {
 } from "replicad";
 import * as opentype from "opentype.js";
 import { svgPathToDrawing } from "./svgPath";
+import { importDXF } from "./dxfImport";
 import {
   booleanMesh,
   repairMesh,
@@ -1306,6 +1307,13 @@ const REGISTRY: Record<string, NodeImpl> = {
     return { kind: "sketch2d", drawing: svgPathToDrawing(d) };
   },
 
+  /** Import a DXF file (LINE/ARC/CIRCLE/LWPOLYLINE) as a 2D profile. */
+  importDXF: (_inputs, params) => {
+    const src = params.dxf;
+    if (typeof src !== "string" || !src.trim()) throw new Error("[importDXF] choose a .dxf file");
+    return { kind: "sketch2d", drawing: importDXF(src) };
+  },
+
   /**
    * Text → SVG → 2D profile. Converts a string to glyph outlines via
    * opentype.js, emits an SVG path `d`, then reuses the SVG parser (whose
@@ -1600,6 +1608,32 @@ const REGISTRY: Record<string, NodeImpl> = {
     const parts = only ? pillars : [solid, ...pillars];
     if (!parts.length) return { kind: "solid", solid };
     return { kind: "solid", solid: makeCompound(parts) as unknown as Shape3D };
+  },
+  /**
+   * Fill a solid with a lightweight internal grid lattice + a closed outer
+   * shell (resin/FDM strength without the weight). Walls run in X and Y on a
+   * `cell` pitch, clipped to the shape; combined with a `wall`-thick shell.
+   */
+  infill: (inputs, params) => {
+    const solid = expectSolid(inputs.in, "infill");
+    const wall = Math.max(0.3, Number(params.wall ?? 1.5));
+    const cell = Math.max(2, Number(params.cell ?? 10));
+    const [lo, hi] = solid.boundingBox.bounds;
+    const sx = hi[0] - lo[0], sy = hi[1] - lo[1], sz = hi[2] - lo[2];
+    const cxm = (lo[0] + hi[0]) / 2, cym = (lo[1] + hi[1]) / 2, z0 = lo[2];
+    const walls: Shape3D[] = [];
+    const CAP = 60; // guard against a runaway wall count
+    for (let x = lo[0] + cell; x < hi[0] && walls.length < CAP; x += cell)
+      walls.push((makeBaseBox(wall, sy, sz) as Shape3D).translate([x, cym, z0]) as Shape3D);
+    for (let y = lo[1] + cell; y < hi[1] && walls.length < CAP; y += cell)
+      walls.push((makeBaseBox(sx, wall, sz) as Shape3D).translate([cxm, y, z0]) as Shape3D);
+    // closed thin shell (walls only, no opening)
+    const shell = solid.clone().shell(-wall, (f) => f.inPlane("XY", 1e9)) as Shape3D;
+    if (!walls.length) return { kind: "solid", solid: shell };
+    let lattice = walls[0];
+    for (let i = 1; i < walls.length; i++) lattice = lattice.fuse(walls[i]) as Shape3D;
+    const inner = solid.clone().intersect(lattice) as Shape3D; // clip lattice to the shape
+    return { kind: "solid", solid: shell.fuse(inner) as Shape3D };
   },
   /**
    * Split a solid by an axis-aligned plane (for parts too big for the build

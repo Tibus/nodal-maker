@@ -376,10 +376,11 @@ function ParamField({
   if (spec.kind === "font") {
     return <FontField label={label} value={value} onChange={onChange} />;
   }
-  if (spec.kind === "stl" || spec.kind === "step") {
-    const loaded = value instanceof ArrayBuffer;
-    const accept = spec.kind === "stl" ? ".stl,model/stl" : ".step,.stp,application/step,model/step";
-    const hint = spec.kind === "stl" ? "choose .stl" : "choose .step";
+  if (spec.kind === "stl" || spec.kind === "step" || spec.kind === "dxf") {
+    const isDxf = spec.kind === "dxf";
+    const loaded = isDxf ? typeof value === "string" && value.length > 0 : value instanceof ArrayBuffer;
+    const accept = spec.kind === "stl" ? ".stl,model/stl" : isDxf ? ".dxf,image/vnd.dxf" : ".step,.stp,application/step,model/step";
+    const hint = spec.kind === "stl" ? "choose .stl" : isDxf ? "choose .dxf" : "choose .step";
     return (
       <label className="pf pf--file">
         <span>{label}</span>
@@ -391,7 +392,7 @@ function ParamField({
             hidden
             onChange={async (e) => {
               const f = e.target.files?.[0];
-              if (f) onChange(await f.arrayBuffer());
+              if (f) onChange(isDxf ? await f.text() : await f.arrayBuffer());
             }}
           />
         </span>

@@ -16,7 +16,7 @@ export interface PortSpec {
 
 export interface ParamSpec {
   name: string;
-  kind: "number" | "text" | "select" | "stl" | "step" | "font" | "sketch";
+  kind: "number" | "text" | "select" | "stl" | "step" | "dxf" | "font" | "sketch";
   label?: string;
   default?: unknown;
   min?: number;
@@ -87,6 +87,7 @@ export const NODE_DESCRIPTIONS: Record<string, string> = {
   gear: "A spur-gear silhouette (trapezoidal teeth) — for laser or as an extrude profile.",
   fingerBox: "Flat pattern for a press-fit finger-joint box (5 or 6 panels) — laser cutting.",
   svgInput: "Import a 2D profile from an SVG path 'd' string.",
+  importDXF: "Import a DXF file (LINE/ARC/CIRCLE/LWPOLYLINE) as a 2D profile — free segments are chained into closed loops.",
   textToSvg: "Convert text to a 2D profile using a chosen font.",
   offset2d: "Grow (or shrink, if negative) a profile outline by a distance.",
   kerf: "Laser kerf compensation — grow an outline or shrink a hole by half the beam width.",
@@ -123,6 +124,7 @@ export const NODE_DESCRIPTIONS: Record<string, string> = {
   bevel: "Chamfer edges of a solid. Feed a selection to target specific edges.",
   shell: "Hollow a solid, opening the selected face(s).",
   hollow: "Resin hollowing: closed thin-walled shell + vertical drain holes through the bottom so uncured resin escapes (no sealed cavity).",
+  infill: "Fill a solid with an internal grid lattice + closed shell — strength without the weight (resin/FDM).",
   split: "Cut a solid by an axis-aligned plane (for parts bigger than the build plate). Keep one side or both halves (pushed apart by a gap).",
   supports: "Auto-generate a resin support forest: thin pillars from every overhang steeper than the angle down to the build plate.",
   collision: "Interference check: outputs the overlap region between two bodies (empty = no clash). Read its volume in Props.",
@@ -149,11 +151,11 @@ export const NODE_DESCRIPTIONS: Record<string, string> = {
 /** Ordered palette categories (drives the grouped palette + search). */
 export const NODE_CATEGORIES: { name: string; types: string[] }[] = [
   { name: "Value", types: ["numberValue", "textValue", "math", "mathUnary", "clamp", "remap", "random"] },
-  { name: "2D Primitive", types: ["sketch", "rect", "circle", "ellipse", "polygon", "star", "slot", "gear", "fingerBox", "livingHinge", "svgInput", "textToSvg"] },
+  { name: "2D Primitive", types: ["sketch", "rect", "circle", "ellipse", "polygon", "star", "slot", "gear", "fingerBox", "livingHinge", "svgInput", "importDXF", "textToSvg"] },
   { name: "2D Op", types: ["offset2d", "kerf", "fillet2d", "bevel2d", "boolean2d", "mirror2d", "transform2d", "arrayLinear2d", "arrayRadial2d", "nest", "dogbone", "group", "scoreCut"] },
   { name: "3D Primitive", types: ["box", "cylinder", "sphere", "cone", "torus", "thread", "internalThread", "importSTEP"] },
   { name: "Sketch → Solid", types: ["extrude", "pocket", "hole", "revolve", "loft", "loftSections", "sweep", "bossOnCap"] },
-  { name: "3D Op", types: ["transform", "rotate3d", "scale3d", "mirror3d", "fillet", "bevel", "shell", "hollow", "split", "supports", "boolean3d", "collision", "assemble", "arrayLinear3d", "arrayRadial3d", "arrayPath"] },
+  { name: "3D Op", types: ["transform", "rotate3d", "scale3d", "mirror3d", "fillet", "bevel", "shell", "hollow", "infill", "split", "supports", "boolean3d", "collision", "assemble", "arrayLinear3d", "arrayRadial3d", "arrayPath"] },
   { name: "Selector", types: ["edgeSelect", "faceSelect"] },
   { name: "Mesh", types: ["tessellate", "meshToSolid", "importSTL", "repair", "boolean", "transformMesh", "convexHull", "minkowski", "decimate", "subdivide"] },
 ];
@@ -235,6 +237,13 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     inputs: [],
     output: "sketch2d",
     params: [{ name: "d", kind: "text", label: "path d", default: "" }],
+  },
+  importDXF: {
+    type: "importDXF",
+    label: "Import DXF",
+    inputs: [],
+    output: "sketch2d",
+    params: [{ name: "dxf", kind: "dxf", label: "file" }],
   },
   sketch: {
     type: "sketch",
@@ -849,6 +858,16 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
       { name: "offset", kind: "number", label: "plane at", default: 0, min: -300, max: 300, step: 1 },
       { name: "keep", kind: "select", default: "positive", options: ["positive", "negative", "both"] },
       { name: "gap", kind: "number", label: "gap (both)", default: 0, min: 0, max: 200, step: 1 },
+    ],
+  },
+  infill: {
+    type: "infill",
+    label: "Infill lattice",
+    inputs: [{ name: "in", type: "solid" }],
+    output: "solid",
+    params: [
+      { name: "wall", kind: "number", label: "wall/shell", default: 1.5, min: 0.3, max: 10, step: 0.1 },
+      { name: "cell", kind: "number", label: "cell size", default: 10, min: 2, max: 80, step: 1 },
     ],
   },
   hollow: {
