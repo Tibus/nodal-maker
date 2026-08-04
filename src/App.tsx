@@ -383,7 +383,8 @@ export default function App() {
               setRecording(true);
               setStatus("enregistrement du turntable… (5 s)");
               try {
-                const blob = await viewportRef.current!.recordTurntable(5, 30);
+                const blob = await viewportRef.current!.recordTurntable(5);
+                if (!blob.size) { setStatus("turntable : le navigateur n'a pas encodé de vidéo (MediaRecorder indisponible ici)"); return; }
                 download(blob, "turntable.webm", "video/webm");
                 setStatus(`turntable exporté (${(blob.size / 1024).toFixed(0)} Ko)`);
               } catch {

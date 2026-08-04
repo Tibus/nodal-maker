@@ -910,7 +910,7 @@ export class Viewport {
     this.renderer.setSize(container.clientWidth, container.clientHeight);
   }
 
-  private turntable: { start: THREE.Vector3; target: THREE.Vector3; up: THREE.Vector3; t0: number; dur: number; onEnd: () => void } | null = null;
+  private turntable: { start: THREE.Vector3; target: THREE.Vector3; up: THREE.Vector3; t0: number; dur: number; track: CanvasCaptureMediaStreamTrack; onEnd: () => void } | null = null;
 
   private animate = () => {
     requestAnimationFrame(this.animate);
@@ -921,10 +921,12 @@ export class Viewport {
       const off = tt.start.clone().sub(tt.target).applyAxisAngle(tt.up, ang);
       this.camera.position.copy(tt.target).add(off);
       this.camera.lookAt(tt.target);
+      this.renderer.render(this.scene, this.camera);
+      tt.track.requestFrame(); // push this freshly-drawn frame into the recording
       if (t >= tt.dur) { const end = tt.onEnd; this.turntable = null; end(); }
-    } else {
-      this.controls.update();
+      return;
     }
+    this.controls.update();
     this.renderer.render(this.scene, this.camera);
   };
 
@@ -933,9 +935,12 @@ export class Viewport {
    * full turn around the orbit target over `durationSec`, capturing the canvas
    * via MediaRecorder. Resolves with the video Blob.
    */
-  recordTurntable(durationSec = 5, fps = 30): Promise<Blob> {
+  recordTurntable(durationSec = 5): Promise<Blob> {
     const canvas = this.renderer.domElement;
-    const stream = canvas.captureStream(fps);
+    // capture with no auto-fps → we push each freshly-rendered frame via
+    // track.requestFrame() in animate (reliable for a rAF-driven WebGL canvas).
+    const stream = canvas.captureStream(0);
+    const track = stream.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack;
     const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
     const rec = new MediaRecorder(stream, { mimeType: mime });
     const chunks: Blob[] = [];
@@ -943,13 +948,14 @@ export class Viewport {
     return new Promise((resolve, reject) => {
       rec.onstop = () => resolve(new Blob(chunks, { type: mime }));
       rec.onerror = () => reject(new Error("recording failed"));
-      rec.start();
+      rec.start(100); // timeslice → flush chunks during capture
       this.turntable = {
         start: this.camera.position.clone(),
         target: this.controls.target.clone(),
         up: this.camera.up.clone().normalize(),
         t0: performance.now(),
         dur: durationSec,
+        track,
         onEnd: () => rec.stop(),
       };
     });
