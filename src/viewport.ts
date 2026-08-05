@@ -8,11 +8,9 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
 import type { MeshPayload, FaceTag } from "./kernel/nodes";
 
-const TAG_COLORS: Record<FaceTag, number> = {
-  top: 0xff8c42, // orange  — the cap we re-select
-  side: 0x4a90d9, // blue    — contour faces
-  bottom: 0x8a8f98, // gray  — base
-};
+// Fusion-style: one neutral gray for every face (orientation is read from the
+// shading, not the colour). Face tags still drive picking, just not the tint.
+const BODY_GRAY = 0xb4b8bf;
 
 export class Viewport {
   private renderer: THREE.WebGLRenderer;
@@ -89,12 +87,10 @@ export class Viewport {
     fill.position.set(-100, 40, -80);
     this.scene.add(fill);
 
-    // materials indexed to match the geometry groups we build below
-    this.materials = [
-      new THREE.MeshStandardMaterial({ color: TAG_COLORS.top, roughness: 0.55, metalness: 0.1 }),
-      new THREE.MeshStandardMaterial({ color: TAG_COLORS.side, roughness: 0.6, metalness: 0.1 }),
-      new THREE.MeshStandardMaterial({ color: TAG_COLORS.bottom, roughness: 0.7, metalness: 0.1 }),
-    ];
+    // materials indexed to match the geometry groups we build below — all the
+    // same neutral gray (Fusion look); the tag grouping still serves picking.
+    const bodyMat = () => new THREE.MeshStandardMaterial({ color: BODY_GRAY, roughness: 0.5, metalness: 0.12 });
+    this.materials = [bodyMat(), bodyMat(), bodyMat()];
 
     window.addEventListener("resize", () => this.onResize(container));
     this.animate();
