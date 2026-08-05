@@ -1700,6 +1700,17 @@ export default function NodeEditor({
           </div>
         </div>
 
+        {/* colour legend: each node's dot is its OUTPUT type — match it to an
+            input port of the same colour to know what can feed it. */}
+        <div className="palette__legend" title="La pastille d'un nœud = son type de sortie. Branche-la sur une entrée de même couleur.">
+          {(Object.keys(SOCKET_COLORS) as (keyof typeof SOCKET_COLORS)[]).map((t) => (
+            <span key={t} className="palette__leg">
+              <span className="palette__sw" style={{ background: SOCKET_COLORS[t] }} />
+              {SOCKET_LABELS[t].name}
+            </span>
+          ))}
+        </div>
+
         <div className="palette__list">
           {search.trim() ? (
             searchHits.map((s) => (
@@ -1710,6 +1721,7 @@ export default function NodeEditor({
                 onMouseEnter={(e) => setTip({ type: s.type, y: e.currentTarget.getBoundingClientRect().top })}
                 onMouseLeave={() => setTip(null)}
               >
+                <span className="palette__sw" style={{ background: SOCKET_COLORS[s.output] }} title={`sortie : ${SOCKET_LABELS[s.output].name}`} />
                 {s.label}
               </button>
             ))
@@ -1739,6 +1751,7 @@ export default function NodeEditor({
                         onMouseEnter={(e) => setTip({ type: t, y: e.currentTarget.getBoundingClientRect().top })}
                         onMouseLeave={() => setTip(null)}
                       >
+                        <span className="palette__sw" style={{ background: SOCKET_COLORS[NODE_SPECS[t].output] }} title={`sortie : ${SOCKET_LABELS[NODE_SPECS[t].output].name}`} />
                         {NODE_SPECS[t].label}
                       </button>
                     ))}
