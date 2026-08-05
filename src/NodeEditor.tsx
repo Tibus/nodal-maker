@@ -33,7 +33,6 @@ import {
   NODE_CATEGORIES,
   NODE_DESCRIPTIONS,
   NODE_THUMBS,
-  EXAMPLE_THUMBS,
   SOCKET_COLORS,
   SOCKET_LABELS,
   paramPortType,
@@ -743,7 +742,7 @@ function SimpleView({
               title={ex.title}
               onClick={() => applyDoc(ex.doc)}
             >
-              <span className="simple__thumb" dangerouslySetInnerHTML={{ __html: EXAMPLE_THUMBS[ex.name] ?? "" }} />
+              <img className="simple__thumb" src={`${import.meta.env.BASE_URL}thumbs/${ex.name}.png`} alt="" loading="lazy" />
               <span className="simple__tilename">{ex.title.split(" — ")[0].split(" (")[0]}</span>
             </button>
           ))}

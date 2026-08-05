@@ -27,6 +27,7 @@
     "three": "^0.160.0"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@types/node": "^22.9.0",
     "@types/opentype.js": "^1.3.10",
     "@types/react": "^18.3.12",
