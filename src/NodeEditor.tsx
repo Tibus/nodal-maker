@@ -815,7 +815,8 @@ export default function NodeEditor({
   // author-exposed node params (drive the Simple form) + Simple/Expert view mode
   const [exposed, setExposed] = useState<ExposedParam[]>(saved?.exposed ?? []);
   const [mode, setMode] = useState<"simple" | "expert">(() => {
-    try { return localStorage.getItem(MODE_KEY) === "simple" ? "simple" : "expert"; } catch { return "expert"; }
+    // Simple (form) is the default; only an explicit stored choice opts into Expert
+    try { return localStorage.getItem(MODE_KEY) === "expert" ? "expert" : "simple"; } catch { return "simple"; }
   });
   useEffect(() => { try { localStorage.setItem(MODE_KEY, mode); } catch { /* ignore */ } }, [mode]);
   const isExposed = useCallback((nodeId: string, param: string) => exposed.some((e) => e.nodeId === nodeId && e.param === param), [exposed]);
