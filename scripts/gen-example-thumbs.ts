@@ -8,23 +8,26 @@
  */
 import { createRequire } from "module";
 import { dirname } from "path";
-import { writeFileSync, readdirSync, readFileSync, mkdirSync } from "fs";
+import { writeFileSync, readdirSync, readFileSync, mkdirSync, existsSync } from "fs";
 import { setOC } from "replicad";
 import { Resvg } from "@resvg/resvg-js";
 import { evalGraph, type Graph, type GraphValue } from "../src/kernel/nodes";
 import { setManifold } from "../src/kernel/manifold";
 
-const require = createRequire(import.meta.url);
-const wasmPath = require.resolve("replicad-opencascadejs/src/replicad_single.wasm");
-const srcDir = dirname(wasmPath);
-(globalThis as Record<string, unknown>).require = require;
-(globalThis as Record<string, unknown>).__dirname = srcDir;
-(globalThis as Record<string, unknown>).__filename = `${srcDir}/replicad_single.js`;
-const { default: factory } = await import("replicad-opencascadejs/src/replicad_single.js");
-setOC((await factory({ locateFile: () => wasmPath })) as Parameters<typeof setOC>[0]);
-const mfWasm = require.resolve("manifold-3d/manifold.wasm");
-const { default: MFModule } = await import("manifold-3d");
-setManifold(await MFModule({ locateFile: () => mfWasm }));
+/** Boot the OCCT + Manifold WASM kernels (only when we actually have work). */
+async function initKernels(): Promise<void> {
+  const require = createRequire(import.meta.url);
+  const wasmPath = require.resolve("replicad-opencascadejs/src/replicad_single.wasm");
+  const srcDir = dirname(wasmPath);
+  (globalThis as Record<string, unknown>).require = require;
+  (globalThis as Record<string, unknown>).__dirname = srcDir;
+  (globalThis as Record<string, unknown>).__filename = `${srcDir}/replicad_single.js`;
+  const { default: factory } = await import("replicad-opencascadejs/src/replicad_single.js");
+  setOC((await factory({ locateFile: () => wasmPath })) as Parameters<typeof setOC>[0]);
+  const mfWasm = require.resolve("manifold-3d/manifold.wasm");
+  const { default: MFModule } = await import("manifold-3d");
+  setManifold(await MFModule({ locateFile: () => mfWasm }));
+}
 
 type V3 = [number, number, number];
 const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -111,8 +114,19 @@ function toPNG(svg: string): Buffer {
 const dir = "examples";
 const outDir = "public/thumbs";
 mkdirSync(outDir, { recursive: true });
+// By default only fill in MISSING thumbnails (fast, idempotent — this is what
+// the deploy CI runs). Pass --force to regenerate every PNG from scratch.
+const force = process.argv.includes("--force");
+const all = readdirSync(dir).filter((x) => x.endsWith(".json")).sort();
+const todo = all.filter((f) => force || !existsSync(`${outDir}/${f.replace(/\.json$/, "")}.png`));
+const skip = all.length - todo.length;
+if (todo.length === 0) {
+  process.stdout.write(`all ${all.length} thumbnails already present — nothing to do\n`);
+  process.exit(0);
+}
+await initKernels(); // only boot the heavy WASM kernels when there's work
 let ok = 0, fail = 0, bytes = 0;
-for (const f of readdirSync(dir).filter((x) => x.endsWith(".json")).sort()) {
+for (const f of todo) {
   const name = f.replace(/\.json$/, "");
   try {
     const doc = JSON.parse(readFileSync(`${dir}/${f}`, "utf8")) as SceneDoc;
@@ -128,4 +142,4 @@ for (const f of readdirSync(dir).filter((x) => x.endsWith(".json")).sort()) {
     fail++; process.stdout.write(`  ✗ ${name}: ${e instanceof Error ? e.message : e}\n`);
   }
 }
-process.stdout.write(`\nwrote ${ok} PNGs to ${outDir}/ (${(bytes / 1024).toFixed(0)} KB total, ${fail} skipped)\n`);
+process.stdout.write(`\ngenerated ${ok} PNG(s) into ${outDir}/ (${(bytes / 1024).toFixed(0)} KB) · ${skip} already present · ${fail} failed\n`);

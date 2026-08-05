@@ -24,6 +24,9 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      # generate any thumbnails not committed to public/thumbs (missing-only,
+      # so a new example gets a preview on deploy without a local pre-render)
+      - run: npm run thumbs:examples
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
         with:
