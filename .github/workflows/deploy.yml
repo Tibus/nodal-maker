@@ -24,6 +24,8 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      # gate the deploy on the test suite (kernel eval, expr, mass props, …)
+      - run: npm test
       # cache the Playwright browser so the thumbnail shooter doesn't re-download
       - name: Cache Playwright browser
         uses: actions/cache@v4

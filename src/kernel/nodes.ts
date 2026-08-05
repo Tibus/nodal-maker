@@ -1916,6 +1916,29 @@ const REGISTRY: Record<string, NodeImpl> = {
 /* Graph evaluation (topological)                                      */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Rewrite a raw node failure into a clear, actionable message. Our own node
+ * errors already read "[node] …" and pass through untouched; cryptic OCCT /
+ * replicad kernel aborts get mapped to a plain-language hint prefixed by the
+ * node type. Exported so the test suite can lock the mapping in.
+ */
+export function humanizeError(nodeType: string, raw: string): string {
+  if (raw.trimStart().startsWith("[")) return raw; // already a friendly node message
+  const n = nodeType.toLowerCase();
+  const r = raw.toLowerCase();
+  let hint: string;
+  // the failing node's own type is the strongest signal — a generic OCCT abort
+  // on a fillet almost always means the radius is too big, etc.
+  if (/fillet|bevel|chamfer/.test(n) || /fillet|chamfer|chfi|blend/.test(r)) hint = "fillet/chamfer radius is too large for this edge — reduce it";
+  else if (/shell|hollow|infill|thicken/.test(n) || /offset|\bshell\b|thick/.test(r)) hint = "wall thickness is invalid (too large, or the walls self-intersect)";
+  else if (/bool|collision/.test(n) || /fuse|\bcut\b|common|intersect|boolean/.test(r)) hint = "boolean failed — the shapes may be disjoint, coplanar or non-manifold";
+  else if (/loft|sweep|revolve|extrude/.test(n) || /loft|sweep|revolve|extrude/.test(r)) hint = "could not build the solid — check the profile is a single closed loop";
+  else if (/null|empty|no geometry|no result|nothing to/.test(r)) hint = "produced no geometry — check the inputs are connected";
+  else if (/notdone|not done|stdfail|standard_|brep_api|abort|failed/.test(r)) hint = "the kernel could not complete this operation on the given geometry";
+  else hint = raw; // unknown — surface the raw message rather than hide it
+  return `[${nodeType}] ${hint}`;
+}
+
 export function evalGraph(graph: Graph, vars: Record<string, number> = {}): { outputs: Record<string, GraphValue>; order: string[] } {
   const byId = new Map(graph.map((n) => [n.id, n]));
   const cache = new Map<string, GraphValue>();
@@ -2061,8 +2084,10 @@ export function evalGraphCached(
       try {
         value = impl(inputs, params);
       } catch (e) {
-        // tag the failing node so the editor can highlight it
-        throw Object.assign(e instanceof Error ? e : new Error(String(e)), { nodeId: id });
+        // rewrite cryptic OCCT/replicad failures into a clear, actionable message
+        // and tag the failing node so the editor can highlight it
+        const raw = e instanceof Error ? e.message : String(e);
+        throw Object.assign(new Error(humanizeError(node.type, raw)), { nodeId: id, raw });
       }
       cache.entries.set(key, { value, run: cache.run });
       misses++;

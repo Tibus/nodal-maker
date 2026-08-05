@@ -1,0 +1,75 @@
+import { describe, it, expect, beforeAll } from "vitest";
+import { initKernel } from "./kernel";
+import { evalToPayload } from "../src/kernel/model";
+import { meshMassProps } from "../src/massprops";
+import type { Graph } from "../src/kernel/nodes";
+
+const volumeOf = (g: Graph, out: string) => {
+  const r = evalToPayload(g, out);
+  return meshMassProps(r.mesh.vertices, r.mesh.indices).volume;
+};
+
+describe("graph evaluation (real geometry)", () => {
+  beforeAll(async () => { await initKernel(); });
+
+  it("a box has the expected volume", () => {
+    const g: Graph = [{ id: "b", type: "box", params: { x: 30, y: 20, z: 10 }, inputs: {} }];
+    expect(volumeOf(g, "b")).toBeCloseTo(6000, 0);
+  });
+
+  it("extrudes a rectangle profile into a solid", () => {
+    const g: Graph = [
+      { id: "r", type: "rect", params: { width: 40, height: 30 }, inputs: {} },
+      { id: "e", type: "extrude", params: { height: 10 }, inputs: { in: "r" } },
+    ];
+    expect(volumeOf(g, "e")).toBeCloseTo(12000, 0);
+  });
+
+  it("boolean difference removes material", () => {
+    const g: Graph = [
+      { id: "a", type: "box", params: { x: 20, y: 20, z: 20 }, inputs: {} },
+      { id: "c", type: "cylinder", params: { radius: 5, height: 40 }, inputs: {} },
+      { id: "cc", type: "transform", params: { tz: -10 }, inputs: { in: "c" } },
+      { id: "d", type: "boolean3d", params: { op: "difference" }, inputs: { base: "a", tool: "cc" } },
+    ];
+    const vol = volumeOf(g, "d");
+    expect(vol).toBeGreaterThan(6000); // 8000 minus a Ø10 bore (~1570 mm³)
+    expect(vol).toBeLessThan(7000);
+  });
+
+  it("collision outputs the overlap volume of two boxes", () => {
+    const g: Graph = [
+      { id: "a", type: "box", params: { x: 20, y: 20, z: 20 }, inputs: {} },
+      { id: "b0", type: "box", params: { x: 20, y: 20, z: 20 }, inputs: {} },
+      { id: "b", type: "transform", params: { tx: 10 }, inputs: { in: "b0" } },
+      { id: "col", type: "collision", params: {}, inputs: { a: "a", b: "b" } },
+    ];
+    expect(volumeOf(g, "col")).toBeCloseTo(4000, 0); // 10×20×20 overlap
+  });
+
+  it("hollow turns a solid into a thin-walled shell", () => {
+    const hollow: Graph = [
+      { id: "b", type: "box", params: { x: 30, y: 30, z: 30 }, inputs: {} },
+      { id: "h", type: "hollow", params: { wall: 2, drainDia: 0, drainCount: 0 }, inputs: { in: "b" } },
+    ];
+    // a closed shell has inner + outer walls → far more triangles than the 12
+    // of a plain box (meshMassProps volume is unreliable on non-solid shells).
+    expect(evalToPayload(hollow, "h").mesh.indices.length / 3).toBeGreaterThan(50);
+  });
+
+  it("previews a 2D profile as a flat sketch (zero thickness)", () => {
+    const g: Graph = [{ id: "r", type: "rect", params: { width: 40, height: 30 }, inputs: {} }];
+    const res = evalToPayload(g, "r");
+    expect(res.outputKind).toBe("sketch2d");
+    expect(res.mesh.isSketch).toBe(true);
+    const v = res.mesh.vertices;
+    let minz = Infinity, maxz = -Infinity;
+    for (let i = 0; i < v.length; i += 3) { minz = Math.min(minz, v[i + 2]); maxz = Math.max(maxz, v[i + 2]); }
+    expect(maxz - minz).toBeCloseTo(0, 6); // flat, no extruded thickness
+  });
+
+  it("surfaces a clear error for a node that cannot build", () => {
+    const g: Graph = [{ id: "e", type: "extrude", params: { height: 10 }, inputs: {} }];
+    expect(() => evalToPayload(g, "e")).toThrow(/\[extrude\]/);
+  });
+});

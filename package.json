@@ -12,6 +12,8 @@
     "smoke:sketch": "tsx scripts/smoke-sketch.ts && tsx scripts/smoke-sketch2.ts",
     "smoke:mesh": "tsx scripts/smoke-mesh.ts",
     "scenes": "tsx scripts/gen-scenes.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "thumbs": "tsx scripts/gen-node-thumbs.ts",
     "thumbs:examples": "tsx scripts/shoot-thumbs.ts",
     "thumbs:examples:force": "tsx scripts/shoot-thumbs.ts --force"
@@ -37,6 +39,7 @@
     "playwright": "^1.61.1",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3",
-    "vite": "^5.4.11"
+    "vite": "^5.4.11",
+    "vitest": "^4.1.10"
   }
 }
