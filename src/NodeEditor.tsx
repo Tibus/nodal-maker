@@ -33,6 +33,7 @@ import {
   NODE_CATEGORIES,
   NODE_DESCRIPTIONS,
   NODE_THUMBS,
+  EXAMPLE_THUMBS,
   SOCKET_COLORS,
   SOCKET_LABELS,
   paramPortType,
@@ -733,16 +734,20 @@ function SimpleView({
     <div className="simple">
       <div className="simple__card">
         <div className="simple__hd">⚙︎ Configurateur</div>
-        <label className="simple__pick">
-          <span>Modèle</span>
-          <select
-            defaultValue=""
-            onChange={(e) => { const ex = EXAMPLES.find((x) => x.name === e.target.value); if (ex) applyDoc(ex.doc); }}
-          >
-            <option value="" disabled>📚 choisir un exemple…</option>
-            {EXAMPLES.map((ex) => (<option key={ex.name} value={ex.name}>{ex.title}</option>))}
-          </select>
-        </label>
+        <div className="simple__picklabel">Modèle</div>
+        <div className="simple__gallery">
+          {EXAMPLES.map((ex) => (
+            <button
+              key={ex.name}
+              className="simple__tile"
+              title={ex.title}
+              onClick={() => applyDoc(ex.doc)}
+            >
+              <span className="simple__thumb" dangerouslySetInnerHTML={{ __html: EXAMPLE_THUMBS[ex.name] ?? "" }} />
+              <span className="simple__tilename">{ex.title.split(" — ")[0].split(" (")[0]}</span>
+            </button>
+          ))}
+        </div>
 
         {empty ? (
           <div className="simple__empty">

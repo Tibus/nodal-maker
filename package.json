@@ -12,7 +12,8 @@
     "smoke:sketch": "tsx scripts/smoke-sketch.ts && tsx scripts/smoke-sketch2.ts",
     "smoke:mesh": "tsx scripts/smoke-mesh.ts",
     "scenes": "tsx scripts/gen-scenes.ts",
-    "thumbs": "tsx scripts/gen-node-thumbs.ts"
+    "thumbs": "tsx scripts/gen-node-thumbs.ts",
+    "thumbs:examples": "tsx scripts/gen-example-thumbs.ts"
   },
   "dependencies": {
     "@xyflow/react": "^12.11.2",

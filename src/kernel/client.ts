@@ -12,5 +12,6 @@ export type { MeshPayload, FaceTag, Graph, NodeDescriptor } from "./nodes";
 export type { NodeSpec, ParamSpec, PortSpec, SocketType } from "./specs";
 export { NODE_SPECS, SOCKET_COLORS, SOCKET_LABELS, paramPortType, NODE_CATEGORIES, NODE_DESCRIPTIONS } from "./specs";
 export { NODE_THUMBS } from "./nodeThumbs.generated";
+export { EXAMPLE_THUMBS } from "./exampleThumbs.generated";
 export { expandDescriptors, expandOutputId } from "./components";
 export type { ComponentDef, InstanceDescriptor } from "./components";

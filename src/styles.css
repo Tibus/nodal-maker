@@ -120,9 +120,13 @@ button.link {
 .simple { position: absolute; inset: 0; z-index: 30; background: #16181d; display: flex; justify-content: center; align-items: flex-start; overflow-y: auto; padding: 52px 20px 24px; }
 .simple__card { width: 100%; max-width: 420px; background: #1b1e24; border: 1px solid #2a2e36; border-radius: 12px; padding: 18px; }
 .simple__hd { font-weight: 700; color: #ff8c42; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px; }
-.simple__pick { display: flex; flex-direction: column; gap: 4px; font-size: 12px; margin-bottom: 16px; }
-.simple__pick > span { color: #8a8f98; font-weight: 600; }
-.simple__pick select { background: #14171c; color: #e6e8ec; border: 1px solid #2f343d; border-radius: 6px; padding: 8px; font-size: 13px; }
+.simple__picklabel { color: #8a8f98; font-weight: 600; font-size: 12px; margin-bottom: 8px; }
+.simple__gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; max-height: 320px; overflow-y: auto; padding: 2px; margin-bottom: 4px; }
+.simple__tile { display: flex; flex-direction: column; align-items: center; gap: 4px; background: #14171c; border: 1px solid #2a2e36; border-radius: 8px; padding: 6px 4px; cursor: pointer; }
+.simple__tile:hover { border-color: #ff8c42; background: #1e2229; }
+.simple__thumb { width: 100%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; }
+.simple__thumb svg { width: 100%; height: 100%; }
+.simple__tilename { font-size: 9.5px; color: #b7bdc7; line-height: 1.15; text-align: center; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .simple__params { display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #2a2e36; padding-top: 14px; }
 .simple__params .pf > span { color: #b7bdc7; font-weight: 600; font-size: 12px; }
 .simple__params .pf input, .simple__params .pf select, .simple__params .pf textarea { font-size: 13px; padding: 7px; }
