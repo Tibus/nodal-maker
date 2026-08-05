@@ -27,7 +27,7 @@ export class Viewport {
   private edgesObj: THREE.LineSegments | null = null;
   private modelDiag = 100;
   // Fusion-style display: shaded / shaded+edges / wireframe (edges only)
-  private viewMode: "shaded" | "edges" | "wireframe" = "shaded";
+  private viewMode: "shaded" | "edges" | "wireframe" = "edges";
   private brepEdges: THREE.LineSegments | null = null;
   // pinned-visible extra bodies (for assembling several B-reps) — non-pickable
   private extraGroup: THREE.Group | null = null;
@@ -40,6 +40,8 @@ export class Viewport {
   private analysisMat: THREE.MeshStandardMaterial | null = null;
   private tintMat: THREE.MeshStandardMaterial | null = null;
   private grid: THREE.GridHelper | null = null;
+  // flat fill for 2D sketch previews (double-sided so it shows from any angle)
+  private sketchMat = new THREE.MeshBasicMaterial({ color: 0xc678dd, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false });
   // 3D translation gizmo (edits a Transform node's tx/ty/tz)
   private gizmo: TransformControls | null = null;
   private gizmoProxy: THREE.Object3D | null = null;
@@ -129,7 +131,8 @@ export class Viewport {
     // whole-body tint from a Color node overrides the per-tag materials
     if (this.tintMat) { this.tintMat.dispose(); this.tintMat = null; }
     if (payload.tint) this.tintMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(payload.tint), roughness: 0.55, metalness: 0.1 });
-    const mesh = new THREE.Mesh(geom, this.tintMat ?? this.materials);
+    // 2D profiles render as a flat filled region; solids use the gray body mats
+    const mesh = new THREE.Mesh(geom, payload.isSketch ? this.sketchMat : (this.tintMat ?? this.materials));
     this.scene.add(mesh);
     this.mesh = mesh;
 
@@ -192,9 +195,9 @@ export class Viewport {
   }
 
   private applyViewMode() {
-    // a sketch always shows as bright line-work on its plane (no filled plate)
+    // a 2D sketch shows as a flat FILLED region + its bright outline on-plane
     if (this.isSketchView) {
-      if (this.mesh) this.mesh.visible = false;
+      if (this.mesh) this.mesh.visible = true;
       if (this.brepEdges) {
         this.brepEdges.visible = true;
         (this.brepEdges.material as THREE.LineBasicMaterial).color.setHex(0x39d0ff);

@@ -48,7 +48,7 @@ export default function App() {
   const [graphValues, setGraphValues] = useState<Record<string, string>>({});
   const [pickMode, setPickMode] = useState<"face" | "edge" | "border" | "sketchFace" | "measure" | null>(null);
   const measureA = useRef<[number, number, number] | null>(null);
-  const [viewMode, setViewMode] = useState<"shaded" | "edges" | "wireframe">("shaded");
+  const [viewMode, setViewMode] = useState<"shaded" | "edges" | "wireframe">("edges");
   const [analysis, setAnalysis] = useState<"overhang" | "thickness" | null>(null);
   const [recording, setRecording] = useState(false);
   const [props, setProps] = useState<MassProps | null>(null);

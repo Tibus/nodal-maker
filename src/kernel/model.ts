@@ -165,13 +165,22 @@ export function exportMeshSTL(stl: ArrayBuffer, o: MeshImportParams): Uint8Array
 /* renderable payload whatever the output socket type is.               */
 /* ------------------------------------------------------------------ */
 
+/** A 2D profile as a FLAT face (its filled region, zero thickness). Handles
+ * both a single Sketch (`.face()`) and a multi-region Sketches (`.faces()`,
+ * e.g. a profile with holes or several disjoint pieces). */
+function sketchToFace(v: Extract<GraphValue, { kind: "sketch2d" }>): Shape3D {
+  const s = placeSketchValue(v) as unknown as { face?: () => Shape3D; faces?: () => Shape3D };
+  return (s.faces ? s.faces() : s.face!()) as Shape3D;
+}
+
 /** Turn any renderable graph value into a mesh payload (null for scalars/selections). */
 function payloadForValue(v: GraphValue): MeshPayload | null {
   if (v.kind === "solid") return meshAndTag(v.solid);
   if (v.kind === "mesh") return meshToPayload(v.mesh);
   if (v.kind === "sketch2d") {
-    const plate = placeSketchValue(v).extrude(0.5) as Shape3D;
-    return meshAndTag(plate);
+    // a 2D profile has no thickness — preview it as a flat filled face, not an
+    // extruded plate (whose top+bottom edges look like thickness).
+    return { ...meshAndTag(sketchToFace(v)), isSketch: true };
   }
   return null;
 }
@@ -229,11 +238,9 @@ export function evalToPayload(
     return { mesh: meshToPayload(v.mesh), topCapFaceId: null, topCapZ: 0, outputKind: "mesh", values, extras };
   }
   if (v.kind === "sketch2d") {
-    // preview a 2D profile as a thin plate so it's visible in the viewport,
-    // placed on the sketch's own base plane; the true (non-faceted) geometry
-    // is what `exportGraphSVG` emits.
-    const plate = placeSketchValue(v).extrude(0.5) as Shape3D;
-    return { mesh: { ...meshAndTag(plate), isSketch: true }, topCapFaceId: null, topCapZ: 0, outputKind: "sketch2d", values, extras };
+    // preview a 2D profile as a FLAT filled face (zero thickness) on its base
+    // plane — no extruded-plate thickness. Real geometry → exportSVG.
+    return { mesh: { ...meshAndTag(sketchToFace(v)), isSketch: true }, topCapFaceId: null, topCapZ: 0, outputKind: "sketch2d", values, extras };
   }
   throw new Error(`output node "${outputId}" is a ${v.kind}; connect it to geometry to preview`);
 }
