@@ -24,8 +24,15 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      # generate any thumbnails not committed to public/thumbs (missing-only,
-      # so a new example gets a preview on deploy without a local pre-render)
+      # cache the Playwright browser so the thumbnail shooter doesn't re-download
+      - name: Cache Playwright browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npx playwright install --with-deps chromium
+      # capture any MISSING thumbnail by screenshotting the real WebGL scene
+      # (fast no-op when all are committed; never fails the build)
       - run: npm run thumbs:examples
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3

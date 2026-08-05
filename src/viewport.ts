@@ -41,6 +41,7 @@ export class Viewport {
   private analysis: { mode: "overhang" | "thickness"; angle: number; minWall: number } | null = null;
   private analysisMat: THREE.MeshStandardMaterial | null = null;
   private tintMat: THREE.MeshStandardMaterial | null = null;
+  private grid: THREE.GridHelper | null = null;
   // 3D translation gizmo (edits a Transform node's tx/ty/tz)
   private gizmo: TransformControls | null = null;
   private gizmoProxy: THREE.Object3D | null = null;
@@ -77,6 +78,7 @@ export class Viewport {
 
     const grid = new THREE.GridHelper(400, 40, 0x333842, 0x2a2e36);
     this.scene.add(grid);
+    this.grid = grid;
 
     const hemi = new THREE.HemisphereLight(0xffffff, 0x33383f, 1.0);
     this.scene.add(hemi);
@@ -389,6 +391,30 @@ export class Viewport {
   snapshotPNG(): string {
     this.renderer.render(this.scene, this.camera);
     return this.renderer.domElement.toDataURL("image/png");
+  }
+
+  /** Override the scene background (e.g. to match a thumbnail tile). */
+  setBackground(hex: number): void {
+    this.scene.background = new THREE.Color(hex);
+  }
+
+  /** Show/hide the ground grid (hidden for clean thumbnails). */
+  setGridVisible(v: boolean): void {
+    if (this.grid) this.grid.visible = v;
+  }
+
+  /** Render, then downscale the frame to a `size`×`size` PNG (supersampled AA). */
+  snapshotScaled(size = 256): string {
+    this.renderer.render(this.scene, this.camera);
+    const src = this.renderer.domElement;
+    const c = document.createElement("canvas");
+    c.width = size; c.height = size;
+    const ctx = c.getContext("2d")!;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    const s = Math.min(src.width, src.height); // centre-crop to square, then fit
+    ctx.drawImage(src, (src.width - s) / 2, (src.height - s) / 2, s, s, 0, 0, size, size);
+    return c.toDataURL("image/png");
   }
 
   /** Look straight down the Z axis — a flat top view for 2D profiles. */
