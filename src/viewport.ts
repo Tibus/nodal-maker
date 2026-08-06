@@ -40,6 +40,9 @@ export class Viewport {
   private analysisMat: THREE.MeshStandardMaterial | null = null;
   private tintMat: THREE.MeshStandardMaterial | null = null;
   private grid: THREE.GridHelper | null = null;
+  // section-cap: fills the cut surface via the stencil buffer (a solid section,
+  // not a hollow hole). Holds two stencil passes + the cap plane.
+  private capGroup: THREE.Group | null = null;
   // flat fill for 2D sketch previews (double-sided so it shows from any angle)
   private sketchMat = new THREE.MeshBasicMaterial({ color: 0xc678dd, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false });
   // 3D translation gizmo (edits a Transform node's tx/ty/tz)
@@ -374,6 +377,69 @@ export class Viewport {
     if (this.extraGroup) this.extraGroup.traverse((o) => {
       if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) (o.material as THREE.Material).clippingPlanes = planes;
     });
+    this.buildCap();
+  }
+
+  private clearCap() {
+    if (!this.capGroup) return;
+    this.scene.remove(this.capGroup);
+    this.capGroup.traverse((o) => {
+      const g = (o as THREE.Mesh).geometry;
+      if (g && g !== this.mesh?.geometry) g.dispose(); // never dispose the shared model geometry
+      const m = (o as THREE.Mesh).material;
+      if (m) (Array.isArray(m) ? m : [m]).forEach((x) => x.dispose());
+    });
+    this.capGroup = null;
+  }
+
+  /**
+   * Fill the section cut. Two stencil passes mark the solid interior at the
+   * plane (back faces increment, front faces decrement the stencil), then a
+   * big plane draws the cap only where the stencil is non-zero.
+   */
+  private buildCap() {
+    this.clearCap();
+    if (!this.mesh || this.clip.length === 0 || this.isSketchView) return;
+    const plane = this.clip[0];
+    const geom = this.mesh.geometry;
+    const group = new THREE.Group();
+
+    const stencilMat = (side: THREE.Side, op: THREE.StencilOp) => {
+      const m = new THREE.MeshBasicMaterial();
+      m.depthWrite = false; m.depthTest = false; m.colorWrite = false;
+      m.stencilWrite = true; m.stencilFunc = THREE.AlwaysStencilFunc;
+      m.side = side; m.clippingPlanes = [plane];
+      m.stencilFail = m.stencilZFail = m.stencilZPass = op;
+      return m;
+    };
+    const back = new THREE.Mesh(geom, stencilMat(THREE.BackSide, THREE.IncrementWrapStencilOp));
+    const front = new THREE.Mesh(geom, stencilMat(THREE.FrontSide, THREE.DecrementWrapStencilOp));
+    back.renderOrder = 1; front.renderOrder = 1;
+    group.add(back, front);
+
+    const size = this.modelDiag * 2;
+    const capMat = new THREE.MeshStandardMaterial({
+      color: BODY_GRAY, roughness: 0.5, metalness: 0.12, side: THREE.DoubleSide,
+      stencilWrite: true, stencilRef: 0, stencilFunc: THREE.NotEqualStencilFunc,
+      stencilFail: THREE.ReplaceStencilOp, stencilZFail: THREE.ReplaceStencilOp, stencilZPass: THREE.ReplaceStencilOp,
+    });
+    const cap = new THREE.Mesh(new THREE.PlaneGeometry(size, size), capMat);
+    cap.renderOrder = 2;
+    cap.onAfterRender = (r) => r.clearStencil(); // reset for the next frame
+    group.add(cap);
+
+    this.scene.add(group);
+    this.capGroup = group;
+    this.positionCap();
+  }
+
+  /** Place & orient the cap plane onto the active clipping plane. */
+  private positionCap() {
+    if (!this.capGroup || !this.clip.length) return;
+    const plane = this.clip[0];
+    const cap = this.capGroup.children[2] as THREE.Mesh;
+    plane.coplanarPoint(cap.position);
+    cap.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), plane.normal.clone().negate());
   }
 
   /** Force the next setGeometry to re-frame the camera (used on first load). */
