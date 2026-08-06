@@ -84,6 +84,8 @@ const faceXY = (z: number): Crit => ({ target: "face", t: "planeXY", z });
 const faceYZ = (x: number): Crit => ({ target: "face", t: "planeYZ", x });
 const faceXZ = (y: number): Crit => ({ target: "face", t: "planeXZ", y });
 const faceCyl = (): Crit => ({ target: "face", t: "cyl" });
+const faceCone = (): Crit => ({ target: "face", t: "cone" });
+const faceTorus = (): Crit => ({ target: "face", t: "torus" });
 const edgeDir = (d: Vec3): Crit => ({ target: "edge", t: "dir", d });
 const edgeXY = (z: number): Crit => ({ target: "edge", t: "planeXY", z });
 
@@ -104,6 +106,8 @@ export function critApply(c: Crit): (finder: unknown) => unknown {
         case "planeYZ": return ff.inPlane("YZ", c.x);
         case "planeXZ": return ff.inPlane("XZ", c.y);
         case "cyl": return ff.ofSurfaceType("CYLINDRE");
+        case "cone": return ff.ofSurfaceType("CONE");
+        case "torus": return ff.ofSurfaceType("TORUS");
         case "planar": return ff.ofSurfaceType("PLANE");
         case "parallel": return ff.parallelTo(c.plane);
         case "all": return ff;
@@ -171,12 +175,22 @@ export const LEAF_PORTS: Record<string, Record<string, CritBuilder>> = {
     back: (p) => faceXZ(Number(p.y ?? 30) / 2),
     verticalEdges: () => edgeDir([0, 0, 1]),
     topEdges: (p) => edgeXY(Number(p.z ?? 30)),
+    bottomEdges: () => edgeXY(0),
   },
   cylinder: {
     cap: (p) => faceXY(Number(p.height ?? 30)),
     bottom: () => faceXY(0),
     side: () => faceCyl(),
     capEdges: (p) => edgeXY(Number(p.height ?? 30)),
+    bottomEdges: () => edgeXY(0),
+  },
+  cone: {
+    bottom: () => faceXY(0),
+    side: () => faceCone(),
+    bottomEdges: () => edgeXY(0),
+  },
+  torus: {
+    side: () => faceTorus(),
   },
   revolve: {
     top: (_p, s) => faceXY(s ? zBounds(s).max : 0),
@@ -222,7 +236,7 @@ export function mirrorCrit(c: Crit, plane: "XY" | "XZ" | "YZ"): Crit {
 /** Z-axis rotation. Returns null for crits that become non-axis-aligned (a
  * tilted plane can't be expressed by `inPlane`), so those ports aren't forwarded. */
 export function rotateZCrit(c: Crit, angleDeg: number): Crit | null {
-  if (c.t === "planeXY" || c.t === "cyl" || c.t === "planar" || c.t === "all") return c;
+  if (c.t === "planeXY" || c.t === "cyl" || c.t === "cone" || c.t === "torus" || c.t === "planar" || c.t === "all") return c;
   if (c.target === "face" && c.t === "parallel" && c.plane === "XY") return c;
   if (c.target === "edge" && c.t === "dir") {
     if (c.d[0] === 0 && c.d[1] === 0) return c; // a Z-aligned edge is invariant

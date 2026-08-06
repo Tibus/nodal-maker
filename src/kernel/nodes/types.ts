@@ -74,6 +74,8 @@ export type Crit =
   | { target: "face"; t: "planeYZ"; x: number }
   | { target: "face"; t: "planeXZ"; y: number }
   | { target: "face"; t: "cyl" }
+  | { target: "face"; t: "cone" }
+  | { target: "face"; t: "torus" }
   | { target: "face"; t: "planar" }
   | { target: "face"; t: "parallel"; plane: "XY" | "YZ" | "XZ" }
   | { target: "face"; t: "all" }

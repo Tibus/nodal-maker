@@ -113,6 +113,17 @@ describe("graph evaluation (real geometry)", () => {
     expect(vTop).toBeLessThan(8000); // and both remove some vs the raw 8000 box
   });
 
+  it("a cone exposes named selection ports (fillet its base rim)", () => {
+    const g: Graph = [
+      { id: "c", type: "cone", params: { radius: 15, height: 30 }, inputs: {} },
+      { id: "f", type: "fillet", params: { radius: 2 }, inputs: { in: "c", sel: "c#bottomEdges" } },
+    ];
+    const cone = volumeOf([{ id: "c", type: "cone", params: { radius: 15, height: 30 }, inputs: {} }], "c");
+    const filleted = volumeOf(g, "f");
+    expect(filleted).toBeLessThan(cone); // base rim rounded → a little material gone
+    expect(filleted).toBeGreaterThan(cone * 0.9);
+  });
+
   it("a picked-edge fillet re-binds to the edge when a parameter moves it", () => {
     // pick the top +Y edge (runs along X at y=10, z=20) of a 20³ box. The pick's
     // bbox-relative signature: top-face level (posRel.z=1), mid-span, along X.

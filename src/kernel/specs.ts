@@ -453,6 +453,7 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
       { name: "back", target: "face" },
       { name: "verticalEdges", target: "edge" },
       { name: "topEdges", target: "edge" },
+      { name: "bottomEdges", target: "edge" },
     ],
   },
   cylinder: {
@@ -469,6 +470,7 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
       { name: "bottom", target: "face" },
       { name: "side", target: "face" },
       { name: "capEdges", target: "edge" },
+      { name: "bottomEdges", target: "edge" },
     ],
   },
   sphere: {
@@ -523,6 +525,11 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
       { name: "radius", kind: "number", default: 15, min: 0.5, max: 200, step: 0.5 },
       { name: "height", kind: "number", default: 30, min: 1, max: 300, step: 1 },
     ],
+    selectionOutputs: [
+      { name: "bottom", target: "face" },
+      { name: "side", target: "face" },
+      { name: "bottomEdges", target: "edge" },
+    ],
   },
   torus: {
     type: "torus",
@@ -532,6 +539,9 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     params: [
       { name: "radius", kind: "number", label: "major", default: 25, min: 1, max: 200, step: 0.5 },
       { name: "tube", kind: "number", label: "minor", default: 7, min: 0.5, max: 100, step: 0.5 },
+    ],
+    selectionOutputs: [
+      { name: "side", target: "face" },
     ],
   },
   revolve: {
