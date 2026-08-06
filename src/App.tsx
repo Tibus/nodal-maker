@@ -153,7 +153,7 @@ export default function App() {
         const where = pick.axis === "curved" ? "cylindrical" : `at${pick.axis}`;
         // a curved (cylindrical) pick is disambiguated by its AABB → a Face Select
         // that isolates THIS bore, ready to feed an Internal Thread
-        editorApi.current?.addFaceSelect(where, pick.offset, pick.axis === "curved" ? pick.box : undefined);
+        editorApi.current?.addFaceSelect(where, pick.offset, pick.axis === "curved" ? pick.box : undefined, pick.ref);
         setStatus(
           pick.axis === "curved"
             ? "picked a cylindrical face → Face Select (this bore)"
@@ -164,7 +164,7 @@ export default function App() {
         // Edge Select at that face's plane → chamfer/fillet a face's rim.
         const pick = viewportRef.current?.pickBorder(e.clientX, e.clientY);
         if (!pick) { setStatus("border: pick a FLAT face (its rim lies in a plane)"); return; }
-        editorApi.current?.addEdgeSelect(`at${pick.axis}`, pick.offset, pick.near);
+        editorApi.current?.addEdgeSelect(`at${pick.axis}`, pick.offset, pick.near, pick.ref);
         setStatus(
           pick.near
             ? `picked border → Edge Select (single loop @${pick.axis}=${pick.offset})`
@@ -173,7 +173,7 @@ export default function App() {
       } else {
         const pick = viewportRef.current?.pickEdge(e.clientX, e.clientY);
         if (!pick) { setStatus("pick: no edge near the cursor"); return; }
-        editorApi.current?.addEdgeSelect(pick.where, pick.offset, pick.near);
+        editorApi.current?.addEdgeSelect(pick.where, pick.offset, pick.near, pick.ref);
         setStatus(`picked edge → Edge Select (tracks the picked edge)`);
       }
       setPickMode(null);

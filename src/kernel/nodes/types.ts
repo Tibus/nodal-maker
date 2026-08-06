@@ -21,11 +21,11 @@ export type GraphValue =
   | { kind: "number"; value: number }
   | { kind: "text"; value: string }
   // a criteria-based face/edge selection — resolved against whatever geometry
-  // the fillet/bevel/shell receives, so it survives regeneration. `nearest`, when
-  // set, is a reference point from the original pick: the consumer re-selects the
-  // element NEAREST to it on the current geometry, so the pick tracks the edge as
-  // parameters move it (rather than matching a frozen coordinate).
-  | { kind: "selection"; target: "edge" | "face"; apply: (finder: unknown) => unknown; nearest?: [number, number, number] };
+  // the fillet/bevel/shell receives, so it survives regeneration. `ref`, when set,
+  // is a bbox-RELATIVE signature from the original pick: the consumer re-binds to
+  // the best-matching element on the current geometry, so the pick tracks the
+  // entity as parameters move/scale it (rather than matching a frozen coordinate).
+  | { kind: "selection"; target: "edge" | "face"; apply: (finder: unknown) => unknown; ref?: SelRef };
 
 /* ------------------------------------------------------------------ */
 /* Graph description                                                   */
@@ -53,6 +53,16 @@ export type NodeImpl = (
 
 export type Vec2 = [number, number];
 export type Vec3 = [number, number, number];
+
+/**
+ * A bbox-relative pick signature for re-binding a selection to the same entity
+ * after regeneration. `posRel` is the pick point normalised into the shape's
+ * bounding box [0..1] per axis (→ scale/translate invariant); `dir` is the edge
+ * direction (or face normal) for disambiguation; `surf` is the face type.
+ */
+export type SelRef =
+  | { kind: "edge"; posRel: Vec3; dir: Vec3 }
+  | { kind: "face"; posRel: Vec3; normal: Vec3; surf: "planar" | "cylindrical" | "other" };
 
 /**
  * A selection expressed as DATA (not an opaque finder closure) so it can be

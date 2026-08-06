@@ -30,7 +30,8 @@ import {
   buildThreadBRep,
   buildNutBRep,
   cylinderFromFace,
-  nearestEdge,
+  rebindEdge,
+  rebindFace,
   importSTEPSync,
 } from "./helpers";
 import { solidToMeshData, meshAndTag, resolveTopCap } from "./payload";
@@ -46,8 +47,8 @@ function edgeFinderFor(
   solid: Shape3D,
   sel: Extract<GraphValue, { kind: "selection" }>,
 ): (e: EdgeFinder) => EdgeFinder {
-  if (sel.nearest) {
-    const edge = nearestEdge(solid, sel.nearest);
+  if (sel.ref?.kind === "edge") {
+    const edge = rebindEdge(solid, sel.ref);
     if (edge) return (e) => e.inList([edge]) as EdgeFinder;
   }
   return (e) => sel.apply(e) as EdgeFinder;
@@ -116,8 +117,16 @@ export const nodes3d: Record<string, NodeImpl> = {
     // overrides the nominal). Multiple matching bores are all threaded.
     const sel = inputs.face;
     if (sel && sel.kind === "selection" && sel.target === "face") {
-      const ff = sel.apply(new FaceFinder()) as FaceFinder;
-      const faces = ff.find(body as Parameters<FaceFinder["find"]>[0]) as Face[];
+      // prefer the parametric re-bind (tracks the bore as the part changes);
+      // fall back to the static finder criteria
+      const faces: Face[] = [];
+      if (sel.ref?.kind === "face") {
+        const f = rebindFace(body, sel.ref);
+        if (f) faces.push(f);
+      } else {
+        const ff = sel.apply(new FaceFinder()) as FaceFinder;
+        faces.push(...(ff.find(body as Parameters<FaceFinder["find"]>[0]) as Face[]));
+      }
       const bores = faces.map(cylinderFromFace).filter((c): c is NonNullable<typeof c> => c != null);
       if (!bores.length) throw new Error("[internalThread] the selected face is not a cylindrical bore");
       // Use the STANDARD (or custom) Ø, only borrowing the face's location/axis:
@@ -475,7 +484,11 @@ export const nodes3d: Record<string, NodeImpl> = {
     const sel = inputs.faces;
     if (!sel || sel.kind !== "selection" || sel.target !== "face")
       throw new Error("[shell] connect a Face Select (which face(s) to open)");
-    return { kind: "solid", solid: solid.shell(t, (f) => sel.apply(f) as FaceFinder) as Shape3D };
+    // parametric re-bind when the pick carries a signature, else static criteria
+    const faceFn: (f: FaceFinder) => FaceFinder = sel.ref?.kind === "face"
+      ? (() => { const bound = rebindFace(solid, sel.ref); return bound ? (f) => f.inList([bound]) as FaceFinder : (f) => sel.apply(f) as FaceFinder; })()
+      : (f) => sel.apply(f) as FaceFinder;
+    return { kind: "solid", solid: solid.shell(t, faceFn) as Shape3D };
   },
   /**
    * Resin hollowing: turn a solid into a CLOSED thin-walled shell (empty face

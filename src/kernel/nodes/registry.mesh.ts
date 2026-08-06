@@ -16,7 +16,22 @@ import {
 import { parseBinarySTL } from "../stl";
 import { expectSolid, expectMesh, meshToSolidSync } from "./helpers";
 import { solidToMeshData } from "./payload";
-import type { NodeImpl } from "./types";
+import type { NodeImpl, SelRef, Vec3 } from "./types";
+
+/** Parse a stored pick signature (plain JSON from the node params) into a SelRef. */
+const vec3 = (v: unknown): Vec3 | null =>
+  Array.isArray(v) && v.length === 3 && v.every((n) => Number.isFinite(Number(n))) ? [Number(v[0]), Number(v[1]), Number(v[2])] : null;
+function edgeRef(raw: unknown): Extract<SelRef, { kind: "edge" }> | undefined {
+  const r = raw as { kind?: string; posRel?: unknown; dir?: unknown } | undefined;
+  const posRel = vec3(r?.posRel), dir = vec3(r?.dir);
+  return r?.kind === "edge" && posRel && dir ? { kind: "edge", posRel, dir } : undefined;
+}
+function faceRef(raw: unknown): Extract<SelRef, { kind: "face" }> | undefined {
+  const r = raw as { kind?: string; posRel?: unknown; normal?: unknown; surf?: unknown } | undefined;
+  const posRel = vec3(r?.posRel), normal = vec3(r?.normal);
+  const surf = r?.surf === "planar" || r?.surf === "cylindrical" || r?.surf === "other" ? r.surf : "other";
+  return r?.kind === "face" && posRel && normal ? { kind: "face", posRel, normal, surf } : undefined;
+}
 
 export const meshNodes: Record<string, NodeImpl> = {
   /* --- criteria-based selectors (survive regeneration) --- */
@@ -46,10 +61,10 @@ export const meshNodes: Record<string, NodeImpl> = {
       // single B-rep edge → the whole loop is kept, its concentric sibling isn't).
       return near ? f.containsPoint(near) : f;
     };
-    // `nearest` lets a single-selection consumer track the picked edge as it
-    // moves (re-binds to the closest edge each eval); `apply` stays as the static
+    // `ref` (a bbox-relative signature) lets a single-selection consumer re-bind
+    // to the picked edge as the part changes; `apply` stays as the static
     // criteria for the union (multi-selection) path.
-    return { kind: "selection", target: "edge", apply: apply as (f: unknown) => unknown, nearest: near ?? undefined };
+    return { kind: "selection", target: "edge", apply: apply as (f: unknown) => unknown, ref: edgeRef(params.ref) };
   },
   faceSelect: (_inputs, params) => {
     const where = String(params.where ?? "all");
@@ -75,7 +90,7 @@ export const meshNodes: Record<string, NodeImpl> = {
       }
       return box ? ff.inBox([box[0], box[1], box[2]], [box[3], box[4], box[5]]) : ff;
     };
-    return { kind: "selection", target: "face", apply: apply as (f: unknown) => unknown };
+    return { kind: "selection", target: "face", apply: apply as (f: unknown) => unknown, ref: faceRef(params.ref) };
   },
 
   /* --- mesh domain (Manifold) — the bridge from B-rep to STL land --- */

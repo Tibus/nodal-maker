@@ -30,6 +30,8 @@ export class Viewport {
   private measures: THREE.Object3D[] = [];
   private edgesObj: THREE.LineSegments | null = null;
   private modelDiag = 100;
+  // world AABB of the current model — pick signatures are stored relative to it
+  private modelBox = { min: [0, 0, 0] as number[], max: [1, 1, 1] as number[] };
   // Fusion-style display: shaded / shaded+edges / wireframe (edges only)
   private viewMode: "shaded" | "edges" | "wireframe" = "edges";
   private brepEdges: THREE.LineSegments | null = null;
@@ -182,6 +184,7 @@ export class Viewport {
 
     const box = new THREE.Box3().setFromObject(mesh);
     this.modelDiag = Math.max(box.getSize(new THREE.Vector3()).length(), 1);
+    this.modelBox = { min: [box.min.x, box.min.y, box.min.z], max: [box.max.x, box.max.y, box.max.z] };
     if (reframe || !this.framed) {
       this.frameCamera(box);
       this.framed = true;
@@ -862,6 +865,8 @@ export class Viewport {
     centroid: [number, number, number];
     /** the picked face's world AABB — lets a Face Select isolate THIS face */
     box: [number, number, number, number, number, number];
+    /** bbox-relative signature so a Face Select re-binds to THIS face on change */
+    ref: { kind: "face"; posRel: [number, number, number]; normal: [number, number, number]; surf: "planar" | "cylindrical" | "other" };
   } | null {
     const f = this.detectFace(clientX, clientY);
     if (!f) return null;
@@ -884,9 +889,15 @@ export class Viewport {
     this.pickHighlight = hmesh;
     // pad the AABB slightly so a tight box still contains the whole B-rep face
     const pad = Math.max(0.05, this.modelDiag * 0.01);
+    // averaged normal over the face group → part of its re-bind signature
+    const { normals: nrm, indices: idx } = this.payload!;
+    let nx = 0, ny = 0, nz = 0;
+    for (let i = f.group.start; i < f.group.start + f.group.count; i++) { const v = idx[i] * 3; nx += nrm[v]; ny += nrm[v + 1]; nz += nrm[v + 2]; }
+    const nl = Math.hypot(nx, ny, nz) || 1;
     return {
       axis: f.axis, offset: f.offset, tag: f.tag, centroid: f.centroid,
       box: [f.min[0] - pad, f.min[1] - pad, f.min[2] - pad, f.max[0] + pad, f.max[1] + pad, f.max[2] + pad],
+      ref: { kind: "face", posRel: this.relPos(f.centroid), normal: [nx / nl, ny / nl, nz / nl], surf: f.axis === "curved" ? "cylindrical" : "planar" },
     };
   }
 
@@ -984,7 +995,10 @@ export class Viewport {
   pickBorder(
     clientX: number,
     clientY: number,
-  ): { axis: "X" | "Y" | "Z"; offset: number; near?: [number, number, number] } | null {
+  ): {
+    axis: "X" | "Y" | "Z"; offset: number; near?: [number, number, number];
+    ref?: { kind: "edge"; posRel: [number, number, number]; dir: [number, number, number] };
+  } | null {
     const f = this.detectFace(clientX, clientY);
     if (!f || f.axis === "curved") return null;
     const ai = f.axis === "X" ? 0 : f.axis === "Y" ? 1 : 2;
@@ -1090,7 +1104,13 @@ export class Viewport {
     // Emit a point ON the picked loop only when it came from real B-rep edges —
     // then the downstream edgeSelect can `containsPoint` it to isolate this loop.
     const near: [number, number, number] | undefined = usingBrep ? best[0].a : undefined;
-    return { axis: f.axis, offset: f.offset, near };
+    let ref: { kind: "edge"; posRel: [number, number, number]; dir: [number, number, number] } | undefined;
+    if (near) {
+      const d = [best[0].b[0] - best[0].a[0], best[0].b[1] - best[0].a[1], best[0].b[2] - best[0].a[2]];
+      const dl = Math.hypot(d[0], d[1], d[2]) || 1;
+      ref = { kind: "edge", posRel: this.relPos(near), dir: [d[0] / dl, d[1] / dl, d[2] / dl] };
+    }
+    return { axis: f.axis, offset: f.offset, near, ref };
   }
 
   /**
@@ -1239,7 +1259,17 @@ export class Viewport {
    * descriptor: the axis the edge runs along (→ vertical / horizontal-x/-y), or
    * if it lies flat in a horizontal plane, `atZ` with that plane's offset.
    */
-  pickEdge(clientX: number, clientY: number): { where: string; offset: number; near: [number, number, number] } | null {
+  /** Normalise a world point into the model's AABB [0..1]³ (scale/translate
+   *  invariant) — the frame in which pick signatures are stored. */
+  private relPos(p: [number, number, number]): [number, number, number] {
+    const mn = this.modelBox.min, mx = this.modelBox.max;
+    return [(p[0] - mn[0]) / ((mx[0] - mn[0]) || 1), (p[1] - mn[1]) / ((mx[1] - mn[1]) || 1), (p[2] - mn[2]) / ((mx[2] - mn[2]) || 1)];
+  }
+
+  pickEdge(clientX: number, clientY: number): {
+    where: string; offset: number; near: [number, number, number];
+    ref: { kind: "edge"; posRel: [number, number, number]; dir: [number, number, number] };
+  } | null {
     if (!this.edgesObj || !this.mesh) return null;
     const rect = this.renderer.domElement.getBoundingClientRect();
     const ndc = new THREE.Vector2(
@@ -1304,9 +1334,13 @@ export class Viewport {
     // selection re-bind to this edge parametrically as the geometry changes
     const abv = b.clone().sub(a);
     const tt = Math.min(1, Math.max(0, p.clone().sub(a).dot(abv) / (abv.lengthSq() || 1e-9)));
-    const ref = a.clone().addScaledVector(abv, tt);
+    const refPt = a.clone().addScaledVector(abv, tt);
+    const near: [number, number, number] = [refPt.x, refPt.y, refPt.z];
 
-    return { where, offset: Math.round(offset * 100) / 100, near: [ref.x, ref.y, ref.z] };
+    return {
+      where, offset: Math.round(offset * 100) / 100, near,
+      ref: { kind: "edge", posRel: this.relPos(near), dir: [dir.x, dir.y, dir.z] },
+    };
   }
 
   private onResize(container: HTMLElement) {

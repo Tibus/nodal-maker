@@ -113,21 +113,21 @@ describe("graph evaluation (real geometry)", () => {
     expect(vTop).toBeLessThan(8000); // and both remove some vs the raw 8000 box
   });
 
-  it("a picked-edge fillet tracks the edge when a parameter moves it", () => {
-    // pick the top +Y edge (runs along X at y=10, z=20) of a box; box spans
-    // x,y ∈ [-10,10], z ∈ [0,z]
-    const near: [number, number, number] = [0, 10, 20];
+  it("a picked-edge fillet re-binds to the edge when a parameter moves it", () => {
+    // pick the top +Y edge (runs along X at y=10, z=20) of a 20³ box. The pick's
+    // bbox-relative signature: top-face level (posRel.z=1), mid-span, along X.
+    const ref = { kind: "edge", posRel: [0.5, 1, 1], dir: [1, 0, 0] };
     const mk = (z: number): Graph => [
       { id: "b", type: "box", params: { x: 20, y: 20, z }, inputs: {} },
-      { id: "s", type: "edgeSelect", params: { where: "atZ", offset: 20, near }, inputs: {} },
+      { id: "s", type: "edgeSelect", params: { where: "atZ", offset: 20, ref }, inputs: {} },
       { id: "f", type: "fillet", params: { radius: 2 }, inputs: { in: "b", sel: "s" } },
     ];
     const box = (z: number) => 20 * 20 * z;
-    expect(volumeOf(mk(20), "f")).toBeLessThan(box(20)); // edge at the reference → filleted
-    // raise the box: the top edge moves to z=24. The selection re-binds to the
-    // nearest edge (the moved top edge) → still filleted. A frozen-coordinate
-    // match (containsPoint at z=20) would round nothing here.
-    expect(volumeOf(mk(24), "f")).toBeLessThan(box(24));
+    expect(volumeOf(mk(20), "f")).toBeLessThan(box(20)); // filleted at the reference height
+    // DOUBLE the height: the top edge jumps from z=20 to z=40. The relative
+    // signature (top face) re-binds to the moved edge → still exactly one edge
+    // filleted. Absolute matching (or nearest-to-a-frozen-point) would fail here.
+    expect(volumeOf(mk(40), "f")).toBeLessThan(box(40));
   });
 
   it("a broken node does not blank the rest of the history", () => {

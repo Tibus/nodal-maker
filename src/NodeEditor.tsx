@@ -572,8 +572,8 @@ export interface EditorApi {
   /** imperatively set a node param (used by the 3D gizmo to write tx/ty/tz) */
   setParam: (nodeId: string, name: string, value: unknown) => void;
   /** add a Face/Edge Select node preconfigured from a viewport pick */
-  addFaceSelect: (where: string, offset: number, box?: number[]) => void;
-  addEdgeSelect: (where: string, offset: number, near?: [number, number, number]) => void;
+  addFaceSelect: (where: string, offset: number, box?: number[], ref?: unknown) => void;
+  addEdgeSelect: (where: string, offset: number, near?: [number, number, number], ref?: unknown) => void;
   /** create a new Sketch node on a base plane at an offset (with optional face
    * outline as reference geometry), and open the editor */
   addSketchOnPlane: (base: "XY" | "XZ" | "YZ", offset: number, reference?: [number, number][][]) => void;
@@ -1178,7 +1178,7 @@ export default function NodeEditor({
   // viewed node is a fillet/bevel/shell with an empty selection port of the
   // matching kind — auto-wire the new selector straight into it.
   const addSelectFromPick = useCallback(
-    (kind: "face" | "edge", where: string, offset: number, near?: [number, number, number], box?: number[]) => {
+    (kind: "face" | "edge", where: string, offset: number, near?: [number, number, number], box?: number[], ref?: unknown) => {
       const nodeType = kind === "face" ? "faceSelect" : "edgeSelect";
       const id = newId(nodeType);
       const params: Record<string, unknown> = {};
@@ -1187,6 +1187,7 @@ export default function NodeEditor({
       params.offset = offset;
       if (near) params.near = near; // isolate a single border loop (not shown in the panel)
       if (box) params.box = box; // isolate a single face by its AABB (e.g. one bore)
+      if (ref) params.ref = ref; // bbox-relative signature → parametric re-bind on change
 
       const CONSUMERS: Record<string, { port: string; need: "face" | "edge" }> = {
         fillet: { port: "sel", need: "edge" },
@@ -1241,8 +1242,8 @@ export default function NodeEditor({
     [nodes, edges, outputId, setNodes, setEdges],
   );
 
-  const addFaceSelect = useCallback((where: string, offset: number, box?: number[]) => addSelectFromPick("face", where, offset, undefined, box), [addSelectFromPick]);
-  const addEdgeSelect = useCallback((where: string, offset: number, near?: [number, number, number]) => addSelectFromPick("edge", where, offset, near), [addSelectFromPick]);
+  const addFaceSelect = useCallback((where: string, offset: number, box?: number[], ref?: unknown) => addSelectFromPick("face", where, offset, undefined, box, ref), [addSelectFromPick]);
+  const addEdgeSelect = useCallback((where: string, offset: number, near?: [number, number, number], ref?: unknown) => addSelectFromPick("edge", where, offset, near, undefined, ref), [addSelectFromPick]);
 
   const addSketchOnPlane = useCallback((base: "XY" | "XZ" | "YZ", offset: number, reference?: [number, number][][]) => {
     // seed with the face outline as reference geometry when available, else a

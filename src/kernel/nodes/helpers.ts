@@ -24,7 +24,7 @@ import { svgPathToDrawing } from "../svgPath";
 import { writeBinarySTL } from "../stl";
 import type { MeshData } from "../manifold";
 import { solidToMeshData } from "./payload";
-import type { EdgeSpec, GraphValue, RPt, SketchFrame, Vec2 } from "./types";
+import type { EdgeSpec, GraphValue, RPt, SelRef, SketchFrame, Vec2 } from "./types";
 
 export function expectSketch(v: GraphValue | undefined, node: string): Drawing {
   if (!v || v.kind !== "sketch2d")
@@ -345,23 +345,70 @@ export function cylinderFromFace(
   return { center: loC, axis: [d[0] / length, d[1] / length, d[2] / length], radius, length };
 }
 
+/** Map a bbox-relative point [0..1]³ back to absolute coords on the given solid,
+ *  plus the box size / diagonal — the shared frame for signature re-binding. */
+function refFrame(solid: Shape3D): { target: (posRel: number[]) => number[]; size: number[]; diag: number } {
+  const [lo, hi] = solid.boundingBox.bounds;
+  const size = [(hi[0] - lo[0]) || 1, (hi[1] - lo[1]) || 1, (hi[2] - lo[2]) || 1];
+  const diag = Math.hypot(size[0], size[1], size[2]) || 1;
+  return { target: (r) => [lo[0] + r[0] * size[0], lo[1] + r[1] * size[1], lo[2] + r[2] * size[2]], size, diag };
+}
+
 /**
- * The edge of `solid` closest to `near` (sampled along each edge). Lets a picked
- * edge selection re-bind to the same edge after the geometry moves — the essence
- * of a parametric pick: track the entity, not a frozen coordinate.
+ * Re-bind an edge pick to the CURRENT geometry via its bbox-relative signature:
+ * the reference point tracks the box (so scaling/moving the part carries it), and
+ * the closest edge to it wins, lightly biased toward the picked direction. This
+ * follows an edge across parameter changes far better than a frozen coordinate.
  */
-export function nearestEdge(solid: Shape3D, near: [number, number, number]): Edge | null {
-  const edges = (solid as unknown as { edges: Edge[] }).edges;
+export function rebindEdge(solid: Shape3D, ref: Extract<SelRef, { kind: "edge" }>): Edge | null {
+  const { target: toAbs, diag } = refFrame(solid);
+  const target = toAbs(ref.posRel);
+  const hasDir = ref.dir[0] !== 0 || ref.dir[1] !== 0 || ref.dir[2] !== 0;
   let best: Edge | null = null;
-  let bestD = Infinity;
-  for (const e of edges) {
-    let d = Infinity;
+  let bestScore = Infinity;
+  for (const e of (solid as unknown as { edges: Edge[] }).edges) {
+    let dmin = Infinity;
     for (const t of [0, 0.25, 0.5, 0.75, 1]) {
       const p = e.pointAt(t);
-      const dd = (p.x - near[0]) ** 2 + (p.y - near[1]) ** 2 + (p.z - near[2]) ** 2;
-      if (dd < d) d = dd;
+      const dd = (p.x - target[0]) ** 2 + (p.y - target[1]) ** 2 + (p.z - target[2]) ** 2;
+      if (dd < dmin) dmin = dd;
     }
-    if (d < bestD) { bestD = d; best = e; }
+    const posScore = Math.sqrt(dmin) / diag;
+    let dirPenalty = 0;
+    if (hasDir) {
+      const s = e.startPoint, en = e.endPoint;
+      let d = [en.x - s.x, en.y - s.y, en.z - s.z];
+      const dl = Math.hypot(d[0], d[1], d[2]) || 1;
+      d = [d[0] / dl, d[1] / dl, d[2] / dl];
+      dirPenalty = (1 - Math.abs(d[0] * ref.dir[0] + d[1] * ref.dir[1] + d[2] * ref.dir[2])) * 0.15;
+    }
+    const score = posScore + dirPenalty;
+    if (score < bestScore) { bestScore = score; best = e; }
+  }
+  return best;
+}
+
+/** Re-bind a face pick to the CURRENT geometry: match the surface type first,
+ *  then the bbox-relative position (and the normal, for planes). */
+export function rebindFace(solid: Shape3D, ref: Extract<SelRef, { kind: "face" }>): Face | null {
+  const { target: toAbs, diag } = refFrame(solid);
+  const target = toAbs(ref.posRel);
+  let best: Face | null = null;
+  let bestScore = Infinity;
+  for (const f of (solid as unknown as { faces: Face[] }).faces) {
+    const surf = f.geomType === "PLANE" ? "planar" : f.geomType === "CYLINDRE" ? "cylindrical" : "other";
+    const typePenalty = surf === ref.surf ? 0 : 1000; // same type strongly preferred
+    const c = f.center;
+    const posScore = Math.hypot(c.x - target[0], c.y - target[1], c.z - target[2]) / diag;
+    let normPenalty = 0;
+    if (ref.surf === "planar") {
+      const n = f.normalAt();
+      const nl = Math.hypot(n.x, n.y, n.z) || 1;
+      const align = Math.abs((n.x * ref.normal[0] + n.y * ref.normal[1] + n.z * ref.normal[2]) / nl);
+      normPenalty = (1 - align) * 0.3;
+    }
+    const score = typePenalty + posScore + normPenalty;
+    if (score < bestScore) { bestScore = score; best = f; }
   }
   return best;
 }
