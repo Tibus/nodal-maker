@@ -121,15 +121,6 @@ function hashParams(params: Record<string, unknown>): string {
 }
 
 /** Free the WASM object behind a cached B-rep value (mesh values are plain JS). */
-function disposeValue(v: GraphValue): void {
-  try {
-    if (v.kind === "solid") (v.solid as unknown as { delete?: () => void }).delete?.();
-    else if (v.kind === "sketch2d") (v.drawing as unknown as { delete?: () => void }).delete?.();
-  } catch {
-    /* best-effort — never let cleanup crash an eval */
-  }
-}
-
 const CACHE_MAX_ENTRIES = 256;
 
 export function evalGraphCached(
@@ -206,21 +197,32 @@ export function evalGraphCached(
   const outputs: Record<string, GraphValue> = {};
   for (const n of graph) outputs[n.id] = evalNode(n.id);
 
-  // evict entries untouched for more than one run (frees stale OCCT shapes)
-  for (const [k, e] of cache.entries) {
-    if (cache.run - e.run > 1) {
-      disposeValue(e.value);
+  // Evict entries untouched for more than one run. Many nodes pass their input
+  // solid/drawing through unchanged (color, no-op transforms, fillet r=0…), so
+  // the SAME OCCT object can live in several cache entries. Freeing it while
+  // another entry (or a live output) still references it is a use-after-free —
+  // hence the "extrude object was deleted" crash. So we only delete an object
+  // that NO surviving entry / output still holds.
+  const evict = (predicate: (e: { run: number; value: GraphValue }) => boolean) => {
+    const survivors = new Set<object>();
+    const keep = (v: GraphValue) => { if (v.kind === "solid") survivors.add(v.solid); else if (v.kind === "sketch2d") survivors.add(v.drawing); };
+    for (const e of cache.entries.values()) if (!predicate(e)) keep(e.value);
+    for (const v of Object.values(outputs)) keep(v); // still being meshed by the caller
+    const orphans = new Set<{ delete?: () => void }>();
+    for (const [k, e] of cache.entries) {
+      if (!predicate(e)) continue;
+      const obj = e.value.kind === "solid" ? e.value.solid : e.value.kind === "sketch2d" ? e.value.drawing : null;
+      if (obj && !survivors.has(obj)) orphans.add(obj as { delete?: () => void });
       cache.entries.delete(k);
     }
-  }
-  // hard LRU bound as a backstop against pathological graphs: if we're still
-  // over budget, drop the oldest entries (smallest run) first.
+    for (const o of orphans) { try { o.delete?.(); } catch { /* best-effort */ } }
+  };
+
+  evict((e) => cache.run - e.run > 1);
+  // hard LRU bound as a backstop against pathological graphs
   if (cache.entries.size > CACHE_MAX_ENTRIES) {
-    const byAge = [...cache.entries.entries()].sort((a, b) => a[1].run - b[1].run);
-    for (let i = 0; i < byAge.length && cache.entries.size > CACHE_MAX_ENTRIES; i++) {
-      disposeValue(byAge[i][1].value);
-      cache.entries.delete(byAge[i][0]);
-    }
+    const cutoff = [...cache.entries.values()].map((e) => e.run).sort((a, b) => a - b)[cache.entries.size - CACHE_MAX_ENTRIES] ?? -Infinity;
+    evict((e) => e.run <= cutoff);
   }
 
   return { outputs, hits, misses };

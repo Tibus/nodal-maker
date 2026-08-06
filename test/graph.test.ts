@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { initKernel } from "./kernel";
 import { evalToPayload } from "../src/kernel/model";
 import { meshMassProps } from "../src/massprops";
-import type { Graph } from "../src/kernel/nodes";
+import { evalGraphCached, makeEvalCache, meshAndTag, type Graph } from "../src/kernel/nodes";
 
 const volumeOf = (g: Graph, out: string) => {
   const r = evalToPayload(g, out);
@@ -71,5 +71,23 @@ describe("graph evaluation (real geometry)", () => {
   it("surfaces a clear error for a node that cannot build", () => {
     const g: Graph = [{ id: "e", type: "extrude", params: { height: 10 }, inputs: {} }];
     expect(() => evalToPayload(g, "e")).toThrow(/\[extrude\]/);
+  });
+
+  it("does not free a solid still shared by another node after a downstream node is deleted", () => {
+    // repro of the "extrude object was deleted" crash: a pass-through node
+    // (color) shares its input's OCCT solid; deleting it must not dispose the
+    // shared object while the upstream node still holds it.
+    const cache = makeEvalCache();
+    const withColor: Graph = [
+      { id: "b", type: "box", params: { x: 20, y: 20, z: 20 }, inputs: {} },
+      { id: "c", type: "color", params: { color: "#f00" }, inputs: { in: "b" } },
+    ];
+    const noColor: Graph = [{ id: "b", type: "box", params: { x: 20, y: 20, z: 20 }, inputs: {} }];
+    const box = () => { const v = evalGraphCached(noColor, cache).outputs["b"]; if (v.kind !== "solid") throw new Error("not a solid"); return meshAndTag(v.solid).indices.length / 3; };
+    evalGraphCached(withColor, cache); // run 1: color shares the box solid
+    // several runs without color → its cache entry ages out and gets evicted
+    expect(box()).toBe(12); // run 2
+    expect(box()).toBe(12); // run 3 — eviction of color's shared solid happens here
+    expect(box()).toBe(12); // run 4 — box solid must still be alive
   });
 });
