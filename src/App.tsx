@@ -256,6 +256,7 @@ export default function App() {
         onReady={(api) => {
           editorApi.current = api;
         }}
+        onSelectPreview={(desc) => viewportRef.current?.setSelectionPreview(desc)}
         onFit={() => viewportRef.current?.fit()}
         onTopView={() => viewportRef.current?.topView()}
         onExportPNG={() => {

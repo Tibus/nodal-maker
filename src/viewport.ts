@@ -23,6 +23,10 @@ export class Viewport {
   private payload: MeshPayload | null = null;
   private raycaster = new THREE.Raycaster();
   private pickHighlight: THREE.Object3D | null = null;
+  // Persistent "what does this selection node target" overlay — rebuilt after
+  // every re-eval (unlike pickHighlight, which is a one-shot pick flash).
+  private selPreview: { kind: "edge" | "face"; where: string; offset: number; near?: [number, number, number] } | null = null;
+  private selPreviewObj: THREE.Object3D | null = null;
   private measures: THREE.Object3D[] = [];
   private edgesObj: THREE.LineSegments | null = null;
   private modelDiag = 100;
@@ -174,6 +178,7 @@ export class Viewport {
     this.applyViewMode();
     this.applyClip(); // keep any active section plane on the new geometry
     this.applyAnalysis(); // re-apply any overhang/thickness overlay after re-eval
+    this.buildSelectionPreview(); // re-show the active selection node's target
 
     const box = new THREE.Box3().setFromObject(mesh);
     this.modelDiag = Math.max(box.getSize(new THREE.Vector3()).length(), 1);
@@ -1079,6 +1084,147 @@ export class Viewport {
     // then the downstream edgeSelect can `containsPoint` it to isolate this loop.
     const near: [number, number, number] | undefined = usingBrep ? best[0].a : undefined;
     return { axis: f.axis, offset: f.offset, near };
+  }
+
+  /**
+   * Persistently show what an edge/face SELECTION node targets on the live model.
+   * Driven by the node's descriptor (not a mouse pick), so it survives re-evals
+   * and reappears whenever that selection node is highlighted in the editor.
+   * Pass null to clear.
+   */
+  setSelectionPreview(desc: { kind: "edge" | "face"; where: string; offset: number; near?: [number, number, number] } | null) {
+    this.selPreview = desc;
+    this.buildSelectionPreview();
+  }
+
+  private clearSelectionPreview() {
+    if (this.selPreviewObj) {
+      this.scene.remove(this.selPreviewObj);
+      this.selPreviewObj.traverse((o) => {
+        if (o instanceof THREE.Mesh) { o.geometry.dispose(); (o.material as THREE.Material).dispose?.(); }
+      });
+      this.selPreviewObj = null;
+    }
+  }
+
+  /** (Re)build the selection overlay from the stored descriptor + current model. */
+  private buildSelectionPreview() {
+    this.clearSelectionPreview();
+    const desc = this.selPreview;
+    if (!desc) return;
+    if (desc.kind === "edge") this.buildEdgeSelectionPreview(desc);
+    else this.buildFaceSelectionPreview(desc);
+  }
+
+  private buildEdgeSelectionPreview(desc: { where: string; offset: number; near?: [number, number, number] }) {
+    const brep = this.payload?.edges;
+    if (!brep || !brep.length) return; // needs real B-rep edges
+    const eps = Math.max(0.05, this.modelDiag * 0.004);
+    // mirror the kernel's edgeSelect filter, geometrically, on each segment
+    const onAxis = (ax: number, a: number[], b: number[]) => Math.abs(a[ax] - desc.offset) <= eps && Math.abs(b[ax] - desc.offset) <= eps;
+    const dirDom = (a: number[], b: number[]) => {
+      const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+      const l = Math.hypot(d[0], d[1], d[2]) || 1;
+      return [Math.abs(d[0] / l), Math.abs(d[1] / l), Math.abs(d[2] / l)];
+    };
+    const keep = (a: number[], b: number[]) => {
+      switch (desc.where) {
+        case "vertical": return dirDom(a, b)[2] > 0.9;
+        case "horizontal-x": return dirDom(a, b)[0] > 0.9;
+        case "horizontal-y": return dirDom(a, b)[1] > 0.9;
+        case "atX": return onAxis(0, a, b);
+        case "atY": return onAxis(1, a, b);
+        case "atZ": return onAxis(2, a, b);
+        default: return true;
+      }
+    };
+    type Seg = { a: [number, number, number]; b: [number, number, number] };
+    let segs: Seg[] = [];
+    for (let i = 0; i + 5 < brep.length; i += 6) {
+      const a = [brep[i], brep[i + 1], brep[i + 2]];
+      const b = [brep[i + 3], brep[i + 4], brep[i + 5]];
+      if (keep(a, b)) segs.push({ a: [a[0], a[1], a[2]], b: [b[0], b[1], b[2]] });
+    }
+    // `near` narrows to the single loop through that point (mirror containsPoint)
+    if (desc.near && segs.length) segs = this.loopThrough(segs, desc.near);
+    if (!segs.length) return;
+    this.selPreviewObj = this.buildEdgeTubes(segs);
+    this.scene.add(this.selPreviewObj);
+  }
+
+  /** Keep only the connected loop nearest to `p` (union-find over endpoints). */
+  private loopThrough(
+    segs: { a: [number, number, number]; b: [number, number, number] }[],
+    p: [number, number, number],
+  ): { a: [number, number, number]; b: [number, number, number] }[] {
+    const q = Math.max(this.modelDiag * 1e-4, 1e-5);
+    const key = (v: [number, number, number]) => `${Math.round(v[0] / q)}_${Math.round(v[1] / q)}_${Math.round(v[2] / q)}`;
+    const parent: number[] = [];
+    const nodeOf = new Map<string, number>();
+    const idOf = (v: [number, number, number]) => { const k = key(v); let id = nodeOf.get(k); if (id == null) { id = parent.length; parent.push(id); nodeOf.set(k, id); } return id; };
+    const find = (x: number): number => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+    const seed: number[] = [];
+    for (const s of segs) { const ia = idOf(s.a), ib = idOf(s.b); parent[find(ia)] = find(ib); seed.push(ia); }
+    const loops = new Map<number, typeof segs>();
+    segs.forEach((s, i) => { const r = find(seed[i]); (loops.get(r) ?? (loops.set(r, []), loops.get(r)!)).push(s); });
+    const target = new THREE.Vector3(...p);
+    const va = new THREE.Vector3(), vb = new THREE.Vector3(), ab = new THREE.Vector3(), ap = new THREE.Vector3(), pr = new THREE.Vector3();
+    const dist = (s: { a: [number, number, number]; b: [number, number, number] }) => {
+      va.set(...s.a); vb.set(...s.b); ab.subVectors(vb, va);
+      const t = Math.min(1, Math.max(0, ap.subVectors(target, va).dot(ab) / (ab.lengthSq() || 1e-9)));
+      return pr.copy(va).addScaledVector(ab, t).distanceTo(target);
+    };
+    let best = segs, bestD = Infinity;
+    for (const loop of loops.values()) { let d = Infinity; for (const s of loop) d = Math.min(d, dist(s)); if (d < bestD) { bestD = d; best = loop; } }
+    return best;
+  }
+
+  /** Green tube overlay for a set of edge segments (shared by pick + preview). */
+  private buildEdgeTubes(segs: { a: [number, number, number]; b: [number, number, number] }[]): THREE.Group {
+    const r = Math.max(0.4, this.modelDiag * 0.006);
+    const group = new THREE.Group();
+    const mat = new THREE.MeshBasicMaterial({ color: 0x39d98a, depthTest: false });
+    for (const s of segs) {
+      const a = new THREE.Vector3(...s.a);
+      const b = new THREE.Vector3(...s.b);
+      const tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(a, b), 1, r, 5, false), mat);
+      tube.renderOrder = 999;
+      group.add(tube);
+    }
+    return group;
+  }
+
+  /** Translucent fill over the face group(s) an axis-plane face selection targets. */
+  private buildFaceSelectionPreview(desc: { where: string; offset: number }) {
+    if (!this.payload) return;
+    const ax = desc.where === "atX" ? 0 : desc.where === "atY" ? 1 : desc.where === "atZ" ? 2 : -1;
+    if (ax < 0) return; // only axis-plane face selections are previewed for now
+    const { vertices, indices, groups } = this.payload;
+    const eps = Math.max(0.05, this.modelDiag * 0.01);
+    const inPlane = (g: { start: number; count: number }) => {
+      for (let i = g.start; i < g.start + g.count; i++) {
+        if (Math.abs(vertices[indices[i] * 3 + ax] - desc.offset) > eps) return false;
+      }
+      return true;
+    };
+    const pts: number[] = [];
+    for (const g of groups) {
+      if (!inPlane(g)) continue;
+      for (let i = g.start; i < g.start + g.count; i++) {
+        const v = indices[i] * 3;
+        pts.push(vertices[v], vertices[v + 1], vertices[v + 2]);
+      }
+    }
+    if (!pts.length) return;
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(pts), 3));
+    const mesh = new THREE.Mesh(
+      geom,
+      new THREE.MeshBasicMaterial({ color: 0x39d98a, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthTest: false }),
+    );
+    mesh.renderOrder = 998;
+    this.selPreviewObj = mesh;
+    this.scene.add(mesh);
   }
 
   /**

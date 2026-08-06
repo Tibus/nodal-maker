@@ -583,6 +583,9 @@ export interface NodeEditorProps {
   onChange: (graph: Graph, outputId: string, pinnedIds: string[], userVars: Record<string, number>) => void;
   /** hands the parent an imperative handle once mounted */
   onReady?: (api: EditorApi) => void;
+  /** fires when a single edge/face selection node is highlighted (or null) so the
+   *  viewport can show what that selection targets on the live model */
+  onSelectPreview?: (desc: { kind: "edge" | "face"; where: string; offset: number; near?: [number, number, number] } | null) => void;
   errorNodeId?: string | null;
   errorMessage?: string | null;
   values?: Record<string, string>;
@@ -821,6 +824,7 @@ export default function NodeEditor({
   initialOutputId,
   onChange,
   onReady,
+  onSelectPreview,
   errorNodeId,
   errorMessage,
   values,
@@ -999,6 +1003,27 @@ export default function NodeEditor({
     }
     prevSnap.current = { nodes, edges, outputId: validOut };
   }, [nodes, edges, outputId, onChange, components, hidden, userVars]);
+
+  // Preview what a selection node targets: when exactly one edge/face selection
+  // node is highlighted, hand its descriptor to the parent (→ viewport overlay).
+  const onSelectPreviewRef = useRef(onSelectPreview);
+  onSelectPreviewRef.current = onSelectPreview;
+  const lastPreviewSig = useRef<string>("");
+  useEffect(() => {
+    const sel = nodes.filter((n) => n.selected && !isNote(n));
+    const one = sel.length === 1 ? sel[0] : null;
+    const t = one?.data.nodeType;
+    let desc: { kind: "edge" | "face"; where: string; offset: number; near?: [number, number, number] } | null = null;
+    if (one && (t === "edgeSelect" || t === "faceSelect")) {
+      const p = one.data.params ?? {};
+      const near = Array.isArray(p.near) && p.near.length === 3 ? (p.near.map(Number) as [number, number, number]) : undefined;
+      desc = { kind: t === "faceSelect" ? "face" : "edge", where: String(p.where ?? "all"), offset: Number(p.offset ?? 0), near };
+    }
+    const sig = JSON.stringify(desc);
+    if (sig === lastPreviewSig.current) return; // avoid re-emitting on every drag
+    lastPreviewSig.current = sig;
+    onSelectPreviewRef.current?.(desc);
+  }, [nodes]);
 
   const undo = useCallback(() => {
     const snap = undoStack.current.pop();
