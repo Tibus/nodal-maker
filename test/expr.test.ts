@@ -29,6 +29,20 @@ describe("expression evaluator", () => {
     expect(evalExpr("sind(30)")).toBeCloseTo(0.5, 10);
   });
 
+  it("handles modulo, constants and nested calls", () => {
+    expect(evalExpr("17 % 5")).toBe(2);
+    expect(evalExpr("tau")).toBeCloseTo(2 * Math.PI, 10);
+    expect(evalExpr("e")).toBeCloseTo(Math.E, 10);
+    expect(evalExpr("atan2(1, 1)")).toBeCloseTo(Math.PI / 4, 10);
+    expect(evalExpr("sqrt(max(9, 4))")).toBe(3);
+    expect(evalExpr("cosd(60)")).toBeCloseTo(0.5, 10);
+  });
+
+  it("ignores surrounding whitespace and respects nested parens", () => {
+    expect(evalExpr("  (2 + 3) * (4 - 1)  ")).toBe(15);
+    expect(evalExpr("2 * -(3 + 1)")).toBe(-8);
+  });
+
   it("throws on malformed input", () => {
     expect(() => evalExpr("1 +")).toThrow();
     expect(() => evalExpr("(1 + 2")).toThrow();
