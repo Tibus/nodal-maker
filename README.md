@@ -1,10 +1,10 @@
 # nodal-maker
 
 **Un outil de CAO/FAO paramétrique nodal qui tourne entièrement dans le navigateur** —
-conçu pour l'**impression 3D résine** et la **découpe laser / Cricut**. On câble des nœuds
-en un graphe (à mi-chemin entre Fusion360 et Blender), on ajuste des paramètres, et on
-obtient en direct des solides B-rep et des profils 2D exportables en STL / STEP / 3MF /
-SVG / DXF.
+conçu pour l'**impression 3D (résine & FDM)**, la **découpe laser / Cricut** et le
+**fraisage CNC**. On câble des nœuds en un graphe (à mi-chemin entre Fusion360 et Blender),
+on ajuste des paramètres, et on obtient en direct des solides B-rep et des profils 2D
+exportables en STL / STEP / 3MF / SVG / DXF.
 
 🔗 **En ligne :** https://tibus.github.io/nodal-maker/
 📐 **Comment ça marche :** [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
@@ -39,7 +39,9 @@ SVG / DXF.
 | Domaine | Ce que tu obtiens |
 |---|---|
 | **Impression résine** | évidement + trous de drainage, infill lattice, infill **gyroïde**, auto-orientation, génération de supports, découpe pour plateau, analyse surplombs & épaisseur de paroi, contrôle watertight, estimation coût/temps résine |
-| **Laser / Cricut** | living hinge, nesting, coins dogbone/T-bone, micro-joints (hold-in-sheet), compensation de kerf, boîtes à encoches, calques DXF CUT/SCORE, import/export SVG & DXF |
+| **Impression FDM** | supports, auto-orientation, analyse surplombs/épaisseur, hollow/infill, **agencement multi-pièces sur plateau**, **estimation filament** (longueur/poids), export STL/3MF |
+| **Fraisage CNC** | coins **dogbone/T-bone**, **nœud CNC job** (contour + poche + perçages avec profondeurs) → **export DXF FAO** (un calque par opération + entités POINT de perçage), export STEP |
+| **Laser / Cricut** | living hinge, nesting, micro-joints (hold-in-sheet), compensation de kerf, boîtes à encoches, calques DXF CUT/SCORE, import/export SVG & DXF |
 | **Modélisation** | extrusion (taper/twist), poche, perçages paramétriques, révolution, loft, sweep, boss-on-cap, congé à rayon variable, chanfrein, coque, répétitions (linéaire/radiale/**sur chemin**), texte gravé/embossé sur une face |
 | **Analyse & viewport** | vue en coupe, outil de mesure, propriétés de masse, couleur par corps, export vidéo turntable |
 | **Import/export** | STL, STEP, 3MF, SVG, DXF, PNG, WebM |
