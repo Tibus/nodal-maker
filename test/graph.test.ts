@@ -73,6 +73,18 @@ describe("graph evaluation (real geometry)", () => {
     expect(() => evalToPayload(g, "e")).toThrow(/\[extrude\]/);
   });
 
+  it("a broken node does not blank the rest of the history", () => {
+    // repro: a fillet whose edge selection was deleted rounds EVERY edge with a
+    // radius too large for the geometry → it fails. Viewing the fillet must show
+    // that error, but the upstream box (and any sibling) must stay viewable.
+    const g: Graph = [
+      { id: "b", type: "box", params: { x: 20, y: 20, z: 20 }, inputs: {} },
+      { id: "f", type: "fillet", params: { radius: 50 }, inputs: { in: "b" } },
+    ];
+    expect(() => evalToPayload(g, "f")).toThrow(); // the broken node still errors
+    expect(volumeOf(g, "b")).toBeCloseTo(8000, 0); // …but the box is unaffected
+  });
+
   it("does not free a solid still shared by another node after a downstream node is deleted", () => {
     // repro of the "extrude object was deleted" crash: a pass-through node
     // (color) shares its input's OCCT solid; deleting it must not dispose the

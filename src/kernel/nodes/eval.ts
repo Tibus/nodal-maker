@@ -47,7 +47,7 @@ export function humanizeError(nodeType: string, raw: string): string {
   return `[${nodeType}] ${hint}`;
 }
 
-export function evalGraph(graph: Graph, vars: Record<string, number> = {}): { outputs: Record<string, GraphValue>; order: string[] } {
+export function evalGraph(graph: Graph, vars: Record<string, number> = {}): { outputs: Record<string, GraphValue>; order: string[]; errors: Record<string, Error> } {
   const byId = new Map(graph.map((n) => [n.id, n]));
   const cache = new Map<string, GraphValue>();
   const visiting = new Set<string>();
@@ -77,8 +77,19 @@ export function evalGraph(graph: Graph, vars: Record<string, number> = {}): { ou
   };
 
   const outputs: Record<string, GraphValue> = {};
-  for (const n of graph) outputs[n.id] = evalNode(n.id);
-  return { outputs, order };
+  const errors: Record<string, Error> = {};
+  for (const n of graph) {
+    try {
+      outputs[n.id] = evalNode(n.id);
+    } catch (e) {
+      // A failing node must not blank the whole history: record its error and
+      // keep evaluating the rest so unrelated / upstream nodes stay viewable.
+      errors[n.id] = e instanceof Error ? e : new Error(String(e));
+    } finally {
+      visiting.clear(); // top-level calls must start balanced; a failed subtree can leave ids behind
+    }
+  }
+  return { outputs, order, errors };
 }
 
 /* ------------------------------------------------------------------ */
@@ -127,7 +138,7 @@ export function evalGraphCached(
   graph: Graph,
   cache: EvalCache,
   vars: Record<string, number> = {},
-): { outputs: Record<string, GraphValue>; hits: number; misses: number } {
+): { outputs: Record<string, GraphValue>; hits: number; misses: number; errors: Record<string, Error> } {
   cache.run++;
   const byId = new Map(graph.map((n) => [n.id, n]));
   // user params affect any expression param, so fold them into every cache key
@@ -195,7 +206,19 @@ export function evalGraphCached(
   };
 
   const outputs: Record<string, GraphValue> = {};
-  for (const n of graph) outputs[n.id] = evalNode(n.id);
+  const errors: Record<string, Error> = {};
+  for (const n of graph) {
+    try {
+      outputs[n.id] = evalNode(n.id);
+    } catch (e) {
+      // Resilient eval: one broken node (e.g. a fillet whose edge selection was
+      // deleted, so it now tries to round every edge) must not abort the pass —
+      // otherwise the entire history goes blank. Record it, keep going.
+      errors[n.id] = e instanceof Error ? e : new Error(String(e));
+    } finally {
+      visiting.clear(); // top-level calls must start balanced; a failed subtree can leave ids behind
+    }
+  }
 
   // Evict entries untouched for more than one run. Many nodes pass their input
   // solid/drawing through unchanged (color, no-op transforms, fillet r=0…), so
@@ -225,5 +248,5 @@ export function evalGraphCached(
     evict((e) => e.run <= cutoff);
   }
 
-  return { outputs, hits, misses };
+  return { outputs, hits, misses, errors };
 }

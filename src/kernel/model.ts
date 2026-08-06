@@ -192,7 +192,7 @@ export function evalToPayload(
   extraIds?: string[],
   vars?: Record<string, number>,
 ): BuildResult {
-  const outputs = cache ? evalGraphCached(graph, cache, vars).outputs : evalGraph(graph, vars).outputs;
+  const { outputs, errors } = cache ? evalGraphCached(graph, cache, vars) : evalGraph(graph, vars);
 
   // collect inline value previews for scalar nodes
   const values: Record<string, string> = {};
@@ -221,7 +221,13 @@ export function evalToPayload(
   }
 
   const v: GraphValue | undefined = outputs[outputId];
-  if (!v) throw new Error(`unknown output node "${outputId}"`);
+  if (!v) {
+    // The viewed node itself failed to build — surface its (humanized) error so
+    // the editor can flag it. Unrelated nodes were still evaluated and remain
+    // viewable; only selecting the broken one shows this.
+    if (errors[outputId]) throw errors[outputId];
+    throw new Error(`unknown output node "${outputId}"`);
+  }
   if (v.kind === "solid") {
     let topCapFaceId: number | null = null;
     let topCapZ = 0;
