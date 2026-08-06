@@ -51,20 +51,26 @@ export const meshNodes: Record<string, NodeImpl> = {
   faceSelect: (_inputs, params) => {
     const where = String(params.where ?? "all");
     const offset = Number(params.offset ?? 0);
+    // Optional AABB of a specific picked face — isolates ONE face among several
+    // matching the criterion (e.g. a single bore among many cylindrical faces).
+    const b = params.box;
+    const box = Array.isArray(b) && b.length === 6 && b.every((n) => Number.isFinite(Number(n))) ? b.map(Number) : null;
     const apply = (f: FaceFinder): FaceFinder => {
+      let ff: FaceFinder;
       switch (where) {
         case "top":
         case "bottom":
-        case "atZ": return f.inPlane("XY", offset); // precise plane at Z = offset
-        case "atX": return f.inPlane("YZ", offset); // precise plane at X = offset
-        case "atY": return f.inPlane("XZ", offset); // precise plane at Y = offset
-        case "horizontal": return f.parallelTo("XY");
-        case "vertical-x": return f.parallelTo("YZ");
-        case "vertical-y": return f.parallelTo("XZ");
-        case "planar": return f.ofSurfaceType("PLANE");
-        case "cylindrical": return f.ofSurfaceType("CYLINDRE");
-        default: return f;
+        case "atZ": ff = f.inPlane("XY", offset); break; // precise plane at Z = offset
+        case "atX": ff = f.inPlane("YZ", offset); break; // precise plane at X = offset
+        case "atY": ff = f.inPlane("XZ", offset); break; // precise plane at Y = offset
+        case "horizontal": ff = f.parallelTo("XY"); break;
+        case "vertical-x": ff = f.parallelTo("YZ"); break;
+        case "vertical-y": ff = f.parallelTo("XZ"); break;
+        case "planar": ff = f.ofSurfaceType("PLANE"); break;
+        case "cylindrical": ff = f.ofSurfaceType("CYLINDRE"); break;
+        default: ff = f;
       }
+      return box ? ff.inBox([box[0], box[1], box[2]], [box[3], box[4], box[5]]) : ff;
     };
     return { kind: "selection", target: "face", apply: apply as (f: unknown) => unknown };
   },

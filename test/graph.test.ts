@@ -73,16 +73,19 @@ describe("graph evaluation (real geometry)", () => {
     expect(() => evalToPayload(g, "e")).toThrow(/\[extrude\]/);
   });
 
-  it("an internal thread can be placed on a picked bore (off-centre, any axis)", () => {
-    // box spans x,y ∈ [-20,20], z ∈ [0,20]
-    const box = { id: "b", type: "box", params: { x: 40, y: 40, z: 20 }, inputs: {} };
-    // Z-axis bore, off-centre at (8,8), full height
-    const gZ: Graph = [box, { id: "t", type: "internalThread", params: { standard: "custom", pitch: 2, place: { center: [8, 8, 0], axis: [0, 0, 1], length: 20, diameter: 8 } }, inputs: { in: "b" } }];
-    const pz = evalToPayload(gZ, "t");
-    expect(pz.mesh.indices.length / 3).toBeGreaterThan(50); // bored body + helical ridge
-    // X-axis bore exercises the rotate-onto-axis path
-    const gX: Graph = [box, { id: "t", type: "internalThread", params: { standard: "custom", pitch: 2, place: { center: [-20, 8, 8], axis: [1, 0, 0], length: 40, diameter: 8 } }, inputs: { in: "b" } }];
-    expect(() => evalToPayload(gX, "t")).not.toThrow();
+  it("internal thread threads a selected cylindrical bore (face input)", () => {
+    // a block with a through-bore → thread the bore via a cylindrical Face Select
+    const g: Graph = [
+      { id: "blk", type: "box", params: { x: 30, y: 30, z: 20 }, inputs: {} },
+      { id: "cyl", type: "cylinder", params: { radius: 6, height: 40 }, inputs: {} },
+      { id: "cc", type: "transform", params: { tz: -10 }, inputs: { in: "cyl" } },
+      { id: "bored", type: "boolean3d", params: { op: "difference" }, inputs: { base: "blk", tool: "cc" } },
+      { id: "fs", type: "faceSelect", params: { where: "cylindrical" }, inputs: {} },
+      { id: "t", type: "internalThread", params: { standard: "custom", pitch: 2 }, inputs: { in: "bored", face: "fs" } },
+    ];
+    const bored = evalToPayload(g, "bored").mesh.indices.length / 3;
+    const threaded = evalToPayload(g, "t").mesh.indices.length / 3;
+    expect(threaded).toBeGreaterThan(bored); // helical ridge cut into the selected bore
   });
 
   it("a fillet accepts several selection nodes (union of edges)", () => {

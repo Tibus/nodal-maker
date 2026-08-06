@@ -16,6 +16,7 @@ import {
   getOC,
   cast,
   Plane as RPlane,
+  type Face,
 } from "replicad";
 import * as opentype from "opentype.js";
 import { svgPathToDrawing } from "../svgPath";
@@ -306,6 +307,31 @@ export function buildNutBRep(
   const bodyWithHole = body.cut(orient(boreLocal)) as Shape3D;
   const ridge = orient(sweepHelicalRidge(rOuter, profile, p, L, lefthand, 0));
   return makeCompound([bodyWithHole, ridge]) as Shape3D;
+}
+
+/**
+ * Read a cylindrical B-rep face's geometry (so an Internal Thread can be placed
+ * on it): the axis base point at its LOW end, the axis direction, the radius and
+ * the axial length. Derived purely from the public surface API — sample two
+ * diametrically-opposite points at each V-bound; their midpoints lie on the axis.
+ * Returns null if the face isn't a (full) cylinder.
+ */
+export function cylinderFromFace(
+  face: Face,
+): { center: [number, number, number]; axis: [number, number, number]; radius: number; length: number } | null {
+  if (face.geomType !== "CYLINDRE") return null;
+  // NB: replicad's pointOnSurface takes NORMALISED (u,v) in [0,1]. On a full bore
+  // u=0 and u=0.5 are diametrically opposite; v=0/v=1 are the two ends.
+  const P = (u: number, v: number): [number, number, number] => { const p = face.pointOnSurface(u, v); return [p.x, p.y, p.z]; };
+  const mid = (a: number[], b: number[]): [number, number, number] => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
+  const loC = mid(P(0, 0), P(0.5, 0)); // axis point at the low end
+  const hiC = mid(P(0, 1), P(0.5, 1)); // axis point at the high end
+  const d = [hiC[0] - loC[0], hiC[1] - loC[1], hiC[2] - loC[2]];
+  const length = Math.hypot(d[0], d[1], d[2]);
+  if (length < 1e-6) return null;
+  const a = P(0, 0), b = P(0.5, 0);
+  const radius = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) / 2;
+  return { center: loC, axis: [d[0] / length, d[1] / length, d[2] / length], radius, length };
 }
 
 let stepCounter = 0;

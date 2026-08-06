@@ -860,6 +860,8 @@ export class Viewport {
     offset: number;
     tag: FaceTag;
     centroid: [number, number, number];
+    /** the picked face's world AABB — lets a Face Select isolate THIS face */
+    box: [number, number, number, number, number, number];
   } | null {
     const f = this.detectFace(clientX, clientY);
     if (!f) return null;
@@ -880,7 +882,12 @@ export class Viewport {
     hmesh.renderOrder = 999;
     this.scene.add(hmesh);
     this.pickHighlight = hmesh;
-    return { axis: f.axis, offset: f.offset, tag: f.tag, centroid: f.centroid };
+    // pad the AABB slightly so a tight box still contains the whole B-rep face
+    const pad = Math.max(0.05, this.modelDiag * 0.01);
+    return {
+      axis: f.axis, offset: f.offset, tag: f.tag, centroid: f.centroid,
+      box: [f.min[0] - pad, f.min[1] - pad, f.min[2] - pad, f.max[0] + pad, f.max[1] + pad, f.max[2] + pad],
+    };
   }
 
   /**
@@ -1225,61 +1232,6 @@ export class Viewport {
     mesh.renderOrder = 998;
     this.selPreviewObj = mesh;
     this.scene.add(mesh);
-  }
-
-  /**
-   * Pick a cylindrical face and describe its bore, so an Internal Thread can be
-   * placed exactly on it: axis base point (its LOW end along the axis), axis
-   * direction, radius and axial length. `internal` is true when the surface's
-   * normals point toward the axis (a bore) rather than outward (a rod).
-   */
-  pickCylinder(clientX: number, clientY: number): {
-    center: [number, number, number];
-    axis: [number, number, number];
-    radius: number;
-    length: number;
-    internal: boolean;
-  } | null {
-    const f = this.detectFace(clientX, clientY);
-    if (!f || f.axis !== "curved" || !this.payload) return null;
-    const { vertices, normals, indices } = this.payload;
-    const g = f.group;
-    // axis = the coordinate direction the surface normals never point along (a
-    // cylinder's normals are radial, i.e. perpendicular to its axis)
-    const nSum = [0, 0, 0];
-    let cx = 0, cy = 0, cz = 0, cnt = 0;
-    for (let i = g.start; i < g.start + g.count; i++) {
-      const v = indices[i] * 3;
-      for (let a = 0; a < 3; a++) nSum[a] += Math.abs(normals[v + a]);
-      cx += vertices[v]; cy += vertices[v + 1]; cz += vertices[v + 2]; cnt++;
-    }
-    if (!cnt) return null;
-    const centroid = [cx / cnt, cy / cnt, cz / cnt];
-    const ai = nSum[0] <= nSum[1] && nSum[0] <= nSum[2] ? 0 : nSum[1] <= nSum[2] ? 1 : 2;
-    const axis: [number, number, number] = [0, 0, 0];
-    axis[ai] = 1;
-    // radius = mean perpendicular distance; extent = span along the axis; inward
-    // vote = does the normal point toward the axis (internal bore) on average
-    let rad = 0, tmin = Infinity, tmax = -Infinity, inward = 0;
-    for (let i = g.start; i < g.start + g.count; i++) {
-      const v = indices[i] * 3;
-      const d = [vertices[v] - centroid[0], vertices[v + 1] - centroid[1], vertices[v + 2] - centroid[2]];
-      const t = d[ai];
-      tmin = Math.min(tmin, t); tmax = Math.max(tmax, t);
-      const r2 = Math.max(0, d[0] * d[0] + d[1] * d[1] + d[2] * d[2] - t * t);
-      rad += Math.sqrt(r2);
-      // radial direction (from axis to vertex) vs the surface normal
-      const rd = [d[0], d[1], d[2]]; rd[ai] = 0;
-      const dotN = rd[0] * normals[v] + rd[1] * normals[v + 1] + rd[2] * normals[v + 2];
-      inward += dotN < 0 ? 1 : -1;
-    }
-    rad /= g.count;
-    const center: [number, number, number] = [
-      centroid[0] + axis[0] * tmin,
-      centroid[1] + axis[1] * tmin,
-      centroid[2] + axis[2] * tmin,
-    ];
-    return { center, axis, radius: rad, length: tmax - tmin, internal: inward > 0 };
   }
 
   /**

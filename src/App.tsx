@@ -67,7 +67,7 @@ export default function App() {
   const [status, setStatus] = useState("initialising kernels…");
   const [graphError, setGraphError] = useState<{ nodeId?: string; message: string } | null>(null);
   const [graphValues, setGraphValues] = useState<Record<string, string>>({});
-  const [pickMode, setPickMode] = useState<"face" | "edge" | "border" | "sketchFace" | "measure" | "threadBore" | null>(null);
+  const [pickMode, setPickMode] = useState<"face" | "edge" | "border" | "sketchFace" | "measure" | null>(null);
   const measureA = useRef<[number, number, number] | null>(null);
   const [viewMode, setViewMode] = useState<"shaded" | "edges" | "wireframe">("edges");
   const [analysis, setAnalysis] = useState<"overhang" | "thickness" | null>(null);
@@ -91,7 +91,7 @@ export default function App() {
       hoverRAF.current = requestAnimationFrame(() => {
         hoverRAF.current = undefined;
         const p = lastHover.current;
-        if (p && pickMode) viewportRef.current?.hoverHighlight(pickMode === "sketchFace" || pickMode === "threadBore" ? "face" : pickMode, p.x, p.y);
+        if (p && pickMode) viewportRef.current?.hoverHighlight(pickMode === "sketchFace" ? "face" : pickMode, p.x, p.y);
       });
     },
     [pickMode],
@@ -147,23 +147,16 @@ export default function App() {
         setPickMode(null);
         return;
       }
-      if (pickMode === "threadBore") {
-        const cyl = viewportRef.current?.pickCylinder(e.clientX, e.clientY);
-        if (!cyl) { setStatus("thread: pick an internal CYLINDRICAL face (a bore)"); return; }
-        if (!cyl.internal) { setStatus("thread: that face is a rod, not a bore (its surface faces outward)"); return; }
-        editorApi.current?.placeThreadBore({ center: cyl.center, axis: cyl.axis, length: cyl.length, diameter: cyl.radius * 2 });
-        setStatus(`internal thread placed on Ø${(cyl.radius * 2).toFixed(1)} bore (L${cyl.length.toFixed(1)})`);
-        setPickMode(null);
-        return;
-      }
       if (pickMode === "face") {
         const pick = viewportRef.current?.pickFace(e.clientX, e.clientY);
         if (!pick) { setStatus("pick: no face under the cursor"); return; }
         const where = pick.axis === "curved" ? "cylindrical" : `at${pick.axis}`;
-        editorApi.current?.addFaceSelect(where, pick.offset);
+        // a curved (cylindrical) pick is disambiguated by its AABB → a Face Select
+        // that isolates THIS bore, ready to feed an Internal Thread
+        editorApi.current?.addFaceSelect(where, pick.offset, pick.axis === "curved" ? pick.box : undefined);
         setStatus(
           pick.axis === "curved"
-            ? "picked a curved face → Face Select (cylindrical)"
+            ? "picked a cylindrical face → Face Select (this bore)"
             : `picked ${pick.tag} face at ${pick.axis}=${pick.offset} → Face Select (at${pick.axis})`,
         );
       } else if (pickMode === "border") {
@@ -358,13 +351,6 @@ export default function App() {
             title="Pick a flat face → start a new 2D Sketch on that face's plane (Fusion workflow)"
           >
             ✎ {pickMode === "sketchFace" ? "Click a face…" : "Sketch on face"}
-          </button>
-          <button
-            className={`vp-pick${pickMode === "threadBore" ? " vp-pick--on" : ""}`}
-            onClick={(e) => { e.stopPropagation(); setPickMode((v) => (v === "threadBore" ? null : "threadBore")); }}
-            title="Pick an internal cylindrical face (a bore) → cut an Internal Thread there (or relocate the viewed one)"
-          >
-            ⌾ {pickMode === "threadBore" ? "Click a bore…" : "Thread bore"}
           </button>
           <button
             className={`vp-pick${pickMode === "measure" ? " vp-pick--on" : ""}`}

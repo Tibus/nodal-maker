@@ -4,7 +4,8 @@
 import {
   type Shape3D,
   type EdgeFinder,
-  type FaceFinder,
+  FaceFinder,
+  type Face,
   type Drawing,
   draw,
   drawCircle,
@@ -28,6 +29,7 @@ import {
   THREAD_STANDARDS,
   buildThreadBRep,
   buildNutBRep,
+  cylinderFromFace,
   importSTEPSync,
 } from "./helpers";
 import { solidToMeshData, meshAndTag, resolveTopCap } from "./payload";
@@ -90,14 +92,22 @@ export const nodes3d: Record<string, NodeImpl> = {
     const pitch = preset ? preset.pitch : Number(params.pitch ?? 2);
     const clearance = Number(params.clearance ?? 0.4);
     const lefthand = String(params.hand ?? "right") === "left";
-    // A picked internal cylindrical face sets where the thread goes: its axis
-    // base point, direction, length and bore Ø (which overrides the nominal).
-    const pl = params.place as
-      | { center: [number, number, number]; axis: [number, number, number]; length: number; diameter: number }
-      | undefined;
-    if (pl && Array.isArray(pl.center) && Array.isArray(pl.axis)) {
-      return { kind: "solid", solid: buildNutBRep(body, pl.diameter, pitch, clearance, lefthand, pl) };
+
+    // Wire a cylindrical FACE SELECTION into `face` to thread that exact bore:
+    // its axis, radius and length come from the picked B-rep face (its Ø
+    // overrides the nominal). Multiple matching bores are all threaded.
+    const sel = inputs.face;
+    if (sel && sel.kind === "selection" && sel.target === "face") {
+      const ff = sel.apply(new FaceFinder()) as FaceFinder;
+      const faces = ff.find(body as Parameters<FaceFinder["find"]>[0]) as Face[];
+      const bores = faces.map(cylinderFromFace).filter((c): c is NonNullable<typeof c> => c != null);
+      if (!bores.length) throw new Error("[internalThread] the selected face is not a cylindrical bore");
+      let out = body;
+      for (const b of bores) out = buildNutBRep(out, b.radius * 2, pitch, clearance, lefthand, b);
+      return { kind: "solid", solid: out };
     }
+
+    // No face wired → the original behaviour: a central bore on the world Z axis.
     const diameter = preset ? preset.diameter : Number(params.diameter ?? 16);
     return { kind: "solid", solid: buildNutBRep(body, diameter, pitch, clearance, lefthand) };
   },

@@ -499,10 +499,12 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
   internalThread: {
     type: "internalThread",
     label: "Internal thread (nut)",
-    // cut a mating internal thread into a solid body (its central bore, along Z).
-    // Bore = simple boolean; inward helical ridges added as a compound → analytic
-    // B-rep, no helical boolean. Feed a hex prism / block centred on the axis.
-    inputs: [{ name: "in", type: "solid" }],
+    // cut a mating internal thread into a solid body. Wire a cylindrical Face
+    // Select into `face` (pick an internal bore) to thread THAT bore — its axis,
+    // radius and length come from the picked face. Without it, a central bore on
+    // the world Z axis is threaded. Analytic B-rep (inward helical ridges as a
+    // compound → no helical boolean).
+    inputs: [{ name: "in", type: "solid" }, { name: "face", type: "selection" }],
     output: "solid",
     params: [
       { name: "standard", kind: "select", default: "M16", options: ["custom", "M2", "M2.5", "M3", "M4", "M5", "M6", "M8", "M10", "M12", "M14", "M16", "M20", "M24"] },
