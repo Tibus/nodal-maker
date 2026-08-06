@@ -271,6 +271,7 @@ button.link {
 .quick__ctx b { color: #d8dbe0; font-weight: 600; }
 .quick__sw { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; box-shadow: 0 0 0 1px rgba(0,0,0,0.35); }
 .quick__empty { padding: 8px 10px; font-size: 11px; color: #6a6f78; }
+.quick__ic, .palette__ic { flex: 0 0 auto; width: 15px; text-align: center; color: #9aa0a8; font-size: 12px; line-height: 1; }
 
 /* dark-theme the React Flow minimap + controls */
 .react-flow__minimap { background: #14171c !important; border: 1px solid #2a2e36; border-radius: 6px; }

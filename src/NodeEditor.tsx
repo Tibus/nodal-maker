@@ -68,10 +68,12 @@ const NODE_ICON: Record<string, string> = {
   fingerBox: "⊟", svgInput: "✎", textToSvg: "T",
   offset2d: "⊙", kerf: "╎", fillet2d: "◜", bevel2d: "◹", boolean2d: "⊕", mirror2d: "⇋",
   transform2d: "✥", arrayLinear2d: "⋯", arrayRadial2d: "❋", group: "⊞", scoreCut: "✂",
+  livingHinge: "⋮", nest: "▩", importDXF: "⇩", dogbone: "◵", tabs: "⊣", cncJob: "⌖",
   box: "◼", cylinder: "⬢", sphere: "●", cone: "▲", torus: "◎", thread: "⛊", internalThread: "⊙", importSTEP: "⇩",
-  extrude: "⇧", revolve: "↻", loft: "⏛", loftSections: "≣", sweep: "∿", bossOnCap: "⊤",
+  extrude: "⇧", pocket: "▣", hole: "⊗", revolve: "↻", loft: "⏛", loftSections: "≣", sweep: "∿", bossOnCap: "⊤", textOnFace: "A",
   transform: "✥", rotate3d: "⟳", scale3d: "⤢", mirror3d: "⇋", fillet: "◜", bevel: "◹",
-  shell: "◫", boolean3d: "⊖", assemble: "⧉", arrayLinear3d: "⋯", arrayRadial3d: "❋",
+  shell: "◫", hollow: "◌", infill: "▦", gyroid: "❈", split: "⊘", autoOrient: "⤾", supports: "⇟",
+  boolean3d: "⊖", collision: "✸", color: "◐", arrange3d: "▤", assemble: "⧉", arrayLinear3d: "⋯", arrayRadial3d: "❋", arrayPath: "⌇",
   edgeSelect: "╱", faceSelect: "▱",
   tessellate: "△", meshToSolid: "◆", importSTL: "⇩", repair: "✚", boolean: "⊖", transformMesh: "✥",
   convexHull: "⬡", minkowski: "⊚", decimate: "▽", subdivide: "◈",
@@ -1630,7 +1632,6 @@ export default function NodeEditor({
             ? !!inputPortFor(s, c.socketType) // node that can CONSUME the dragged output
             : s.output === c.socketType || (s.output === "solid" && c.socketType === "mesh"); // node that PRODUCES the needed input
         })
-        .slice(0, 10)
     : [];
   const addFromQuick = (type: string) => {
     if (!quick) return;
@@ -1778,6 +1779,7 @@ export default function NodeEditor({
                 onMouseLeave={() => setTip(null)}
               >
                 <span className="palette__sw" style={{ background: SOCKET_COLORS[s.output] }} title={`sortie : ${SOCKET_LABELS[s.output].name}`} />
+                <span className="palette__ic">{nodeIcon(s.type, false)}</span>
                 {s.label}
               </button>
             ))
@@ -1808,6 +1810,7 @@ export default function NodeEditor({
                         onMouseLeave={() => setTip(null)}
                       >
                         <span className="palette__sw" style={{ background: SOCKET_COLORS[NODE_SPECS[t].output] }} title={`sortie : ${SOCKET_LABELS[NODE_SPECS[t].output].name}`} />
+                        <span className="palette__ic">{nodeIcon(t, false)}</span>
                         {NODE_SPECS[t].label}
                       </button>
                     ))}
@@ -1894,6 +1897,7 @@ export default function NodeEditor({
               <div className="quick__list">
                 {quickHits.map((s) => (
                   <button key={s.type} className="quick__item" onClick={() => addFromQuick(s.type)}>
+                    <span className="quick__ic">{nodeIcon(s.type, false)}</span>
                     <span className="quick__sw" style={{ background: SOCKET_COLORS[s.output] }} />
                     {s.label}
                   </button>
