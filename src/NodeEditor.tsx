@@ -568,7 +568,7 @@ export interface EditorApi {
   setParam: (nodeId: string, name: string, value: unknown) => void;
   /** add a Face/Edge Select node preconfigured from a viewport pick */
   addFaceSelect: (where: string, offset: number) => void;
-  addEdgeSelect: (where: string, offset: number) => void;
+  addEdgeSelect: (where: string, offset: number, near?: [number, number, number]) => void;
   /** create a new Sketch node on a base plane at an offset (with optional face
    * outline as reference geometry), and open the editor */
   addSketchOnPlane: (base: "XY" | "XZ" | "YZ", offset: number, reference?: [number, number][][]) => void;
@@ -1143,13 +1143,14 @@ export default function NodeEditor({
   // viewed node is a fillet/bevel/shell with an empty selection port of the
   // matching kind — auto-wire the new selector straight into it.
   const addSelectFromPick = useCallback(
-    (kind: "face" | "edge", where: string, offset: number) => {
+    (kind: "face" | "edge", where: string, offset: number, near?: [number, number, number]) => {
       const nodeType = kind === "face" ? "faceSelect" : "edgeSelect";
       const id = newId(nodeType);
       const params: Record<string, unknown> = {};
       for (const p of NODE_SPECS[nodeType].params) params[p.name] = p.default;
       params.where = where;
       params.offset = offset;
+      if (near) params.near = near; // isolate a single border loop (not shown in the panel)
 
       const CONSUMERS: Record<string, { port: string; need: "face" | "edge" }> = {
         fillet: { port: "sel", need: "edge" },
@@ -1204,7 +1205,7 @@ export default function NodeEditor({
   );
 
   const addFaceSelect = useCallback((where: string, offset: number) => addSelectFromPick("face", where, offset), [addSelectFromPick]);
-  const addEdgeSelect = useCallback((where: string, offset: number) => addSelectFromPick("edge", where, offset), [addSelectFromPick]);
+  const addEdgeSelect = useCallback((where: string, offset: number, near?: [number, number, number]) => addSelectFromPick("edge", where, offset, near), [addSelectFromPick]);
 
   const addSketchOnPlane = useCallback((base: "XY" | "XZ" | "YZ", offset: number, reference?: [number, number][][]) => {
     // seed with the face outline as reference geometry when available, else a

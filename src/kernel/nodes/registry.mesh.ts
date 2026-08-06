@@ -23,16 +23,28 @@ export const meshNodes: Record<string, NodeImpl> = {
   edgeSelect: (_inputs, params) => {
     const where = String(params.where ?? "all");
     const offset = Number(params.offset ?? 0);
+    // Optional: a point lying exactly on ONE border loop. When present it narrows
+    // the selection to the single loop passing through it — so a "pick border" on
+    // an annular (donut) face grabs just the inner OR outer rim, not both.
+    const nearRaw = params.near;
+    const near =
+      Array.isArray(nearRaw) && nearRaw.length === 3 && nearRaw.every((n) => Number.isFinite(Number(n)))
+        ? ([Number(nearRaw[0]), Number(nearRaw[1]), Number(nearRaw[2])] as [number, number, number])
+        : null;
     const apply = (e: EdgeFinder): EdgeFinder => {
+      let f: EdgeFinder;
       switch (where) {
-        case "vertical": return e.inDirection([0, 0, 1]);
-        case "horizontal-x": return e.inDirection([1, 0, 0]);
-        case "horizontal-y": return e.inDirection([0, 1, 0]);
-        case "atZ": return e.inPlane("XY", offset);
-        case "atX": return e.inPlane("YZ", offset);
-        case "atY": return e.inPlane("XZ", offset);
-        default: return e;
+        case "vertical": f = e.inDirection([0, 0, 1]); break;
+        case "horizontal-x": f = e.inDirection([1, 0, 0]); break;
+        case "horizontal-y": f = e.inDirection([0, 1, 0]); break;
+        case "atZ": f = e.inPlane("XY", offset); break;
+        case "atX": f = e.inPlane("YZ", offset); break;
+        case "atY": f = e.inPlane("XZ", offset); break;
+        default: f = e;
       }
+      // containsPoint(p) keeps edges passing through p (a full circular rim is a
+      // single B-rep edge → the whole loop is kept, its concentric sibling isn't).
+      return near ? f.containsPoint(near) : f;
     };
     return { kind: "selection", target: "edge", apply: apply as (f: unknown) => unknown };
   },

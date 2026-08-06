@@ -969,11 +969,13 @@ export class Viewport {
    * face's plane, within its extent — rather than the face fill. Returns the
    * plane (axis + offset) so an Edge Select can target that rim.
    */
-  pickBorder(clientX: number, clientY: number): { axis: "X" | "Y" | "Z"; offset: number } | null {
+  pickBorder(
+    clientX: number,
+    clientY: number,
+  ): { axis: "X" | "Y" | "Z"; offset: number; near?: [number, number, number] } | null {
     const f = this.detectFace(clientX, clientY);
-    if (!f || f.axis === "curved" || !this.edgesObj) return null;
+    if (!f || f.axis === "curved") return null;
     const ai = f.axis === "X" ? 0 : f.axis === "Y" ? 1 : 2;
-    const pos = this.edgesObj.geometry.getAttribute("position");
     const epsPlane = Math.max(0.05, this.modelDiag * 0.004);
     const pad = this.modelDiag * 0.02;
     const inFace = (x: number, y: number, z: number) => {
@@ -981,28 +983,102 @@ export class Viewport {
       for (let a = 0; a < 3; a++) if (a !== ai && (p[a] < f.min[a] - pad || p[a] > f.max[a] + pad)) return false;
       return Math.abs(p[ai] - f.offset) <= epsPlane;
     };
-    // collect border segments (both endpoints in the face's plane + extent)
-    const segs: number[] = [];
-    for (let i = 0; i < pos.count; i += 2) {
-      const ax = pos.getX(i), ay = pos.getY(i), az = pos.getZ(i);
-      const bx = pos.getX(i + 1), by = pos.getY(i + 1), bz = pos.getZ(i + 1);
-      if (inFace(ax, ay, az) && inFace(bx, by, bz)) segs.push(ax, ay, az, bx, by, bz);
+
+    // Prefer the real B-rep edges (their tessellation nodes lie EXACTLY on the
+    // curve, so a returned point is a valid `containsPoint` target). Fall back to
+    // the dihedral mesh edges when no B-rep is available — but then we can't emit
+    // a precise `near`, so the selection stays plane-wide (both loops).
+    const brep = this.payload?.edges;
+    const usingBrep = !!(brep && brep.length);
+    const readSeg = (i: number): [number, number, number, number, number, number] | null => {
+      if (usingBrep) {
+        const e = brep as Float32Array;
+        return [e[i], e[i + 1], e[i + 2], e[i + 3], e[i + 4], e[i + 5]];
+      }
+      const pos = this.edgesObj?.geometry.getAttribute("position");
+      if (!pos) return null;
+      const j = i / 3; // fallback iterates by vertex pairs, not by 6-float stride
+      return [pos.getX(j), pos.getY(j), pos.getZ(j), pos.getX(j + 1), pos.getY(j + 1), pos.getZ(j + 1)];
+    };
+    const stride = usingBrep ? 6 : 6; // both advance one segment (2 verts) at a time
+    const total = usingBrep ? (brep as Float32Array).length : (this.edgesObj?.geometry.getAttribute("position").count ?? 0) * 3;
+
+    // Border segments = both endpoints inside the face's plane + extent.
+    type Seg = { a: [number, number, number]; b: [number, number, number] };
+    const segs: Seg[] = [];
+    for (let i = 0; i + 5 < total; i += stride) {
+      const s = readSeg(i);
+      if (!s) continue;
+      if (inFace(s[0], s[1], s[2]) && inFace(s[3], s[4], s[5])) {
+        segs.push({ a: [s[0], s[1], s[2]], b: [s[3], s[4], s[5]] });
+      }
     }
     this.clearPick();
     if (segs.length === 0) return { axis: f.axis, offset: f.offset }; // plane known even if no edge drawn
+
+    // Group segments into connected loops (union-find over quantised endpoints),
+    // then keep only the loop nearest the click — so concentric rims separate.
+    const q = Math.max(this.modelDiag * 1e-4, 1e-5);
+    const key = (p: [number, number, number]) =>
+      `${Math.round(p[0] / q)}_${Math.round(p[1] / q)}_${Math.round(p[2] / q)}`;
+    const parent: number[] = [];
+    const nodeOf = new Map<string, number>();
+    const idOf = (p: [number, number, number]) => {
+      const k = key(p);
+      let id = nodeOf.get(k);
+      if (id == null) { id = parent.length; parent.push(id); nodeOf.set(k, id); }
+      return id;
+    };
+    const find = (x: number): number => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+    const seedNode: number[] = [];
+    for (const s of segs) { const ia = idOf(s.a), ib = idOf(s.b); parent[find(ia)] = find(ib); seedNode.push(ia); }
+    const loops = new Map<number, Seg[]>();
+    segs.forEach((s, i) => {
+      const root = find(seedNode[i]);
+      const arr = loops.get(root) ?? (loops.set(root, []), loops.get(root)!);
+      arr.push(s);
+    });
+
+    // click point on the surface → choose the loop whose nearest segment is closest
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    this.raycaster.setFromCamera(ndc, this.camera);
+    const surfHit = this.mesh ? this.raycaster.intersectObject(this.mesh, false)[0] : undefined;
+    const cp = surfHit ? surfHit.point : new THREE.Vector3(...f.centroid);
+    const va = new THREE.Vector3(), vb = new THREE.Vector3(), ab = new THREE.Vector3(), ap = new THREE.Vector3(), pr = new THREE.Vector3();
+    const distToSeg = (s: Seg) => {
+      va.set(...s.a); vb.set(...s.b); ab.subVectors(vb, va);
+      const t = Math.min(1, Math.max(0, ap.subVectors(cp, va).dot(ab) / (ab.lengthSq() || 1e-9)));
+      return pr.copy(va).addScaledVector(ab, t).distanceTo(cp);
+    };
+    let best: Seg[] = segs, bestD = Infinity;
+    for (const loop of loops.values()) {
+      let d = Infinity;
+      for (const s of loop) d = Math.min(d, distToSeg(s));
+      if (d < bestD) { bestD = d; best = loop; }
+    }
+
+    // highlight only the chosen loop
     const r = Math.max(0.4, this.modelDiag * 0.006);
     const group = new THREE.Group();
     const mat = new THREE.MeshBasicMaterial({ color: 0x39d98a, depthTest: false });
-    for (let i = 0; i < segs.length; i += 6) {
-      const a = new THREE.Vector3(segs[i], segs[i + 1], segs[i + 2]);
-      const b = new THREE.Vector3(segs[i + 3], segs[i + 4], segs[i + 5]);
+    for (const s of best) {
+      const a = new THREE.Vector3(...s.a);
+      const b = new THREE.Vector3(...s.b);
       const tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(a, b), 1, r, 5, false), mat);
       tube.renderOrder = 999;
       group.add(tube);
     }
     this.scene.add(group);
     this.pickHighlight = group;
-    return { axis: f.axis, offset: f.offset };
+
+    // Emit a point ON the picked loop only when it came from real B-rep edges —
+    // then the downstream edgeSelect can `containsPoint` it to isolate this loop.
+    const near: [number, number, number] | undefined = usingBrep ? best[0].a : undefined;
+    return { axis: f.axis, offset: f.offset, near };
   }
 
   /**
