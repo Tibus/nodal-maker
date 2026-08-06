@@ -54,6 +54,8 @@ type GeoData = {
   params: Record<string, unknown>;
   /** set when this node is a component instance (points at a ComponentDef id) */
   component?: string;
+  /** user-given name shown on the node + in the Simple form (double-click title) */
+  alias?: string;
 };
 type GeoNode = Node<GeoData>;
 
@@ -115,6 +117,8 @@ interface EditorCtx {
   /** is this node param surfaced to the Simple form? toggle it */
   isExposed: (nodeId: string, param: string) => boolean;
   toggleExpose: (nodeId: string, param: string) => void;
+  /** rename a node (alias shown on the node + in the Simple form) */
+  setAlias: (nodeId: string, alias: string) => void;
 }
 const Ctx = createContext<EditorCtx | null>(null);
 
@@ -135,6 +139,7 @@ function handleType(nodeType: string, handle: string): SocketType | undefined {
 function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
   const ctx = useContext(Ctx)!;
   const [selOpen, setSelOpen] = useState(false); // selection-outputs accordion
+  const [renaming, setRenaming] = useState(false); // inline alias editor
   // hover handlers for a port handle → socket-type tooltip
   const tipH = (t: SocketType) => ({
     onMouseEnter: (e: React.MouseEvent) => ctx.setPortTip({ type: t, x: e.clientX, y: e.clientY }),
@@ -164,7 +169,25 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
       onClick={() => ctx.setOutput(id)}
     >
       <div className="gnode__title">
-        {spec.label}
+        {renaming ? (
+          <input
+            className="gnode__rename"
+            autoFocus
+            defaultValue={data.alias ?? ""}
+            placeholder={spec.label}
+            onClick={(e) => e.stopPropagation()}
+            onBlur={(e) => { ctx.setAlias(id, e.target.value.trim()); setRenaming(false); }}
+            onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setRenaming(false); }}
+          />
+        ) : (
+          <span
+            className={data.alias ? "gnode__alias" : undefined}
+            title="Double-clic pour renommer (affiché dans le mode Simple)"
+            onDoubleClick={(e) => { e.stopPropagation(); setRenaming(true); }}
+          >
+            {data.alias || spec.label}
+          </span>
+        )}
         {isOutput && <span className="gnode__badge">● view</span>}
         <button
           className={`gnode__eye${ctx.isVisible(id) ? " gnode__eye--on" : ""}`}
@@ -640,7 +663,7 @@ interface SceneDoc {
     position: { x: number; y: number };
     width?: number;
     height?: number;
-    data: { nodeType: string; component?: string; params: Record<string, unknown> };
+    data: { nodeType: string; component?: string; alias?: string; params: Record<string, unknown> };
   }[];
   edges: Edge[];
 }
@@ -708,6 +731,7 @@ function paramSpecOf(node: GeoNode, components: Record<string, ComponentDef>, na
   return NODE_SPECS[node.data.nodeType]?.params.find((p) => p.name === name) ?? null;
 }
 function nodeDisplayLabel(node: GeoNode, components: Record<string, ComponentDef>): string {
+  if (node.data.alias) return node.data.alias; // user-given name wins (Simple form)
   if (node.data.component) return components[node.data.component]?.name ?? "Component";
   return NODE_SPECS[node.data.nodeType]?.label ?? node.data.nodeType;
 }
@@ -1087,6 +1111,9 @@ export default function NodeEditor({
   );
 
   const setOutput = useCallback((id: string) => setOutputId(id), []);
+  const setAlias = useCallback((id: string, alias: string) => {
+    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, data: { ...n.data, alias: alias || undefined } } : n)));
+  }, [setNodes]);
 
   const editSketch = useCallback((id: string) => setEditingSketchId(id), []);
   /**
@@ -1416,6 +1443,7 @@ export default function NodeEditor({
         data: {
           nodeType: n.data.nodeType,
           component: n.data.component,
+          alias: n.data.alias,
           params: Object.fromEntries(
             Object.entries(n.data.params).map(([k, v]) => [
               k,
@@ -1450,6 +1478,7 @@ export default function NodeEditor({
         data: {
           nodeType: n.data.nodeType,
           component: n.data.component,
+          alias: n.data.alias,
           params: Object.fromEntries(
             Object.entries(n.data.params).map(([k, v]) => [
               k,
@@ -1577,8 +1606,9 @@ export default function NodeEditor({
       editSketch,
       isExposed,
       toggleExpose,
+      setAlias,
     }),
-    [outputId, setOutput, setParam, linkedSet, sourceLinkedSet, errorNodeId, errorMessage, values, components, selOutputsMap, hidden, toggleVisible, editSketch, isExposed, toggleExpose],
+    [outputId, setOutput, setParam, linkedSet, sourceLinkedSet, errorNodeId, errorMessage, values, components, selOutputsMap, hidden, toggleVisible, editSketch, isExposed, toggleExpose, setAlias],
   );
 
   const outType = NODE_SPECS[nodes.find((n) => n.id === outputId)?.data.nodeType ?? ""]?.output;

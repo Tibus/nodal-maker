@@ -387,7 +387,7 @@ export class Viewport {
       const g = (o as THREE.Mesh).geometry;
       if (g && g !== this.mesh?.geometry) g.dispose(); // never dispose the shared model geometry
       const m = (o as THREE.Mesh).material;
-      if (m) (Array.isArray(m) ? m : [m]).forEach((x) => x.dispose());
+      if (m) (Array.isArray(m) ? m : [m]).forEach((x) => { (x as THREE.MeshStandardMaterial).map?.dispose(); x.dispose(); });
     });
     this.capGroup = null;
   }
@@ -418,8 +418,11 @@ export class Viewport {
     group.add(back, front);
 
     const size = this.modelDiag * 2;
+    const hatch = this.hatchTexture();
+    const rep = Math.max(16, Math.round(size / 4)); // ~4 mm world spacing (Fusion look)
+    hatch.repeat.set(rep, rep);
     const capMat = new THREE.MeshStandardMaterial({
-      color: BODY_GRAY, roughness: 0.5, metalness: 0.12, side: THREE.DoubleSide,
+      color: 0xd0d3d8, roughness: 0.6, metalness: 0.05, side: THREE.DoubleSide, map: hatch,
       stencilWrite: true, stencilRef: 0, stencilFunc: THREE.NotEqualStencilFunc,
       stencilFail: THREE.ReplaceStencilOp, stencilZFail: THREE.ReplaceStencilOp, stencilZPass: THREE.ReplaceStencilOp,
     });
@@ -431,6 +434,29 @@ export class Viewport {
     this.scene.add(group);
     this.capGroup = group;
     this.positionCap();
+  }
+
+  /** A tiling diagonal-hatch texture for the section cap (Fusion-style). */
+  private hatchTexture(): THREE.CanvasTexture {
+    const s = 32;
+    const c = document.createElement("canvas");
+    c.width = c.height = s;
+    const ctx = c.getContext("2d")!;
+    ctx.fillStyle = "#cfd2d8"; ctx.fillRect(0, 0, s, s);
+    ctx.strokeStyle = "#565c67"; ctx.lineWidth = 2.4; ctx.lineCap = "square";
+    // one 45° line + its wrap corners so tiling stays continuous
+    for (const [x0, y0, x1, y1] of [[0, s, s, 0], [-s / 2, s / 2, s / 2, -s / 2], [s / 2, 3 * s / 2, 3 * s / 2, s / 2]]) {
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    // no mipmaps → thin diagonal lines don't get averaged away when the cap
+    // plane is heavily minified in the distance
+    tex.generateMipmaps = false;
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.anisotropy = 8;
+    return tex;
   }
 
   /** Place & orient the cap plane onto the active clipping plane. */
