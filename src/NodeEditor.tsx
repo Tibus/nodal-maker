@@ -857,7 +857,11 @@ export default function NodeEditor({
   const rf = useRef<ReactFlowInstance<GeoNode, Edge> | null>(null);
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const [quick, setQuick] = useState<{ sx: number; sy: number; flow: { x: number; y: number }; q: string } | null>(null);
+  // quick-add popup. `connect` is set when the popup was opened by dropping a
+  // dangling wire on empty canvas → the picked node is auto-wired to that port.
+  type ConnectDrag = { nodeId: string; handleId: string; handleType: "source" | "target"; socketType: SocketType };
+  const [quick, setQuick] = useState<{ sx: number; sy: number; flow: { x: number; y: number }; q: string; connect?: ConnectDrag } | null>(null);
+  const connectStart = useRef<{ nodeId: string; handleId: string; handleType: "source" | "target" } | null>(null);
   const [components, setComponents] = useState<Record<string, ComponentDef>>({});
   // timeline: show only construction steps (geometry) by default, hiding helper
   // nodes (selections, numbers, text, math) that merely parametrise them.
@@ -1589,14 +1593,61 @@ export default function NodeEditor({
     const flow = rf.current.screenToFlowPosition({ x: e.clientX, y: e.clientY });
     setQuick({ sx: e.clientX, sy: e.clientY, flow, q: "" });
   };
+
+  // remember the port a connection drag started from…
+  const onConnectStart = useCallback((_: unknown, p: { nodeId: string | null; handleId: string | null; handleType: "source" | "target" | null }) => {
+    connectStart.current = p.nodeId && p.handleType ? { nodeId: p.nodeId, handleId: p.handleId ?? (p.handleType === "source" ? "out" : ""), handleType: p.handleType } : null;
+  }, []);
+
+  // …and if it's released on empty canvas, offer the compatible nodes.
+  const onConnectEnd = useCallback((e: MouseEvent | TouchEvent) => {
+    const start = connectStart.current;
+    connectStart.current = null;
+    if (!start || !rf.current) return;
+    const target = e.target as HTMLElement | null;
+    if (!target || !target.classList.contains("react-flow__pane")) return; // landed on a handle → normal connect
+    const node = nodes.find((n) => n.id === start.nodeId);
+    if (!node) return;
+    const socketType = start.handleType === "source" ? nodeOutType(node, start.handleId) : nodeInType(node, start.handleId);
+    if (!socketType) return;
+    const pt = "clientX" in e ? e : e.changedTouches[0];
+    const flow = rf.current.screenToFlowPosition({ x: pt.clientX, y: pt.clientY });
+    setQuick({ sx: pt.clientX, sy: pt.clientY, flow, q: "", connect: { ...start, socketType } });
+  }, [nodes, nodeOutType, nodeInType]);
+
+  /** Which input port of `spec` accepts a wire of type `t` (structural or param)? */
+  const inputPortFor = (spec: (typeof NODE_SPECS)[string], t: SocketType): string | undefined =>
+    spec.inputs.find((p) => p.type === t || (t === "solid" && p.type === "mesh"))?.name ??
+    spec.params.map((p) => [p.name, paramPortType(p)] as const).find(([, pt]) => pt === t)?.[0];
+
   const quickHits = quick
     ? Object.values(NODE_SPECS)
-        .filter((s) => s.label.toLowerCase().includes(quick.q.toLowerCase()))
-        .slice(0, 8)
+        .filter((s) => {
+          if (quick.q && !s.label.toLowerCase().includes(quick.q.toLowerCase())) return false;
+          const c = quick.connect;
+          if (!c) return true;
+          return c.handleType === "source"
+            ? !!inputPortFor(s, c.socketType) // node that can CONSUME the dragged output
+            : s.output === c.socketType || (s.output === "solid" && c.socketType === "mesh"); // node that PRODUCES the needed input
+        })
+        .slice(0, 10)
     : [];
   const addFromQuick = (type: string) => {
     if (!quick) return;
-    addNode(type, { position: quick.flow, autoConnect: true });
+    const c = quick.connect;
+    if (c) {
+      const id = newId(type);
+      const params: Record<string, unknown> = {};
+      for (const p of NODE_SPECS[type].params) params[p.name] = p.default;
+      if (type === "sketch") { const doc = starterRect(); params.doc = doc; for (const dim of dimensions(doc)) params[dim.name] = dim.value; }
+      setNodes((prev) => [...prev.map((n) => ({ ...n, selected: false })), { id, type: "geo", position: quick.flow, selected: true, data: { nodeType: type, params } }]);
+      const wire = c.handleType === "source"
+        ? { source: c.nodeId, sourceHandle: c.handleId, target: id, targetHandle: inputPortFor(NODE_SPECS[type], c.socketType)! }
+        : { source: id, sourceHandle: "out", target: c.nodeId, targetHandle: c.handleId };
+      setEdges((es) => addEdge({ ...wire, style: { stroke: SOCKET_COLORS[c.socketType] } }, es));
+    } else {
+      addNode(type, { position: quick.flow, autoConnect: true });
+    }
     setQuick(null);
   };
 
@@ -1803,6 +1854,8 @@ export default function NodeEditor({
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onConnectStart={onConnectStart}
+            onConnectEnd={onConnectEnd}
             isValidConnection={isValidConnection}
             nodeTypes={nodeTypes}
             deleteKeyCode={editingSketchId ? null : ["Backspace", "Delete"]}
@@ -1819,11 +1872,18 @@ export default function NodeEditor({
         {quick && (
           <>
             <div className="quick__scrim" onClick={() => setQuick(null)} />
-            <div className="quick" style={{ left: quick.sx, top: quick.sy }}>
+            <div className="quick" style={{ left: Math.min(quick.sx, window.innerWidth - 240), top: Math.min(quick.sy, window.innerHeight - 320) }}>
+              {quick.connect && (
+                <div className="quick__ctx">
+                  <span className="quick__sw" style={{ background: SOCKET_COLORS[quick.connect.socketType] }} />
+                  {quick.connect.handleType === "source" ? "→ nœuds acceptant " : "← nœuds produisant "}
+                  <b>{SOCKET_LABELS[quick.connect.socketType].name}</b>
+                </div>
+              )}
               <input
                 className="quick__search"
                 autoFocus
-                placeholder="add node…"
+                placeholder={quick.connect ? "filtrer…" : "add node…"}
                 value={quick.q}
                 onChange={(e) => setQuick({ ...quick, q: e.target.value })}
                 onKeyDown={(e) => {
@@ -1834,9 +1894,11 @@ export default function NodeEditor({
               <div className="quick__list">
                 {quickHits.map((s) => (
                   <button key={s.type} className="quick__item" onClick={() => addFromQuick(s.type)}>
+                    <span className="quick__sw" style={{ background: SOCKET_COLORS[s.output] }} />
                     {s.label}
                   </button>
                 ))}
+                {quickHits.length === 0 && <div className="quick__empty">aucun nœud compatible</div>}
               </div>
             </div>
           </>

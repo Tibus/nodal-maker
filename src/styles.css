@@ -265,8 +265,12 @@ button.link {
 }
 .quick__search { width: 100%; box-sizing: border-box; background: #0e1015; color: #d8dbe0; border: 0; border-bottom: 1px solid #2a2e36; padding: 8px; font-size: 12px; }
 .quick__list { max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; }
-.quick__item { background: none; border: 0; color: #d8dbe0; text-align: left; padding: 6px 10px; font-size: 12px; cursor: pointer; }
+.quick__item { background: none; border: 0; color: #d8dbe0; text-align: left; padding: 6px 10px; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 7px; }
 .quick__item:hover { background: #2a2e36; }
+.quick__ctx { display: flex; align-items: center; gap: 6px; padding: 6px 8px; font-size: 10.5px; color: #8a8f98; border-bottom: 1px solid #2a2e36; background: #171a1f; }
+.quick__ctx b { color: #d8dbe0; font-weight: 600; }
+.quick__sw { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; box-shadow: 0 0 0 1px rgba(0,0,0,0.35); }
+.quick__empty { padding: 8px 10px; font-size: 11px; color: #6a6f78; }
 
 /* dark-theme the React Flow minimap + controls */
 .react-flow__minimap { background: #14171c !important; border: 1px solid #2a2e36; border-radius: 6px; }
