@@ -1,113 +1,86 @@
-# maker · spike + PoC SVG
+# nodal-maker
 
-A de-risking spike for a **nodal parametric 3D generator** (à destination de
-l'impression 3D). It proves the risky parts of the stack end-to-end before
-committing to the full build.
+**A node-based parametric CAD/CAM tool that runs entirely in the browser** — built for
+**resin 3D printing** and **laser / Cricut cutting**. Wire nodes into a graph
+(Fusion360-meets-Blender), tweak parameters, and get live B-rep solids and 2D profiles you
+can export to STL / STEP / 3MF / SVG / DXF.
 
-![PoC screenshot](./poc-screenshot.png)
+🔗 **Live:** https://tibus.github.io/nodal-maker/
+📐 **How it works:** [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
 
-> **📐 Full architecture & how it works:** [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
-> — the node graph engine, the two geometry kernels, the constraint solver, the
-> viewport, the Simple/Expert configurator, exports, thumbnails, build/test/deploy.
+![screenshot](./poc-screenshot.png)
 
-## What this proves
+---
 
-1. **SVG pipeline** — an SVG `<path d="…">` is parsed and turned into a 2D
-   profile, offset in 2D, then extruded to a solid. (`svgInput → offset2d →
-   extrude`)
-2. **Extrude on the result of an extrude, taking the cap** — a boss is built on
-   the top face of the first extrude. (`bossOnCap`)
-3. **Face flagging / persistence (the hard part)** — faces are tagged
-   `top` / `side` / `bottom`, and the top cap is re-selected across
-   regenerations by a **criteria-based query, not a stored id**. This is the
-   answer to the *topological naming problem*: raw face ids are unstable, so we
-   store the query and re-resolve it every rebuild.
-4. **STL export** — watertight output for 3D printing.
+## What it does
 
-The geometry runs on **replicad** (a TypeScript wrapper over **OpenCascade /
-OCCT**, a real B-rep CAD kernel compiled to WASM). The viewport is **Three.js**.
+- **Node graph** — a typed DAG of ~80 nodes. Wires carry typed values (2D profile · solid ·
+  mesh · number · text · selection); the socket colours tell you what plugs into what.
+- **Two geometry kernels, in a Web Worker** — [replicad](https://replicad.xyz) /
+  OpenCascade for **exact B-rep** modelling (extrude, revolve, loft, fillet, shell, boolean,
+  threads, STEP export) and [Manifold](https://github.com/elalish/manifold) for **robust
+  mesh** work (booleans, hulls, gyroid infill, collision).
+- **2D constraint sketcher** — points/lines/arcs with coincidence, parallel, tangent,
+  dimensions… solved live with Levenberg–Marquardt. Sketch on a base plane *or an arbitrary
+  picked face*.
+- **Simple / Expert modes** — Expert is the full node graph; **Simple** is an auto-generated
+  form (thumbnail gallery + only the parameters the author exposed) so a non-technical user
+  just tweaks values and watches the model update. No nodes required.
+- **Live picking** — click a face/edge in the viewport to auto-wire a selection node;
+  face selections survive regeneration (they're stored as *criteria*, not fragile ids — the
+  topological-naming problem, solved).
 
-## The stack, confirmed
+## Feature highlights
 
-| Concern | Choice | Status |
-|---|---|---|
-| B-rep kernel (offset, extrude, face selection) | replicad + `replicad-opencascadejs` | ✅ works |
-| Off-thread compute | Web Worker + comlink | ✅ works |
-| Viewport | Three.js (reuses the parent repo's viewport patterns) | ✅ works |
-| SVG path → profile | custom parser (`src/kernel/svgPath.ts`) | ✅ works |
-| STL export | `solid.blobSTL()` | ✅ works |
+| Domain | What you get |
+|---|---|
+| **Resin printing** | hollow + drain holes, infill lattice, **gyroid** infill, auto-orient, support generation, split-for-build-plate, overhang & wall-thickness analysis, watertight check, resin cost/time estimate |
+| **Laser / Cricut** | living hinge, nesting, dogbone/T-bone corners, hold-in-sheet tabs, kerf compensation, finger-joint boxes, CUT/SCORE DXF layers, SVG & DXF import/export |
+| **Modelling** | extrude (taper/twist), pocket, parametric holes, revolve, loft, sweep, boss-on-cap, variable-radius fillet, chamfer, shell, patterns (linear/radial/**path**), text engrave/emboss on a face |
+| **Analysis & viewport** | section view, measure tool, mass properties, per-body colour, turntable video export |
+| **Import/export** | STL, STEP, 3MF, SVG, DXF, PNG, WebM |
 
-## Run it
+## Quick start
 
 ```bash
-cd maker
 npm install
-
-# 1. Headless proof of the geometry (no browser needed)
-npm run smoke
-
-# 2. Interactive PoC in the browser
-npm run dev        # then open the printed URL
+npm run dev          # interactive editor — open the printed URL
 ```
 
-`npm run smoke` output (abridged):
-
-```
-PoC SVG pipeline: svgInput → offset2d → extrude → bossOnCap
-  B-rep faces         : 33
-  resolved top cap    : faceId=623811297 @ z=20.00
-Persistence spike — regenerate with different heights:
-  height= 6  topCapFaceId=759330689  z=14.00  (expected≈14)  ✓
-  height=12  topCapFaceId=921844289  z=20.00  (expected≈20)  ✓
-  height=30  topCapFaceId=1051123585 z=38.00  (expected≈38)  ✓
-  → selector stayed correct across 3 regenerations
-STL export: 742824 bytes  ✅
+```bash
+npm run build        # typecheck + production build
+npm test             # Vitest suite (58 tests: kernel eval, expr, solver, exports…)
+npm run thumbs:examples   # (re)generate missing example thumbnails (WebGL screenshots)
 ```
 
-Note how the raw `faceId` changes every regeneration while the selector keeps
-resolving the correct cap — that's the whole point.
+Headless smoke tests (no browser): `npm run smoke`, `npm run smoke:sketch`,
+`npm run smoke:mesh`, `npm run scenes`.
 
-## Architecture (as spiked)
+## Tech stack
+
+TypeScript (strict, ESM) · React 18 + [React Flow](https://reactflow.dev) · Three.js ·
+replicad/OpenCascade (WASM) · Manifold (WASM) · comlink · Vite · Vitest · Playwright.
+No backend — a fully static SPA, deployed to GitHub Pages on every push to `main`
+(the test suite gates the deploy).
+
+## Project layout
 
 ```
-UI (React)                     ← this PoC hardcodes the graph; React Flow later
-  │  Params
-  ▼
-Web Worker (comlink)
-  │  evalGraph(): tiny typed DAG  → src/kernel/nodes.ts
-  │    nodes: svgInput · offset2d · extrude · bossOnCap
-  │    typed wires: sketch2d | solid
-  ▼
-replicad / OCCT (WASM)  → meshAndTag() → { vertices, indices, normals, groups[tag] }
-  ▼
-Three.js viewport  (one material per tag)
+src/kernel/    the graph engine (nodes.ts), the worker, both kernel wrappers, exporters
+src/sketch/    the framework-free 2D constraint sketcher (model · solver · build)
+src/           App, NodeEditor (React Flow), SketchEditor, viewport (Three.js)
+examples/      55 bundled example projects        public/thumbs/  their preview PNGs
+scripts/       thumbnail & scene generation, smoke tests
+test/          the Vitest suite
 ```
 
-Key files:
+See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for the full tour: the data flow,
+the evaluation cache, the constraint solver, the viewport, the configurator, and **how to
+add a node in 4 edits**.
 
-- `src/kernel/nodes.ts` — the typed node-graph engine + geometry nodes + face
-  tagging + the criteria-based `resolveTopCap` selector.
-- `src/kernel/svgPath.ts` — SVG path → replicad drawing (the future "text → SVG"
-  node plugs in here).
-- `src/kernel/model.ts` — wires the default graph from user params.
-- `src/kernel/worker.ts` / `client.ts` — OCCT worker + comlink bridge.
-- `scripts/smoke.ts` — headless proof.
+## Status
 
-## Known limits (deliberately out of scope for the spike)
-
-- SVG parser handles `M L H V C Q Z` and the **first** closed subpath only —
-  holes (letters like O/A) are TODO.
-- **Mesh domain not included yet.** The full tool also needs STL *import* +
-  editing (booleans, repair). That's a second kernel (**Manifold**, WASM) living
-  next to OCCT, with a one-way `B-rep → mesh` bridge (tessellate) and mesh-domain
-  face flagging via triangle-region segmentation. Not spiked here.
-- The graph is hardcoded; the real editor is **React Flow** over this same
-  `nodes.ts` engine.
-
-## Next steps
-
-1. React Flow editor on top of `nodes.ts` (node palette, typed ports, live eval).
-2. Add the **Manifold** mesh kernel + STL import/boolean/repair nodes and the
-   tessellate bridge.
-3. `text → SVG` node via **opentype.js** glyph paths (feeds `svgPath.ts`).
-4. Per-node caching so only the sub-graph downstream of a changed param recomputes.
+Well past the original de-risking spike — this is a working tool with a live deployment,
+a broad node library, the Simple/Expert configurator, a real test suite, and CI/CD. It
+remains a solo project and a moving target; expect rough edges and see the *Design
+decisions & known limits* section of the architecture doc.
