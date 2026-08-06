@@ -215,7 +215,7 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
         {spec.inputs.map((p) => {
           // selection ports accept SEVERAL wires (their union) — flag them with a
           // stacked-dot handle so it reads as "drop multiple here"
-          const multi = p.type === "selection";
+          const multi = p.type === "edgeSel" || p.type === "faceSel";
           return (
             <div className="gnode__row" key={`in-${p.name}`}>
               <Handle
@@ -325,7 +325,6 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
             collapsible accordion so they're out of the way until needed.
             Connected ports stay rendered even when collapsed (keeps the wire). */}
         {(() => {
-          const t: SocketType = "selection";
           const outs = ctx.selOutputs(id);
           if (outs.length === 0) return null;
           const shown = selOpen ? outs : outs.filter((so) => ctx.isSourceLinked(id, so.name));
@@ -338,7 +337,9 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
               >
                 {selOpen ? "▾" : "▸"} selections ({outs.length})
               </button>
-              {shown.map((so) => (
+              {shown.map((so) => {
+                const t: SocketType = so.target === "edge" ? "edgeSel" : "faceSel";
+                return (
                 <div
                   className="gnode__row gnode__row--out"
                   key={`so-${so.name}`}
@@ -358,7 +359,8 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
                     {...tipH(t)}
                   />
                 </div>
-              ))}
+                );
+              })}
             </div>
           );
         })()}
@@ -926,14 +928,24 @@ export default function NodeEditor({
   const nodeOutType = useCallback(
     (n: GeoNode, handle: string = "out"): SocketType | undefined => {
       if (handle !== "out") {
-        const so = NODE_SPECS[n.data.nodeType]?.selectionOutputs?.find((o) => o.name === handle);
-        if (so) return "selection";
-        // forward-nodes re-expose their input's selection ports (also "selection")
-        return FORWARD_SEL.has(n.data.nodeType) ? "selection" : undefined;
+        // a selection output port is edge- or face-typed by its target; forward
+        // nodes (transform…) re-expose their input's ports, so follow the chain
+        const targetOf = (node: GeoNode): "edge" | "face" | undefined => {
+          const so = NODE_SPECS[node.data.nodeType]?.selectionOutputs?.find((o) => o.name === handle);
+          if (so) return so.target;
+          if (FORWARD_SEL.has(node.data.nodeType)) {
+            const e = edges.find((ed) => ed.target === node.id && ed.targetHandle === "in");
+            const src = e && nodes.find((x) => x.id === e.source);
+            if (src) return targetOf(src);
+          }
+          return undefined;
+        };
+        const t = targetOf(n);
+        return t === "edge" ? "edgeSel" : t === "face" ? "faceSel" : undefined;
       }
       return n.data.component ? components[n.data.component]?.outputType : NODE_SPECS[n.data.nodeType]?.output;
     },
-    [components],
+    [components, nodes, edges],
   );
   const nodeInType = useCallback(
     (n: GeoNode, handle: string): SocketType | undefined => {
@@ -1243,7 +1255,7 @@ export default function NodeEditor({
       if (wire) {
         setEdges((es) =>
           addEdge(
-            { source: id, sourceHandle: "out", target: wire.target, targetHandle: wire.port, style: { stroke: SOCKET_COLORS.selection } },
+            { source: id, sourceHandle: "out", target: wire.target, targetHandle: wire.port, style: { stroke: SOCKET_COLORS[kind === "face" ? "faceSel" : "edgeSel"] } },
             es,
           ),
         );
@@ -1299,7 +1311,7 @@ export default function NodeEditor({
 
       // one input port takes at most one wire — EXCEPT selection ports, which
       // accept several (a fillet/shell targets the union of several selections)
-      const freed = inType === "selection"
+      const freed = inType === "edgeSel" || inType === "faceSel"
         ? edges
         : edges.filter((e) => !(e.target === tgt.id && e.targetHandle === c.targetHandle));
 

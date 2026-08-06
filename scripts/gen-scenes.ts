@@ -9,7 +9,7 @@ import { dirname } from "path";
 import { mkdirSync, writeFileSync } from "fs";
 import { setOC } from "replicad";
 import { evalToPayload, type BuildResult } from "../src/kernel/model";
-import { NODE_SPECS, SOCKET_COLORS, type Graph, type NodeDescriptor } from "../src/kernel/nodes";
+import { NODE_SPECS, SOCKET_COLORS, type Graph, type NodeDescriptor, type SocketType } from "../src/kernel/nodes";
 import { setManifold } from "../src/kernel/manifold";
 import { plateWithHole, circleDoc } from "../src/sketch/presets";
 import { dimensions } from "../src/sketch/model";
@@ -808,8 +808,10 @@ function toSaveDoc(scene: Scene) {
       const hi = ref.indexOf("#");
       const src = hi < 0 ? ref : ref.slice(0, hi);
       const handle = hi < 0 ? "out" : ref.slice(hi + 1);
-      const srcType =
-        handle === "out" ? NODE_SPECS[scene.nodes.find((x) => x.id === src)!.type].output : "selection";
+      const srcType: SocketType =
+        handle === "out"
+          ? NODE_SPECS[scene.nodes.find((x) => x.id === src)!.type].output
+          : (scene.nodes.find((x) => x.id === src)!.type === "faceSelect" ? "faceSel" : "edgeSel");
       edges.push({
         id: `e${e++}`,
         source: src,

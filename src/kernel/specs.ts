@@ -7,7 +7,7 @@
  * `GraphValue["kind"]` there.
  */
 
-export type SocketType = "sketch2d" | "solid" | "mesh" | "number" | "text" | "selection";
+export type SocketType = "sketch2d" | "solid" | "mesh" | "number" | "text" | "edgeSel" | "faceSel";
 
 export interface PortSpec {
   name: string;
@@ -42,7 +42,8 @@ export const SOCKET_COLORS: Record<SocketType, string> = {
   mesh: "#56b6c2", // cyan   — triangle meshes
   number: "#98c379", // green  — scalar numbers
   text: "#e5c07b", // yellow — strings
-  selection: "#d19a66", // amber — face/edge selections (criteria)
+  edgeSel: "#d19a66", // amber — EDGE selections (→ fillet / bevel)
+  faceSel: "#61afef", // blue  — FACE selections (→ shell / internal thread)
 };
 
 /** Human name + one-line meaning per socket type — for the port hover tooltip. */
@@ -52,7 +53,8 @@ export const SOCKET_LABELS: Record<SocketType, { name: string; desc: string }> =
   mesh: { name: "Mesh", desc: "A triangle mesh (cyan). Manifold booleans, repair, hull, STL export." },
   number: { name: "Number", desc: "A scalar value (green). Drives a parameter port." },
   text: { name: "Text", desc: "A text string (yellow). E.g. for Text → SVG." },
-  selection: { name: "Selection", desc: "A set of faces or edges (amber). Feeds Fillet, Bevel or Shell." },
+  edgeSel: { name: "Edge selection", desc: "A set of EDGES (amber). Feeds Fillet or Bevel." },
+  faceSel: { name: "Face selection", desc: "A set of FACES (blue). Feeds Shell or Internal thread." },
 };
 
 /**
@@ -506,7 +508,7 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     // radius and length come from the picked face. Without it, a central bore on
     // the world Z axis is threaded. Analytic B-rep (inward helical ridges as a
     // compound → no helical boolean).
-    inputs: [{ name: "in", type: "solid" }, { name: "face", type: "selection" }],
+    inputs: [{ name: "in", type: "solid" }, { name: "face", type: "faceSel" }],
     output: "solid",
     params: [
       { name: "standard", kind: "select", default: "M16", options: ["custom", "M2", "M2.5", "M3", "M4", "M5", "M6", "M8", "M10", "M12", "M14", "M16", "M20", "M24"] },
@@ -803,7 +805,7 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     type: "edgeSelect",
     label: "Edge Select",
     inputs: [],
-    output: "selection",
+    output: "edgeSel",
     params: [
       { name: "where", kind: "select", default: "vertical", options: ["all", "vertical", "horizontal-x", "horizontal-y", "atZ", "atX", "atY"] },
       { name: "offset", kind: "number", label: "plane offset", default: 0, min: -300, max: 300, step: 0.5 },
@@ -813,7 +815,7 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     type: "faceSelect",
     label: "Face Select",
     inputs: [],
-    output: "selection",
+    output: "faceSel",
     params: [
       { name: "where", kind: "select", default: "top", options: ["all", "top", "bottom", "atZ", "atX", "atY", "horizontal", "vertical-x", "vertical-y", "planar", "cylindrical"] },
       { name: "offset", kind: "number", label: "plane offset", default: 0, min: -300, max: 300, step: 0.5 },
@@ -824,7 +826,7 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     label: "Fillet",
     inputs: [
       { name: "in", type: "solid" },
-      { name: "sel", type: "selection" },
+      { name: "sel", type: "edgeSel" },
     ],
     output: "solid",
     params: [
@@ -837,7 +839,7 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     label: "Bevel",
     inputs: [
       { name: "in", type: "solid" },
-      { name: "sel", type: "selection" },
+      { name: "sel", type: "edgeSel" },
     ],
     output: "solid",
     params: [{ name: "distance", kind: "number", default: 2, min: 0, max: 50, step: 0.5 }],
@@ -847,7 +849,7 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     label: "Shell / Hollow",
     inputs: [
       { name: "in", type: "solid" },
-      { name: "faces", type: "selection" },
+      { name: "faces", type: "faceSel" },
     ],
     output: "solid",
     params: [{ name: "thickness", kind: "number", default: 2, min: 0.2, max: 50, step: 0.2 }],
