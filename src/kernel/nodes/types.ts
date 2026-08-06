@@ -21,8 +21,11 @@ export type GraphValue =
   | { kind: "number"; value: number }
   | { kind: "text"; value: string }
   // a criteria-based face/edge selection — resolved against whatever geometry
-  // the fillet/bevel/shell receives, so it survives regeneration.
-  | { kind: "selection"; target: "edge" | "face"; apply: (finder: unknown) => unknown };
+  // the fillet/bevel/shell receives, so it survives regeneration. `nearest`, when
+  // set, is a reference point from the original pick: the consumer re-selects the
+  // element NEAREST to it on the current geometry, so the pick tracks the edge as
+  // parameters move it (rather than matching a frozen coordinate).
+  | { kind: "selection"; target: "edge" | "face"; apply: (finder: unknown) => unknown; nearest?: [number, number, number] };
 
 /* ------------------------------------------------------------------ */
 /* Graph description                                                   */

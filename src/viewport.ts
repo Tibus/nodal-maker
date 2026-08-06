@@ -1239,7 +1239,7 @@ export class Viewport {
    * descriptor: the axis the edge runs along (→ vertical / horizontal-x/-y), or
    * if it lies flat in a horizontal plane, `atZ` with that plane's offset.
    */
-  pickEdge(clientX: number, clientY: number): { where: string; offset: number } | null {
+  pickEdge(clientX: number, clientY: number): { where: string; offset: number; near: [number, number, number] } | null {
     if (!this.edgesObj || !this.mesh) return null;
     const rect = this.renderer.domElement.getBoundingClientRect();
     const ndc = new THREE.Vector2(
@@ -1300,7 +1300,13 @@ export class Viewport {
     this.scene.add(marker);
     this.pickHighlight = marker;
 
-    return { where, offset: Math.round(offset * 100) / 100 };
+    // reference point ON the picked edge (projection of the hit) → lets the
+    // selection re-bind to this edge parametrically as the geometry changes
+    const abv = b.clone().sub(a);
+    const tt = Math.min(1, Math.max(0, p.clone().sub(a).dot(abv) / (abv.lengthSq() || 1e-9)));
+    const ref = a.clone().addScaledVector(abv, tt);
+
+    return { where, offset: Math.round(offset * 100) / 100, near: [ref.x, ref.y, ref.z] };
   }
 
   private onResize(container: HTMLElement) {

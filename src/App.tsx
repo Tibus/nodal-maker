@@ -173,8 +173,8 @@ export default function App() {
       } else {
         const pick = viewportRef.current?.pickEdge(e.clientX, e.clientY);
         if (!pick) { setStatus("pick: no edge near the cursor"); return; }
-        editorApi.current?.addEdgeSelect(pick.where, pick.offset);
-        setStatus(`picked edge → Edge Select (${pick.where}${pick.where === "atZ" ? ` @${pick.offset}` : ""})`);
+        editorApi.current?.addEdgeSelect(pick.where, pick.offset, pick.near);
+        setStatus(`picked edge → Edge Select (tracks the picked edge)`);
       }
       setPickMode(null);
     },

@@ -17,6 +17,7 @@ import {
   cast,
   Plane as RPlane,
   type Face,
+  type Edge,
 } from "replicad";
 import * as opentype from "opentype.js";
 import { svgPathToDrawing } from "../svgPath";
@@ -342,6 +343,27 @@ export function cylinderFromFace(
   const a = P(0, 0), b = P(0.5, 0);
   const radius = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) / 2;
   return { center: loC, axis: [d[0] / length, d[1] / length, d[2] / length], radius, length };
+}
+
+/**
+ * The edge of `solid` closest to `near` (sampled along each edge). Lets a picked
+ * edge selection re-bind to the same edge after the geometry moves — the essence
+ * of a parametric pick: track the entity, not a frozen coordinate.
+ */
+export function nearestEdge(solid: Shape3D, near: [number, number, number]): Edge | null {
+  const edges = (solid as unknown as { edges: Edge[] }).edges;
+  let best: Edge | null = null;
+  let bestD = Infinity;
+  for (const e of edges) {
+    let d = Infinity;
+    for (const t of [0, 0.25, 0.5, 0.75, 1]) {
+      const p = e.pointAt(t);
+      const dd = (p.x - near[0]) ** 2 + (p.y - near[1]) ** 2 + (p.z - near[2]) ** 2;
+      if (dd < d) d = dd;
+    }
+    if (d < bestD) { bestD = d; best = e; }
+  }
+  return best;
 }
 
 let stepCounter = 0;

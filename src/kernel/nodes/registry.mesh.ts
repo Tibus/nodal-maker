@@ -46,7 +46,10 @@ export const meshNodes: Record<string, NodeImpl> = {
       // single B-rep edge → the whole loop is kept, its concentric sibling isn't).
       return near ? f.containsPoint(near) : f;
     };
-    return { kind: "selection", target: "edge", apply: apply as (f: unknown) => unknown };
+    // `nearest` lets a single-selection consumer track the picked edge as it
+    // moves (re-binds to the closest edge each eval); `apply` stays as the static
+    // criteria for the union (multi-selection) path.
+    return { kind: "selection", target: "edge", apply: apply as (f: unknown) => unknown, nearest: near ?? undefined };
   },
   faceSelect: (_inputs, params) => {
     const where = String(params.where ?? "all");

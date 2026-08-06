@@ -30,10 +30,28 @@ import {
   buildThreadBRep,
   buildNutBRep,
   cylinderFromFace,
+  nearestEdge,
   importSTEPSync,
 } from "./helpers";
 import { solidToMeshData, meshAndTag, resolveTopCap } from "./payload";
 import type { GraphValue, NodeImpl, Vec3 } from "./types";
+
+/**
+ * Build the edge-finder callback a fillet/bevel hands to replicad. When the
+ * selection carries a pick reference (`nearest`), re-bind to the edge closest to
+ * it on the CURRENT geometry — so the pick tracks that edge as parameters move
+ * it, instead of matching a frozen coordinate. Otherwise use its static criteria.
+ */
+function edgeFinderFor(
+  solid: Shape3D,
+  sel: Extract<GraphValue, { kind: "selection" }>,
+): (e: EdgeFinder) => EdgeFinder {
+  if (sel.nearest) {
+    const edge = nearestEdge(solid, sel.nearest);
+    if (edge) return (e) => e.inList([edge]) as EdgeFinder;
+  }
+  return (e) => sel.apply(e) as EdgeFinder;
+}
 
 export const nodes3d: Record<string, NodeImpl> = {
   /* --- primitives 3D (sources) --- */
@@ -435,7 +453,7 @@ export const nodes3d: Record<string, NodeImpl> = {
     const rad: number | [number, number] = r2 > 0 && r2 !== r ? [r, r2] : r;
     const sel = inputs.sel;
     if (sel && sel.kind === "selection" && sel.target === "edge") {
-      return { kind: "solid", solid: solid.fillet(rad, (e) => sel.apply(e) as EdgeFinder) as Shape3D };
+      return { kind: "solid", solid: solid.fillet(rad, edgeFinderFor(solid, sel)) as Shape3D };
     }
     return { kind: "solid", solid: solid.fillet(rad) as Shape3D };
   },
@@ -446,7 +464,7 @@ export const nodes3d: Record<string, NodeImpl> = {
     if (d <= 0) return { kind: "solid", solid };
     const sel = inputs.sel;
     if (sel && sel.kind === "selection" && sel.target === "edge") {
-      return { kind: "solid", solid: solid.chamfer(d, (e) => sel.apply(e) as EdgeFinder) as Shape3D };
+      return { kind: "solid", solid: solid.chamfer(d, edgeFinderFor(solid, sel)) as Shape3D };
     }
     return { kind: "solid", solid: solid.chamfer(d) as Shape3D };
   },
