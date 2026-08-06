@@ -99,6 +99,9 @@ export class Viewport {
     this.materials = [bodyMat(), bodyMat(), bodyMat()];
 
     window.addEventListener("resize", () => this.onResize(container));
+    // also track the container itself so the split-pane resizer (which doesn't
+    // fire a window resize) keeps the canvas aspect correct
+    new ResizeObserver(() => this.onResize(container)).observe(container);
     this.animate();
   }
 
@@ -177,10 +180,10 @@ export class Viewport {
     if (reframe || !this.framed) {
       this.frameCamera(box);
       this.framed = true;
-    } else if (!box.isEmpty()) {
-      // keep the orbit pivot on the model even when we don't re-frame
-      this.controls.target.copy(box.getCenter(new THREE.Vector3()));
     }
+    // otherwise leave the camera exactly where the user put it — tweaking a
+    // parameter must NOT re-centre or re-frame the view (only changing the
+    // viewed node does, via reframe=true from the caller).
   }
 
   /**

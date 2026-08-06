@@ -42,6 +42,27 @@ export default function App() {
   const viewportRef = useRef<Viewport | null>(null);
   const lastMesh = useRef<{ vertices: Float32Array; indices: Uint32Array } | null>(null);
   const graphTimer = useRef<number | undefined>(undefined);
+  const prevOutputId = useRef<string | null>(null);
+  const appRef = useRef<HTMLDivElement>(null);
+  // draggable split between the node editor and the 3D viewport (editor flex, viewport flex = 1)
+  const [split, setSplit] = useState(1.5);
+  const startResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const onMove = (ev: MouseEvent) => {
+      const el = appRef.current; if (!el) return;
+      const r = el.getBoundingClientRect();
+      const frac = Math.min(0.85, Math.max(0.15, (ev.clientX - r.left) / r.width));
+      setSplit(frac / (1 - frac));
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    document.body.style.cursor = "col-resize";
+  }, []);
   const editorApi = useRef<EditorApi | null>(null);
   const [status, setStatus] = useState("initialising kernels…");
   const [graphError, setGraphError] = useState<{ nodeId?: string; message: string } | null>(null);
@@ -178,7 +199,11 @@ export default function App() {
         }
         setGraphError(null);
         setGraphValues(res.values ?? {});
-        viewportRef.current?.setGeometry(res.mesh);
+        // re-frame the camera ONLY when the viewed node changes — tweaking a
+        // parameter must leave the view exactly where the user put it.
+        const reframe = outputId !== prevOutputId.current;
+        prevOutputId.current = outputId;
+        viewportRef.current?.setGeometry(res.mesh, reframe);
         viewportRef.current?.setExtraBodies(res.extras ?? []);
         setStatus(`${res.mesh.stats.faceCount} regions · ${res.mesh.stats.triangleCount} triangles`);
         const solidLike = res.outputKind === "solid" || res.outputKind === "mesh";
@@ -218,7 +243,7 @@ export default function App() {
   }, []);
 
   return (
-    <div className="app">
+    <div className="app" ref={appRef} style={{ "--split": split } as React.CSSProperties}>
       <NodeEditor
         initialNodes={SEED_NODES}
         initialEdges={SEED_EDGES}
@@ -283,6 +308,7 @@ export default function App() {
           }
         }}
       />
+      <div className="resizer" onMouseDown={startResize} title="Glisser pour redimensionner" />
       <div
         className={`viewport${pickMode ? " viewport--pick" : ""}`}
         ref={mountRef}
