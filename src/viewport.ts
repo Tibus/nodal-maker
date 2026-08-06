@@ -419,10 +419,10 @@ export class Viewport {
 
     const size = this.modelDiag * 2;
     const hatch = this.hatchTexture();
-    const rep = Math.max(16, Math.round(size / 4)); // ~4 mm world spacing (Fusion look)
+    const rep = Math.max(24, Math.round(size / 2)); // ~2 mm world spacing (fine hatch)
     hatch.repeat.set(rep, rep);
     const capMat = new THREE.MeshStandardMaterial({
-      color: 0xd0d3d8, roughness: 0.6, metalness: 0.05, side: THREE.DoubleSide, map: hatch,
+      color: 0xffffff, roughness: 0.6, metalness: 0.05, side: THREE.DoubleSide, map: hatch,
       stencilWrite: true, stencilRef: 0, stencilFunc: THREE.NotEqualStencilFunc,
       stencilFail: THREE.ReplaceStencilOp, stencilZFail: THREE.ReplaceStencilOp, stencilZPass: THREE.ReplaceStencilOp,
     });
@@ -442,8 +442,8 @@ export class Viewport {
     const c = document.createElement("canvas");
     c.width = c.height = s;
     const ctx = c.getContext("2d")!;
-    ctx.fillStyle = "#cfd2d8"; ctx.fillRect(0, 0, s, s);
-    ctx.strokeStyle = "#565c67"; ctx.lineWidth = 2.4; ctx.lineCap = "square";
+    ctx.fillStyle = "#f2ead0"; ctx.fillRect(0, 0, s, s); // light yellow fill
+    ctx.strokeStyle = "#d8c260"; ctx.lineWidth = 2; ctx.lineCap = "square"; // clear yellow lines
     // one 45° line + its wrap corners so tiling stays continuous
     for (const [x0, y0, x1, y1] of [[0, s, s, 0], [-s / 2, s / 2, s / 2, -s / 2], [s / 2, 3 * s / 2, 3 * s / 2, s / 2]]) {
       ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
