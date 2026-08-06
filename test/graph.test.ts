@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { initKernel } from "./kernel";
-import { evalToPayload } from "../src/kernel/model";
+import { evalToPayload, describePortGeometry } from "../src/kernel/model";
 import { meshMassProps } from "../src/massprops";
 import { evalGraphCached, makeEvalCache, meshAndTag, type Graph } from "../src/kernel/nodes";
 
@@ -111,6 +111,16 @@ describe("graph evaluation (real geometry)", () => {
     const vBoth = volumeOf(both, "f");
     expect(vBoth).toBeLessThan(vTop); // more edges rounded → more material removed
     expect(vTop).toBeLessThan(8000); // and both remove some vs the raw 8000 box
+  });
+
+  it("describePort returns the geometry a selection-output port targets", () => {
+    const g: Graph = [{ id: "b", type: "box", params: { x: 20, y: 20, z: 20 }, inputs: {} }];
+    const top = describePortGeometry(g, "b", "b", "top");
+    expect(top.tris.length).toBeGreaterThan(0); // the top face's triangles
+    expect(top.segs.length).toBe(0);
+    const vedges = describePortGeometry(g, "b", "b", "verticalEdges");
+    expect(vedges.segs.length).toBeGreaterThan(0); // the 4 vertical edges as polylines
+    expect(vedges.tris.length).toBe(0);
   });
 
   it("a cone exposes named selection ports (fillet its base rim)", () => {

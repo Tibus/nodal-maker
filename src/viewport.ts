@@ -27,6 +27,8 @@ export class Viewport {
   // every re-eval (unlike pickHighlight, which is a one-shot pick flash).
   private selPreview: { kind: "edge" | "face"; where: string; offset: number; near?: [number, number, number] } | null = null;
   private selPreviewObj: THREE.Object3D | null = null;
+  // transient highlight when hovering a node's selection OUTPUT port
+  private portHl: THREE.Object3D | null = null;
   private measures: THREE.Object3D[] = [];
   private edgesObj: THREE.LineSegments | null = null;
   private modelDiag = 100;
@@ -128,6 +130,7 @@ export class Viewport {
       this.mesh = null;
     }
     this.clearPick();
+    this.clearPortHighlight(); // drop any hover highlight tied to the old geometry
     this.payload = payload;
     this.isSketchView = !!payload.isSketch;
 
@@ -1122,6 +1125,39 @@ export class Viewport {
   setSelectionPreview(desc: { kind: "edge" | "face"; where: string; offset: number; near?: [number, number, number] } | null) {
     this.selPreview = desc;
     this.buildSelectionPreview();
+  }
+
+  /** Flash the faces (triangles) / edges (segments) a selection-output port
+   *  targets, computed on the B-rep by the kernel. Pass empty arrays to clear. */
+  showPortHighlight(tris: Float32Array, segs: Float32Array) {
+    this.clearPortHighlight();
+    const group = new THREE.Group();
+    if (tris.length) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.BufferAttribute(tris, 3));
+      const mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0x39d98a, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthTest: false }));
+      mesh.renderOrder = 998;
+      group.add(mesh);
+    }
+    if (segs.length) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.BufferAttribute(segs, 3));
+      const lines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0x39d98a, depthTest: false }));
+      lines.renderOrder = 999;
+      group.add(lines);
+    }
+    if (!group.children.length) return;
+    this.scene.add(group);
+    this.portHl = group;
+  }
+
+  clearPortHighlight() {
+    if (!this.portHl) return;
+    this.scene.remove(this.portHl);
+    this.portHl.traverse((o) => {
+      if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) { o.geometry.dispose(); (o.material as THREE.Material).dispose?.(); }
+    });
+    this.portHl = null;
   }
 
   private clearSelectionPreview() {

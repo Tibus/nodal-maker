@@ -119,6 +119,9 @@ interface EditorCtx {
   toggleExpose: (nodeId: string, param: string) => void;
   /** rename a node (alias shown on the node + in the Simple form) */
   setAlias: (nodeId: string, alias: string) => void;
+  /** hover a selection-output port → highlight its geometry on the model */
+  hoverPort: (nodeId: string, port: string) => void;
+  clearHoverPort: () => void;
 }
 const Ctx = createContext<EditorCtx | null>(null);
 
@@ -336,7 +339,12 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
                 {selOpen ? "▾" : "▸"} selections ({outs.length})
               </button>
               {shown.map((so) => (
-                <div className="gnode__row gnode__row--out" key={`so-${so.name}`}>
+                <div
+                  className="gnode__row gnode__row--out"
+                  key={`so-${so.name}`}
+                  onMouseEnter={() => ctx.hoverPort(id, so.name)}
+                  onMouseLeave={() => ctx.clearHoverPort()}
+                >
                   <span className="gnode__portlabel gnode__portlabel--r" style={{ color: SOCKET_COLORS[t] }}>
                     {so.name} ▶
                   </span>
@@ -591,6 +599,8 @@ export interface NodeEditorProps {
   /** fires when a single edge/face selection node is highlighted (or null) so the
    *  viewport can show what that selection targets on the live model */
   onSelectPreview?: (desc: { kind: "edge" | "face"; where: string; offset: number; near?: [number, number, number] } | null) => void;
+  /** hover a selection-output port → highlight its geometry on the model */
+  onPortHover?: (info: { nodeId: string; port: string } | null) => void;
   errorNodeId?: string | null;
   errorMessage?: string | null;
   values?: Record<string, string>;
@@ -835,6 +845,7 @@ export default function NodeEditor({
   onChange,
   onReady,
   onSelectPreview,
+  onPortHover,
   errorNodeId,
   errorMessage,
   values,
@@ -1630,6 +1641,11 @@ export default function NodeEditor({
     return result;
   }, [nodes, edges]);
 
+  const onPortHoverRef = useRef(onPortHover);
+  onPortHoverRef.current = onPortHover;
+  const hoverPort = useCallback((nodeId: string, port: string) => onPortHoverRef.current?.({ nodeId, port }), []);
+  const clearHoverPort = useCallback(() => onPortHoverRef.current?.(null), []);
+
   const ctx = useMemo<EditorCtx>(
     () => ({
       outputId,
@@ -1649,8 +1665,10 @@ export default function NodeEditor({
       isExposed,
       toggleExpose,
       setAlias,
+      hoverPort,
+      clearHoverPort,
     }),
-    [outputId, setOutput, setParam, linkedSet, sourceLinkedSet, errorNodeId, errorMessage, values, components, selOutputsMap, hidden, toggleVisible, editSketch, isExposed, toggleExpose, setAlias],
+    [outputId, setOutput, setParam, linkedSet, sourceLinkedSet, errorNodeId, errorMessage, values, components, selOutputsMap, hidden, toggleVisible, editSketch, isExposed, toggleExpose, setAlias, hoverPort, clearHoverPort],
   );
 
   const outType = NODE_SPECS[nodes.find((n) => n.id === outputId)?.data.nodeType ?? ""]?.output;

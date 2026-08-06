@@ -22,6 +22,7 @@ import {
   importMesh,
   exportMeshSTL,
   evalToPayload,
+  describePortGeometry,
   exportGraphSTL,
   exportGraphSVG,
   exportGraphDXF,
@@ -75,6 +76,14 @@ const api = {
       const nodeId =
         e && typeof e === "object" && "nodeId" in e ? String((e as { nodeId: unknown }).nodeId) : undefined;
       return { ok: false as const, error: { nodeId, message: e instanceof Error ? e.message : String(e) } };
+    }
+  },
+  async describePort(graph: Graph, outputId: string, sourceNodeId: string, port: string, userParams?: Record<string, number>) {
+    await ensureKernels();
+    try {
+      return describePortGeometry(graph, outputId, sourceNodeId, port, graphCache, userParams);
+    } catch {
+      return { tris: new Float32Array(0), segs: new Float32Array(0) };
     }
   },
   async exportGraphSTL(graph: Graph, outputId: string) {

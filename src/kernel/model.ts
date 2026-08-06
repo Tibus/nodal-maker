@@ -16,7 +16,8 @@ import {
   type MeshPayload,
 } from "./nodes";
 import { writeBinarySTL } from "./stl";
-import type { Shape3D, Drawing } from "replicad";
+import { resolveCrit, critApply } from "./nodes/selection";
+import { FaceFinder, EdgeFinder, type Shape3D, type Drawing, type Face, type Edge } from "replicad";
 
 /** A single-geometry port carries one ref; take it (ignoring the multi form). */
 const oneRef = (r?: string | string[]): string | undefined => (Array.isArray(r) ? r[0] : r);
@@ -252,6 +253,63 @@ export function evalToPayload(
     return { mesh: { ...meshAndTag(sketchToFace(v)), isSketch: true }, topCapFaceId: null, topCapZ: 0, outputKind: "sketch2d", values, extras };
   }
   throw new Error(`output node "${outputId}" is a ${v.kind}; connect it to geometry to preview`);
+}
+
+/**
+ * Geometry to highlight when hovering a node's selection OUTPUT port (extrude
+ * cap, box top, cylinder side…): resolve that port's criteria and apply it to
+ * the currently DISPLAYED solid, returning the matched faces' triangles and/or
+ * the matched edges' polylines so the viewport can flash them.
+ */
+export function describePortGeometry(
+  graph: Graph,
+  outputId: string,
+  sourceNodeId: string,
+  port: string,
+  cache?: EvalCache,
+  vars?: Record<string, number>,
+): { tris: Float32Array; segs: Float32Array } {
+  const empty = { tris: new Float32Array(0), segs: new Float32Array(0) };
+  const { outputs } = cache ? evalGraphCached(graph, cache, vars) : evalGraph(graph, vars);
+  const v = outputs[outputId];
+  if (!v || v.kind !== "solid") return empty;
+  const byId = new Map(graph.map((n) => [n.id, n]));
+  const evalNode = (id: string): GraphValue => {
+    const o = outputs[id];
+    if (!o) throw new Error(`unknown node ${id}`);
+    return o;
+  };
+  let crit;
+  try {
+    crit = resolveCrit(`${sourceNodeId}#${port}`, byId, evalNode);
+  } catch {
+    return empty; // port not resolvable against this geometry
+  }
+  const apply = critApply(crit);
+  if (crit.target === "face") {
+    // triangulation() only returns data once the shape is meshed
+    (v.solid as unknown as { mesh: (o: { tolerance: number; angularTolerance: number }) => unknown }).mesh({ tolerance: 0.1, angularTolerance: 20 });
+    const faces = (apply(new FaceFinder()) as FaceFinder).find(v.solid as Parameters<FaceFinder["find"]>[0]) as Face[];
+    const tris: number[] = [];
+    for (const f of faces) {
+      const t = f.triangulation();
+      if (!t) continue;
+      for (const idx of t.trianglesIndexes) tris.push(t.vertices[idx * 3], t.vertices[idx * 3 + 1], t.vertices[idx * 3 + 2]);
+    }
+    return { tris: new Float32Array(tris), segs: new Float32Array(0) };
+  }
+  const edges = (apply(new EdgeFinder()) as EdgeFinder).find(v.solid as Parameters<EdgeFinder["find"]>[0]) as Edge[];
+  const segs: number[] = [];
+  for (const e of edges) {
+    const N = 24;
+    let prev: { x: number; y: number; z: number } | null = null;
+    for (let i = 0; i <= N; i++) {
+      const p = e.pointAt(i / N);
+      if (prev) segs.push(prev.x, prev.y, prev.z, p.x, p.y, p.z);
+      prev = p;
+    }
+  }
+  return { tris: new Float32Array(0), segs: new Float32Array(segs) };
 }
 
 /** Export the displayed node as SVG (2D profiles only). Curves are preserved. */

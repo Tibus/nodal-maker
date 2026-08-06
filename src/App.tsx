@@ -44,6 +44,11 @@ export default function App() {
   const graphTimer = useRef<number | undefined>(undefined);
   const prevOutputId = useRef<string | null>(null);
   const appRef = useRef<HTMLDivElement>(null);
+  // last evaluated (flat) graph/output/vars — reused to describe hovered ports
+  const lastGraph = useRef<Graph | null>(null);
+  const lastOutputId = useRef<string>("");
+  const lastVars = useRef<Record<string, number>>({});
+  const portHoverTimer = useRef<number | undefined>(undefined);
   // draggable split between the node editor and the 3D viewport (editor flex, viewport flex = 1)
   const [split, setSplit] = useState(1.5);
   const startResize = useCallback((e: React.MouseEvent) => {
@@ -193,7 +198,24 @@ export default function App() {
     viewportRef.current?.setClip(clipAxis, clipPos, clipFlip);
   }, [clipAxis, clipPos, clipFlip]);
 
+  // highlight the geometry a node's selection-output port targets, on hover
+  const onPortHover = useCallback((info: { nodeId: string; port: string } | null) => {
+    window.clearTimeout(portHoverTimer.current);
+    if (!info) { viewportRef.current?.clearPortHighlight(); return; }
+    portHoverTimer.current = window.setTimeout(async () => {
+      const g = lastGraph.current;
+      if (!g) return;
+      try {
+        const r = await kernel.describePort(g, lastOutputId.current, info.nodeId, info.port, lastVars.current);
+        viewportRef.current?.showPortHighlight(r.tris, r.segs);
+      } catch { /* ignore hover errors */ }
+    }, 40);
+  }, []);
+
   const onGraphChange = useCallback((graph: Graph, outputId: string, pinnedIds: string[], userVars: Record<string, number>) => {
+    lastGraph.current = graph;
+    lastOutputId.current = outputId;
+    lastVars.current = userVars;
     window.clearTimeout(graphTimer.current);
     graphTimer.current = window.setTimeout(async () => {
       try {
@@ -259,6 +281,7 @@ export default function App() {
           editorApi.current = api;
         }}
         onSelectPreview={(desc) => viewportRef.current?.setSelectionPreview(desc)}
+        onPortHover={onPortHover}
         onFit={() => viewportRef.current?.fit()}
         onTopView={() => viewportRef.current?.topView()}
         onExportPNG={() => {
