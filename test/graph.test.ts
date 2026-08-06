@@ -73,6 +73,23 @@ describe("graph evaluation (real geometry)", () => {
     expect(() => evalToPayload(g, "e")).toThrow(/\[extrude\]/);
   });
 
+  it("a fillet accepts several selection nodes (union of edges)", () => {
+    // box 20³; select the top 4 edges and the bottom 4 edges as TWO edgeSelect
+    // nodes wired into one fillet. Filleting rounds convex edges → removes volume,
+    // so filleting 8 edges must remove strictly more than filleting only 4.
+    const base: Graph = [
+      { id: "b", type: "box", params: { x: 20, y: 20, z: 20 }, inputs: {} },
+      { id: "st", type: "edgeSelect", params: { where: "atZ", offset: 20 }, inputs: {} },
+      { id: "sb", type: "edgeSelect", params: { where: "atZ", offset: 0 }, inputs: {} },
+    ];
+    const topOnly: Graph = [...base, { id: "f", type: "fillet", params: { radius: 2 }, inputs: { in: "b", sel: "st" } }];
+    const both: Graph = [...base, { id: "f", type: "fillet", params: { radius: 2 }, inputs: { in: "b", sel: ["st", "sb"] } }];
+    const vTop = volumeOf(topOnly, "f");
+    const vBoth = volumeOf(both, "f");
+    expect(vBoth).toBeLessThan(vTop); // more edges rounded → more material removed
+    expect(vTop).toBeLessThan(8000); // and both remove some vs the raw 8000 box
+  });
+
   it("a broken node does not blank the rest of the history", () => {
     // repro: a fillet whose edge selection was deleted rounds EVERY edge with a
     // radius too large for the geometry → it fails. Viewing the fillet must show

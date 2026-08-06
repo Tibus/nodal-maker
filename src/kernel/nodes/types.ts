@@ -31,8 +31,9 @@ export type GraphValue =
 export interface NodeDescriptor {
   id: string;
   type: string;
-  /** map of input-port-name -> id of the node feeding it */
-  inputs?: Record<string, string>;
+  /** map of input-port-name -> ref(s) feeding it. A selection port may take
+   *  several refs (multiple Edge/Face Select nodes → their union). */
+  inputs?: Record<string, string | string[]>;
   params?: Record<string, unknown>;
 }
 

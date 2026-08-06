@@ -18,6 +18,9 @@ import {
 import { writeBinarySTL } from "./stl";
 import type { Shape3D, Drawing } from "replicad";
 
+/** A single-geometry port carries one ref; take it (ignoring the multi form). */
+const oneRef = (r?: string | string[]): string | undefined => (Array.isArray(r) ? r[0] : r);
+
 export interface Params {
   /** SVG path `d` attribute — the "SVG input" node */
   svgPath: string;
@@ -258,8 +261,9 @@ export function exportGraphSVG(graph: Graph, outputId: string): string {
 
   // Score/Cut node → layered SVG: red = cut (through), blue = score (fold/engrave)
   if (node?.type === "scoreCut") {
-    const cutV = node.inputs?.cut ? outputs[node.inputs.cut] : undefined;
-    const scoreV = node.inputs?.score ? outputs[node.inputs.score] : undefined;
+    const cutRef = oneRef(node.inputs?.cut), scoreRef = oneRef(node.inputs?.score);
+    const cutV = cutRef ? outputs[cutRef] : undefined;
+    const scoreV = scoreRef ? outputs[scoreRef] : undefined;
     if (!cutV || cutV.kind !== "sketch2d") throw new Error("Score/Cut needs a cut profile");
     const score = scoreV && scoreV.kind === "sketch2d" ? scoreV.drawing : undefined;
     return scoreCutSVG(cutV.drawing, score);
@@ -383,8 +387,9 @@ export function exportGraphDXF(graph: Graph, outputId: string): string {
   const node = graph.find((n) => n.id === outputId);
 
   if (node?.type === "scoreCut") {
-    const cutV = node.inputs?.cut ? outputs[node.inputs.cut] : undefined;
-    const scoreV = node.inputs?.score ? outputs[node.inputs.score] : undefined;
+    const cutRef = oneRef(node.inputs?.cut), scoreRef = oneRef(node.inputs?.score);
+    const cutV = cutRef ? outputs[cutRef] : undefined;
+    const scoreV = scoreRef ? outputs[scoreRef] : undefined;
     if (!cutV || cutV.kind !== "sketch2d") throw new Error("Score/Cut needs a cut profile");
     const layers: DxfLayer[] = [{ name: "CUT", color: 1, polylines: drawingToPolylines(cutV.drawing) }];
     if (scoreV && scoreV.kind === "sketch2d")
@@ -395,7 +400,7 @@ export function exportGraphDXF(graph: Graph, outputId: string): string {
   // CNC job → one DXF layer per operation, depths encoded in the layer name and
   // drills as POINT entities, so a CAM tool can assign toolpaths per layer.
   if (node?.type === "cncJob") {
-    const g = (port: string) => { const v = node.inputs?.[port] ? outputs[node.inputs[port]] : undefined; return v && v.kind === "sketch2d" ? v.drawing : undefined; };
+    const g = (port: string) => { const r = oneRef(node.inputs?.[port]); const v = r ? outputs[r] : undefined; return v && v.kind === "sketch2d" ? v.drawing : undefined; };
     const depth = (k: string, d: number) => Number(node.params?.[k] ?? d);
     const layers: DxfLayer[] = [];
     const contour = g("contour");

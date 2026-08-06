@@ -68,6 +68,9 @@ export function parseRef(ref: string): { node: string; handle: string } {
   return i < 0 ? { node: ref, handle: "out" } : { node: ref.slice(0, i), handle: ref.slice(i + 1) };
 }
 
+/** A geometry port (`in`/`base`/…) always carries a single ref; take the first. */
+const firstRef = (r: string | string[]): string => (Array.isArray(r) ? r[0] : r);
+
 // where an extrude's cap / bottom sit along the extrusion axis, per direction
 const extrudeCapZ = (p: Record<string, unknown>): number => {
   const h = Number(p.height ?? 1), m = String(p.mode ?? "up");
@@ -119,6 +122,25 @@ export function critApply(c: Crit): (finder: unknown) => unknown {
   };
 }
 export const critToSelection = (c: Crit): GraphValue => ({ kind: "selection", target: c.target, apply: critApply(c) });
+
+/**
+ * Combine several selections feeding one port into a single OR-selection: an
+ * edge/face is kept if ANY of the wired selections keeps it. Lets a fillet (or
+ * shell/bevel) target the union of several Edge/Face Select nodes at once.
+ * `either([...builders])` is replicad's built-in filter-OR combinator.
+ */
+export function combineSelections(values: GraphValue[]): GraphValue {
+  const sels = values.filter((v): v is Extract<GraphValue, { kind: "selection" }> => v.kind === "selection");
+  if (sels.length === 0) throw new Error("selection port received no selection");
+  if (sels.length === 1) return sels[0];
+  const target = sels[0].target;
+  if (sels.some((s) => s.target !== target)) {
+    throw new Error(`cannot mix ${target} and other selections on one port`);
+  }
+  const builders = sels.map((s) => s.apply);
+  const apply = (finder: unknown) => (finder as { either: (b: ((f: unknown) => unknown)[]) => unknown }).either(builders);
+  return { kind: "selection", target, apply };
+}
 
 /** min / max Z of a solid's bounding box — lets ports on nodes whose face
  * heights depend on upstream geometry (revolve, boss) locate their caps. */
@@ -238,7 +260,7 @@ export function resolveCrit(
     let plane: Plane | undefined;
     let offset = 0;
     if (src.type === "extrude" && src.inputs?.in) {
-      const inV = evalNode(parseRef(src.inputs.in).node);
+      const inV = evalNode(parseRef(firstRef(src.inputs.in)).node);
       if (inV.kind === "sketch2d") { if (inV.plane) plane = inV.plane; offset = inV.planeOffset ?? 0; }
     }
     return leaf(src.params ?? {}, v.kind === "solid" ? v.solid : undefined, plane, offset);
@@ -246,7 +268,7 @@ export function resolveCrit(
   if (FORWARD_TYPES.has(src.type)) {
     const inputRef = src.inputs?.in;
     if (!inputRef) throw new Error(`[${src.type}] nothing to forward selection "${handle}" from`);
-    const up = resolveCrit(`${parseRef(inputRef).node}#${handle}`, byId, evalNode);
+    const up = resolveCrit(`${parseRef(firstRef(inputRef)).node}#${handle}`, byId, evalNode);
     const out = forwardCrit(up, src.type, src.params ?? {});
     if (!out) throw new Error(`selection "${handle}" can't follow a ${src.type}`);
     return out;
@@ -263,4 +285,15 @@ export function resolveRef(
   const { node, handle } = parseRef(ref);
   if (handle === "out") return evalNode(node);
   return critToSelection(resolveCrit(ref, byId, evalNode));
+}
+
+/** Resolve a port that may carry one ref or several (selections → their union). */
+export function resolvePort(
+  ref: string | string[],
+  byId: Map<string, NodeDescriptor>,
+  evalNode: (id: string) => GraphValue,
+): GraphValue {
+  if (!Array.isArray(ref)) return resolveRef(ref, byId, evalNode);
+  if (ref.length === 1) return resolveRef(ref[0], byId, evalNode);
+  return combineSelections(ref.map((r) => resolveRef(r, byId, evalNode)));
 }

@@ -366,6 +366,14 @@ button.link {
 /* optional param ports: hollow ring (border colour set inline) — the visual
    cue that the link is optional and the node already has a default value */
 .rf-port--opt { background: #1e2127; border-width: 2px; border-style: solid; }
+/* multi ports (selection): a second offset disc behind the handle signals it
+   accepts several wires stacked together (a fillet's union of selections) */
+.rf-port--multi { overflow: visible; }
+.rf-port--multi::after {
+  content: ""; position: absolute; width: 100%; height: 100%;
+  left: 3px; top: -3px; border-radius: 50%;
+  background: inherit; border: 2px solid #14171c; z-index: -1;
+}
 .gnode__row .react-flow__handle-left { left: -12px; top: 50%; }
 .gnode__row .react-flow__handle-right { right: -12px; top: 50%; }
 .gnode__row--out { justify-content: flex-end; }

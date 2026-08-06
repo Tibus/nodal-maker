@@ -782,7 +782,7 @@ function layout(nodes: NodeDescriptor[]): Record<string, { x: number; y: number 
     if (seen.has(id)) return 0;
     seen.add(id);
     const n = byId.get(id)!;
-    const ins = Object.values(n.inputs ?? {}).map((s) => s.split("#")[0]);
+    const ins = Object.values(n.inputs ?? {}).flatMap((s) => (Array.isArray(s) ? s : [s])).map((s) => s.split("#")[0]);
     const d = ins.length ? 1 + Math.max(...ins.map((s) => compute(s, seen))) : 0;
     depth.set(id, d);
     return d;

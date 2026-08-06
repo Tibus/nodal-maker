@@ -41,6 +41,9 @@ function splitRef(ref: string): { node: string; handle: string } {
   return i < 0 ? { node: ref, handle: "" } : { node: ref.slice(0, i), handle: ref.slice(i + 1) };
 }
 const joinRef = (node: string, handle: string) => (handle ? `${node}#${handle}` : node);
+/** apply a ref rewrite over a port value that may hold one ref or several */
+const mapRefs = (src: string | string[], fn: (s: string) => string): string | string[] =>
+  Array.isArray(src) ? src.map(fn) : fn(src);
 
 /**
  * Expand every component instance in `descs` into its inner nodes, wiring the
@@ -65,10 +68,9 @@ export function expandDescriptors(
     outputAlias.set(d.id, px(def.output));
 
     for (const inner of def.nodes) {
-      const inputs: Record<string, string> = {};
+      const inputs: Record<string, string | string[]> = {};
       for (const [port, src] of Object.entries(inner.inputs ?? {})) {
-        const r = splitRef(src);
-        inputs[port] = joinRef(px(r.node), r.handle); // prefix inner node, keep #handle
+        inputs[port] = mapRefs(src, (s) => { const r = splitRef(s); return joinRef(px(r.node), r.handle); }); // prefix inner node, keep #handle
       }
       out.push({ id: px(inner.id), type: inner.type, params: { ...(inner.params ?? {}) }, inputs });
     }
@@ -91,9 +93,11 @@ export function expandDescriptors(
   for (const n of out) {
     if (!n.inputs) continue;
     for (const [port, src] of Object.entries(n.inputs)) {
-      const r = splitRef(src);
-      const alias = outputAlias.get(r.node);
-      if (alias) n.inputs[port] = joinRef(alias, r.handle);
+      n.inputs[port] = mapRefs(src, (s) => {
+        const r = splitRef(s);
+        const alias = outputAlias.get(r.node);
+        return alias ? joinRef(alias, r.handle) : s;
+      });
     }
   }
   return out;

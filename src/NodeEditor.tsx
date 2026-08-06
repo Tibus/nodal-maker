@@ -209,22 +209,27 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
 
       <div className="gnode__body" onClick={(e) => e.stopPropagation()}>
         {/* structural inputs — required, filled ports */}
-        {spec.inputs.map((p) => (
-          <div className="gnode__row" key={`in-${p.name}`}>
-            <Handle
-              id={p.name}
-              type="target"
-              position={Position.Left}
-              className="rf-port rf-port--req"
-              style={{ background: SOCKET_COLORS[p.type] }}
-              title={`${p.name}: ${p.type} (required)`}
-              {...tipH(p.type)}
-            />
-            <span className="gnode__portlabel" style={{ color: SOCKET_COLORS[p.type] }}>
-              {p.name}
-            </span>
-          </div>
-        ))}
+        {spec.inputs.map((p) => {
+          // selection ports accept SEVERAL wires (their union) — flag them with a
+          // stacked-dot handle so it reads as "drop multiple here"
+          const multi = p.type === "selection";
+          return (
+            <div className="gnode__row" key={`in-${p.name}`}>
+              <Handle
+                id={p.name}
+                type="target"
+                position={Position.Left}
+                className={`rf-port rf-port--req${multi ? " rf-port--multi" : ""}`}
+                style={{ background: SOCKET_COLORS[p.type] }}
+                title={multi ? `${p.name}: ${p.type} — accepts several selections` : `${p.name}: ${p.type} (required)`}
+                {...tipH(p.type)}
+              />
+              <span className="gnode__portlabel" style={{ color: SOCKET_COLORS[p.type] }}>
+                {p.name}
+              </span>
+            </div>
+          );
+        })}
 
         {/* params — those that are portable get an OPTIONAL, hollow port */}
         {spec.params.map((ps) => {
@@ -609,11 +614,16 @@ const isNote = (n: GeoNode) => n.data.nodeType === "__note";
 
 function toGraph(nodes: GeoNode[], edges: Edge[]): InstanceDescriptor[] {
   return nodes.filter((n) => !isNote(n)).map<InstanceDescriptor>((n) => {
-    const inputs: Record<string, string> = {};
+    const inputs: Record<string, string | string[]> = {};
     for (const e of edges) {
       if (e.target === n.id && e.targetHandle) {
         // encode a non-default source handle (selection output) as "src#handle"
-        inputs[e.targetHandle] = e.sourceHandle && e.sourceHandle !== "out" ? `${e.source}#${e.sourceHandle}` : e.source;
+        const ref = e.sourceHandle && e.sourceHandle !== "out" ? `${e.source}#${e.sourceHandle}` : e.source;
+        const existing = inputs[e.targetHandle];
+        // a port fed by several wires (multi-selection) accumulates into an array
+        if (existing === undefined) inputs[e.targetHandle] = ref;
+        else if (Array.isArray(existing)) existing.push(ref);
+        else inputs[e.targetHandle] = [existing, ref];
       }
     }
     const d: InstanceDescriptor = { id: n.id, type: n.data.nodeType, params: n.data.params, inputs };
@@ -1273,8 +1283,11 @@ export default function NodeEditor({
       const inType = nodeInType(tgt, c.targetHandle);
       if (!outType || !inType) return;
 
-      // one input port takes at most one wire — drop any existing edge into it
-      const freed = edges.filter((e) => !(e.target === tgt.id && e.targetHandle === c.targetHandle));
+      // one input port takes at most one wire — EXCEPT selection ports, which
+      // accept several (a fillet/shell targets the union of several selections)
+      const freed = inType === "selection"
+        ? edges
+        : edges.filter((e) => !(e.target === tgt.id && e.targetHandle === c.targetHandle));
 
       if (outType === inType) {
         setEdges(addEdge({ ...c, style: { stroke: SOCKET_COLORS[outType] } }, freed));

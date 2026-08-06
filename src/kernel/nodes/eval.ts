@@ -3,7 +3,7 @@
  * caching — and the assembled node REGISTRY.
  */
 import type { EvalCache, Graph, GraphValue, NodeImpl } from "./types";
-import { parseRef, resolveInputs, resolveRef } from "./selection";
+import { parseRef, resolveInputs, resolvePort } from "./selection";
 import { valueNodes } from "./registry.value";
 import { nodes2d } from "./registry.2d";
 import { nodes3d } from "./registry.3d";
@@ -63,7 +63,7 @@ export function evalGraph(graph: Graph, vars: Record<string, number> = {}): { ou
 
     const rawInputs: Record<string, GraphValue> = {};
     for (const [port, ref] of Object.entries(node.inputs ?? {})) {
-      rawInputs[port] = resolveRef(ref, byId, evalNode);
+      rawInputs[port] = resolvePort(ref, byId, evalNode);
     }
     const impl = REGISTRY[node.type];
     if (!impl) throw new Error(`no implementation for node type "${node.type}"`);
@@ -156,8 +156,11 @@ export function evalGraphCached(
     if (!node) throw new Error(`unknown node ${id}`);
     const childParts: string[] = [];
     for (const [port, ref] of Object.entries(node.inputs ?? {})) {
-      const { node: srcId, handle } = parseRef(ref);
-      childParts.push(`${port}=${keyOf(srcId)}#${handle}`);
+      // a port may carry several refs (a multi-selection) — fold them all in,
+      // sorted so wiring order doesn't change the cache key
+      const refs = Array.isArray(ref) ? ref : [ref];
+      const sub = refs.map((r) => { const { node: srcId, handle } = parseRef(r); return `${keyOf(srcId)}#${handle}`; }).sort();
+      childParts.push(`${port}=${sub.join("+")}`);
     }
     const key = fnv1a(
       `${node.type}(${hashParams(node.params ?? {})})[${childParts.sort().join(",")}]{${varsKey}}`,
@@ -183,7 +186,7 @@ export function evalGraphCached(
     } else {
       const rawInputs: Record<string, GraphValue> = {};
       for (const [port, ref] of Object.entries(node.inputs ?? {})) {
-        rawInputs[port] = resolveRef(ref, byId, evalNode);
+        rawInputs[port] = resolvePort(ref, byId, evalNode);
       }
       const impl = REGISTRY[node.type];
       if (!impl) throw new Error(`no implementation for node type "${node.type}"`);
