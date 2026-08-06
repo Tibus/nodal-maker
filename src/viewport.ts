@@ -469,8 +469,10 @@ export class Viewport {
     const hatch = this.hatchTexture();
     const rep = Math.max(24, Math.round(size / 2)); // ~2 mm world spacing (fine hatch)
     hatch.repeat.set(rep, rep);
-    const capMat = new THREE.MeshStandardMaterial({
-      color: 0xffffff, roughness: 0.6, metalness: 0.05, side: THREE.DoubleSide, map: hatch,
+    // unlit (MeshBasic): the section fill must read the same whatever the plane
+    // faces — a lit material left the Y-normal cap in shadow.
+    const capMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff, side: THREE.DoubleSide, map: hatch,
       stencilWrite: true, stencilRef: 0, stencilFunc: THREE.NotEqualStencilFunc,
       stencilFail: THREE.ReplaceStencilOp, stencilZFail: THREE.ReplaceStencilOp, stencilZPass: THREE.ReplaceStencilOp,
     });
