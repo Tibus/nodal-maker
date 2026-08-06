@@ -1,86 +1,91 @@
 # nodal-maker
 
-**A node-based parametric CAD/CAM tool that runs entirely in the browser** — built for
-**resin 3D printing** and **laser / Cricut cutting**. Wire nodes into a graph
-(Fusion360-meets-Blender), tweak parameters, and get live B-rep solids and 2D profiles you
-can export to STL / STEP / 3MF / SVG / DXF.
+**Un outil de CAO/FAO paramétrique nodal qui tourne entièrement dans le navigateur** —
+conçu pour l'**impression 3D résine** et la **découpe laser / Cricut**. On câble des nœuds
+en un graphe (à mi-chemin entre Fusion360 et Blender), on ajuste des paramètres, et on
+obtient en direct des solides B-rep et des profils 2D exportables en STL / STEP / 3MF /
+SVG / DXF.
 
-🔗 **Live:** https://tibus.github.io/nodal-maker/
-📐 **How it works:** [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
+🔗 **En ligne :** https://tibus.github.io/nodal-maker/
+📐 **Comment ça marche :** [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
 
-![screenshot](./poc-screenshot.png)
+![capture](./poc-screenshot.png)
 
 ---
 
-## What it does
+## Ce que ça fait
 
-- **Node graph** — a typed DAG of ~80 nodes. Wires carry typed values (2D profile · solid ·
-  mesh · number · text · selection); the socket colours tell you what plugs into what.
-- **Two geometry kernels, in a Web Worker** — [replicad](https://replicad.xyz) /
-  OpenCascade for **exact B-rep** modelling (extrude, revolve, loft, fillet, shell, boolean,
-  threads, STEP export) and [Manifold](https://github.com/elalish/manifold) for **robust
-  mesh** work (booleans, hulls, gyroid infill, collision).
-- **2D constraint sketcher** — points/lines/arcs with coincidence, parallel, tangent,
-  dimensions… solved live with Levenberg–Marquardt. Sketch on a base plane *or an arbitrary
-  picked face*.
-- **Simple / Expert modes** — Expert is the full node graph; **Simple** is an auto-generated
-  form (thumbnail gallery + only the parameters the author exposed) so a non-technical user
-  just tweaks values and watches the model update. No nodes required.
-- **Live picking** — click a face/edge in the viewport to auto-wire a selection node;
-  face selections survive regeneration (they're stored as *criteria*, not fragile ids — the
-  topological-naming problem, solved).
+- **Graphe de nœuds** — un DAG typé d'environ 80 nœuds. Les fils transportent des valeurs
+  typées (profil 2D · solide · mesh · nombre · texte · sélection) ; la couleur des ports
+  indique ce qui se branche où.
+- **Deux moteurs géométriques, dans un Web Worker** — [replicad](https://replicad.xyz) /
+  OpenCascade pour la modélisation **B-rep exacte** (extrusion, révolution, loft, congé,
+  coque, booléens, filetages, export STEP) et [Manifold](https://github.com/elalish/manifold)
+  pour le **travail mesh robuste** (booléens, enveloppes convexes, infill gyroïde, collision).
+- **Sketcher 2D à contraintes** — points/lignes/arcs avec coïncidence, parallélisme,
+  tangence, cotes… résolus en direct par Levenberg–Marquardt. Esquisse sur un plan de base
+  *ou sur une face quelconque sélectionnée*.
+- **Modes Simple / Expert** — Expert = le graphe de nœuds complet ; **Simple** = un
+  formulaire généré automatiquement (galerie de vignettes + uniquement les paramètres
+  exposés par l'auteur) pour qu'un utilisateur non technique n'ait qu'à ajuster des valeurs
+  et voir le modèle se mettre à jour. Sans toucher aux nœuds.
+- **Picking en direct** — clique une face/arête dans le viewport pour câbler automatiquement
+  un nœud de sélection ; les sélections de faces survivent à la régénération (elles sont
+  stockées comme *critères*, pas comme des ids fragiles — le problème du *topological
+  naming*, résolu).
 
-## Feature highlights
+## Aperçu des fonctionnalités
 
-| Domain | What you get |
+| Domaine | Ce que tu obtiens |
 |---|---|
-| **Resin printing** | hollow + drain holes, infill lattice, **gyroid** infill, auto-orient, support generation, split-for-build-plate, overhang & wall-thickness analysis, watertight check, resin cost/time estimate |
-| **Laser / Cricut** | living hinge, nesting, dogbone/T-bone corners, hold-in-sheet tabs, kerf compensation, finger-joint boxes, CUT/SCORE DXF layers, SVG & DXF import/export |
-| **Modelling** | extrude (taper/twist), pocket, parametric holes, revolve, loft, sweep, boss-on-cap, variable-radius fillet, chamfer, shell, patterns (linear/radial/**path**), text engrave/emboss on a face |
-| **Analysis & viewport** | section view, measure tool, mass properties, per-body colour, turntable video export |
+| **Impression résine** | évidement + trous de drainage, infill lattice, infill **gyroïde**, auto-orientation, génération de supports, découpe pour plateau, analyse surplombs & épaisseur de paroi, contrôle watertight, estimation coût/temps résine |
+| **Laser / Cricut** | living hinge, nesting, coins dogbone/T-bone, micro-joints (hold-in-sheet), compensation de kerf, boîtes à encoches, calques DXF CUT/SCORE, import/export SVG & DXF |
+| **Modélisation** | extrusion (taper/twist), poche, perçages paramétriques, révolution, loft, sweep, boss-on-cap, congé à rayon variable, chanfrein, coque, répétitions (linéaire/radiale/**sur chemin**), texte gravé/embossé sur une face |
+| **Analyse & viewport** | vue en coupe, outil de mesure, propriétés de masse, couleur par corps, export vidéo turntable |
 | **Import/export** | STL, STEP, 3MF, SVG, DXF, PNG, WebM |
 
-## Quick start
+## Démarrage rapide
 
 ```bash
 npm install
-npm run dev          # interactive editor — open the printed URL
+npm run dev          # éditeur interactif — ouvre l'URL affichée
 ```
 
 ```bash
-npm run build        # typecheck + production build
-npm test             # Vitest suite (58 tests: kernel eval, expr, solver, exports…)
-npm run thumbs:examples   # (re)generate missing example thumbnails (WebGL screenshots)
+npm run build        # typecheck + build de production
+npm test             # suite Vitest (58 tests : éval du kernel, expr, solver, exports…)
+npm run thumbs:examples   # (re)génère les vignettes d'exemples manquantes (screenshots WebGL)
 ```
 
-Headless smoke tests (no browser): `npm run smoke`, `npm run smoke:sketch`,
+Smoke tests headless (sans navigateur) : `npm run smoke`, `npm run smoke:sketch`,
 `npm run smoke:mesh`, `npm run scenes`.
 
-## Tech stack
+## Stack technique
 
 TypeScript (strict, ESM) · React 18 + [React Flow](https://reactflow.dev) · Three.js ·
 replicad/OpenCascade (WASM) · Manifold (WASM) · comlink · Vite · Vitest · Playwright.
-No backend — a fully static SPA, deployed to GitHub Pages on every push to `main`
-(the test suite gates the deploy).
+Pas de backend — une SPA entièrement statique, déployée sur GitHub Pages à chaque push sur
+`main` (la suite de tests conditionne le déploiement).
 
-## Project layout
+## Organisation du projet
 
 ```
-src/kernel/    the graph engine (nodes.ts), the worker, both kernel wrappers, exporters
-src/sketch/    the framework-free 2D constraint sketcher (model · solver · build)
+src/kernel/    le moteur de graphe (nodes.ts), le worker, les wrappers des deux kernels, les exporteurs
+src/sketch/    le sketcher 2D à contraintes (sans framework) : model · solver · build
 src/           App, NodeEditor (React Flow), SketchEditor, viewport (Three.js)
-examples/      55 bundled example projects        public/thumbs/  their preview PNGs
-scripts/       thumbnail & scene generation, smoke tests
-test/          the Vitest suite
+examples/      55 projets d'exemple           public/thumbs/  leurs vignettes PNG
+scripts/       génération de vignettes & scènes, smoke tests
+test/          la suite Vitest
 ```
 
-See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for the full tour: the data flow,
-the evaluation cache, the constraint solver, the viewport, the configurator, and **how to
-add a node in 4 edits**.
+Voir [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) pour la visite complète : le flux de
+données, le cache d'évaluation, le solver de contraintes, le viewport, le configurateur, et
+**comment ajouter un nœud en 4 éditions**.
 
-## Status
+## Statut
 
-Well past the original de-risking spike — this is a working tool with a live deployment,
-a broad node library, the Simple/Expert configurator, a real test suite, and CI/CD. It
-remains a solo project and a moving target; expect rough edges and see the *Design
-decisions & known limits* section of the architecture doc.
+Bien au-delà du spike de dé-risquage d'origine — c'est un outil fonctionnel avec un
+déploiement en ligne, une large bibliothèque de nœuds, le configurateur Simple/Expert, une
+vraie suite de tests et du CI/CD. Ça reste un projet solo et une cible mouvante ; attends-toi
+à des aspérités et consulte la section *Décisions de design & limites connues* du document
+d'architecture.

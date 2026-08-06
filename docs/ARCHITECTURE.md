@@ -1,366 +1,383 @@
-# nodal-maker — Architecture & how it works
+# nodal-maker — Architecture & fonctionnement
 
-A node-based parametric CAD/CAM tool for the browser, aimed at **resin 3D printing**
-and **laser / Cricut cutting**. You wire nodes into a graph (Fusion360-meets-Blender),
-tweak parameters, and get live B-rep solids and 2D profiles you can export to
-STL / STEP / 3MF / SVG / DXF.
+Un outil de CAO/FAO paramétrique nodal pour le navigateur, orienté **impression 3D résine**
+et **découpe laser / Cricut**. On câble des nœuds en un graphe (Fusion360 rencontre
+Blender), on ajuste des paramètres, et on obtient en direct des solides B-rep et des profils
+2D exportables en STL / STEP / 3MF / SVG / DXF.
 
-This document is the ground-truth tour of the codebase: the moving parts, the data
-flow, the two geometry kernels, the constraint solver, the viewport, and the build/
-deploy/test pipeline. It's meant to get a new contributor productive fast.
+Ce document est la visite de référence du code : les briques, le flux de données, les deux
+moteurs géométriques, le solver de contraintes, le viewport, et la chaîne build/deploy/tests.
+Objectif : rendre un nouveau contributeur productif rapidement.
 
 ---
 
-## 1. TL;DR — the shape of the thing
+## 1. En bref — la forme générale
 
 ```mermaid
 flowchart LR
-  UI["React UI<br/>NodeEditor (React Flow)<br/>+ SketchEditor"] -- "graph + params" --> CLIENT["kernel/client.ts<br/>(comlink proxy)"]
+  UI["UI React<br/>NodeEditor (React Flow)<br/>+ SketchEditor"] -- "graphe + params" --> CLIENT["kernel/client.ts<br/>(proxy comlink)"]
   CLIENT -- "postMessage" --> WORKER["Web Worker<br/>kernel/worker.ts"]
   WORKER --> EVAL["evalGraph()<br/>kernel/nodes.ts"]
-  EVAL -- "B-rep ops" --> OCCT["replicad / OpenCascade<br/>(WASM)"]
-  EVAL -- "mesh booleans" --> MANI["Manifold<br/>(WASM)"]
-  EVAL --> PAYLOAD["MeshPayload<br/>(transferable)"]
-  PAYLOAD -- "back to UI thread" --> VP["viewport.ts<br/>(Three.js WebGL)"]
+  EVAL -- "opérations B-rep" --> OCCT["replicad / OpenCascade<br/>(WASM)"]
+  EVAL -- "booléens mesh" --> MANI["Manifold<br/>(WASM)"]
+  EVAL --> PAYLOAD["MeshPayload<br/>(transférable)"]
+  PAYLOAD -- "retour vers le thread UI" --> VP["viewport.ts<br/>(Three.js WebGL)"]
 ```
 
-- **Everything geometric runs in a Web Worker** so the UI never blocks on OpenCascade.
-- **Two geometry kernels** live side by side: **replicad** (OpenCascade / B-rep, exact)
-  for most modelling, and **Manifold** (guaranteed-manifold mesh) for robust booleans,
-  hulls, gyroid infill, etc.
-- The graph is **content-addressed cached**: change one parameter and only that node
-  and its descendants re-evaluate.
-- The 2D **constraint sketcher** is a small framework-free module shared by the UI and
-  the kernel, solved with **Levenberg–Marquardt**.
+- **Toute la géométrie tourne dans un Web Worker** : l'UI ne bloque jamais sur OpenCascade.
+- **Deux moteurs géométriques** cohabitent : **replicad** (OpenCascade / B-rep, exact) pour
+  l'essentiel de la modélisation, et **Manifold** (mesh garanti manifold) pour les booléens
+  robustes, enveloppes, infill gyroïde, etc.
+- Le graphe est **caché en content-addressed** : changer un paramètre ne recalcule que ce
+  nœud et ses descendants.
+- Le **sketcher 2D à contraintes** est un petit module sans framework, partagé par l'UI et
+  le kernel, résolu par **Levenberg–Marquardt**.
 
 ---
 
-## 2. Tech stack
+## 2. Stack technique
 
-| Layer | Choice |
+| Couche | Choix |
 |---|---|
-| Language | TypeScript (strict, ESM) |
-| UI | React 18 + [@xyflow/react](https://reactflow.dev) (React Flow) for the node canvas |
-| 3D viewport | Three.js (WebGLRenderer, OrbitControls, TransformControls) |
-| B-rep kernel | [replicad](https://replicad.xyz) → OpenCascade.js (WASM) |
-| Mesh kernel | [Manifold](https://github.com/elalish/manifold) (WASM) |
-| Worker bridge | [comlink](https://github.com/GoogleChromeLabs/comlink) |
-| Fonts / text | opentype.js |
+| Langage | TypeScript (strict, ESM) |
+| UI | React 18 + [@xyflow/react](https://reactflow.dev) (React Flow) pour le canvas de nœuds |
+| Viewport 3D | Three.js (WebGLRenderer, OrbitControls, TransformControls) |
+| Kernel B-rep | [replicad](https://replicad.xyz) → OpenCascade.js (WASM) |
+| Kernel mesh | [Manifold](https://github.com/elalish/manifold) (WASM) |
+| Pont vers le worker | [comlink](https://github.com/GoogleChromeLabs/comlink) |
+| Polices / texte | opentype.js |
 | Build | Vite |
 | Tests | Vitest |
-| Thumbnails | Playwright (headless WebGL screenshot) |
-| Deploy | GitHub Actions → GitHub Pages |
+| Vignettes | Playwright (screenshot WebGL headless) |
+| Déploiement | GitHub Actions → GitHub Pages |
 
-No backend — it's a fully static SPA. Both WASM kernels load lazily inside the worker.
+Pas de backend — une SPA entièrement statique. Les deux kernels WASM se chargent
+paresseusement dans le worker.
 
 ---
 
-## 3. Directory map
+## 3. Carte des répertoires
 
 ```
 src/
-  main.tsx              entry; mounts <App> (or the thumbnail harness on ?thumbs)
-  App.tsx               top-level shell: viewport + toolbar + panels, wires UI↔worker
-  NodeEditor.tsx        the React Flow node canvas, palette, Simple/Expert modes
-  SketchEditor.tsx      the 2D constraint sketch overlay
-  ThumbHarness.tsx      off-app harness that renders one example → PNG (for thumbnails)
-  viewport.ts           Three.js scene: shading, picking, gizmos, clipping, analysis
-  massprops.ts          volume / area / bbox / centroid + watertight check (pure JS)
-  export3mf.ts          minimal 3MF (OPC/ZIP) writer
+  main.tsx              point d'entrée ; monte <App> (ou le harnais de vignettes sur ?thumbs)
+  App.tsx               coquille de haut niveau : viewport + barre d'outils + panneaux, câble UI↔worker
+  NodeEditor.tsx        le canvas de nœuds React Flow, la palette, les modes Simple/Expert
+  SketchEditor.tsx      l'overlay d'esquisse 2D à contraintes
+  ThumbHarness.tsx      harnais hors-app qui rend un exemple → PNG (pour les vignettes)
+  viewport.ts           scène Three.js : ombrage, picking, gizmos, coupe, analyses
+  massprops.ts          volume / aire / bbox / centroïde + contrôle watertight (pur JS)
+  export3mf.ts          écriture 3MF minimale (OPC/ZIP)
 
   kernel/
-    client.ts           comlink proxy to the worker + re-exported metadata
-    worker.ts           the Web Worker: boots both WASM kernels, exposes the API
-    nodes.ts            ★ the heart: node REGISTRY, GraphValue types, evalGraph, cache
-    specs.ts            UI-facing metadata: NODE_SPECS, categories, socket colours (no WASM)
-    model.ts            graph → renderable MeshPayload; SVG/DXF exporters
-    manifold.ts         Manifold wrapper: mesh booleans, hull, minkowski, decimate…
-    components.ts       node "components" (reusable sub-graphs) expansion
-    expr.ts             the expression evaluator (parameters like `width/2 + 4`)
-    marchingCubes.ts    isosurface extraction (used by the gyroid infill)
-    dxfImport.ts        minimal DXF reader → replicad Drawing
-    svgPath.ts          SVG path `d` → replicad Drawing
-    stl.ts              binary STL read/write
+    client.ts           proxy comlink vers le worker + réexport des métadonnées
+    worker.ts           le Web Worker : boote les deux kernels WASM, expose l'API
+    nodes.ts            ★ le cœur : REGISTRY des nœuds, types GraphValue, evalGraph, cache
+    specs.ts            métadonnées côté UI : NODE_SPECS, catégories, couleurs de sockets (sans WASM)
+    model.ts            graphe → MeshPayload affichable ; exporteurs SVG/DXF
+    manifold.ts         wrapper Manifold : booléens mesh, enveloppe, minkowski, decimate…
+    components.ts       expansion des « composants » (sous-graphes réutilisables)
+    expr.ts             l'évaluateur d'expressions (paramètres du type `width/2 + 4`)
+    marchingCubes.ts    extraction d'isosurface (utilisée par l'infill gyroïde)
+    dxfImport.ts        lecteur DXF minimal → Drawing replicad
+    svgPath.ts          chemin SVG `d` → Drawing replicad
+    stl.ts              lecture/écriture STL binaire
 
-  sketch/               the 2D constraint sketcher (framework-free, shared UI↔kernel)
-    model.ts            SketchDoc data model (points, entities, constraints)
-    solver.ts           Levenberg–Marquardt constraint solver
-    build.ts            solved SketchDoc → replicad Drawing
-    geometry.ts         2D geometry helpers
-    trim.ts             trim / split / fillet-corner editing ops
-    presets.ts          starter documents (rectangle, plate-with-hole, …)
+  sketch/               le sketcher 2D à contraintes (sans framework, partagé UI↔kernel)
+    model.ts            modèle de données SketchDoc (points, entités, contraintes)
+    solver.ts           solver de contraintes Levenberg–Marquardt
+    build.ts            SketchDoc résolu → Drawing replicad
+    geometry.ts         helpers de géométrie 2D
+    trim.ts             opérations d'édition trim / split / congé-de-coin
+    presets.ts          documents de départ (rectangle, plaque-à-trou, …)
 
-scripts/                build-time tooling (thumbnails, scene generation, smoke tests)
-test/                   Vitest suite (kernel eval, expr, mass props, solver, exports…)
-examples/*.json         55 bundled example projects (SceneDoc format)
-public/thumbs/*.png     one WebGL-rendered thumbnail per example
+scripts/                outillage build-time (vignettes, génération de scènes, smoke tests)
+test/                   suite Vitest (éval kernel, expr, mass props, solver, exports…)
+examples/*.json         55 projets d'exemple (format SceneDoc)
+public/thumbs/*.png     une vignette rendue WebGL par exemple
 ```
 
 ---
 
-## 4. The node graph — core concepts
+## 4. Le graphe de nœuds — concepts de base
 
-Everything the user builds is a **graph of typed nodes**. This lives in `kernel/nodes.ts`.
+Tout ce que l'utilisateur construit est un **graphe de nœuds typés**. Ça vit dans
+`kernel/nodes.ts`.
 
-### 4.1 Values flow on the wires (typed)
+### 4.1 Les valeurs circulent sur les fils (typées)
 
-Wires carry a `GraphValue`, a tagged union:
+Les fils transportent une `GraphValue`, une union discriminée :
 
 ```ts
 type GraphValue =
-  | { kind: "sketch2d"; drawing: Drawing; plane?; planeOffset?; frame? }  // 2D profile (purple)
-  | { kind: "solid";    solid: Shape3D; color? }                          // B-rep solid (orange→gray)
-  | { kind: "mesh";     mesh: MeshData }                                   // triangle mesh (cyan)
-  | { kind: "number";   value: number }                                   // scalar (green)
-  | { kind: "text";     value: string }                                   // string (yellow)
-  | { kind: "selection"; target: "edge" | "face"; apply: (finder) => … }  // criteria (amber)
+  | { kind: "sketch2d"; drawing: Drawing; plane?; planeOffset?; frame? }  // profil 2D (violet)
+  | { kind: "solid";    solid: Shape3D; color? }                          // solide B-rep (orange→gris)
+  | { kind: "mesh";     mesh: MeshData }                                   // mesh triangulé (cyan)
+  | { kind: "number";   value: number }                                   // scalaire (vert)
+  | { kind: "text";     value: string }                                   // chaîne (jaune)
+  | { kind: "selection"; target: "edge" | "face"; apply: (finder) => … }  // critères (ambre)
 ```
 
-The socket **colours** in the palette and on ports come straight from these kinds
-(`SOCKET_COLORS` in `specs.ts`) — a node's output dot tells you which inputs it can feed.
+Les **couleurs** de sockets dans la palette et sur les ports viennent directement de ces
+`kind` (`SOCKET_COLORS` dans `specs.ts`) — la pastille de sortie d'un nœud indique quelles
+entrées il peut alimenter.
 
-### 4.2 Two parallel tables
+### 4.2 Deux tables parallèles
 
-- **`NODE_SPECS`** (`specs.ts`) — pure metadata: label, inputs, output type, params.
-  Imported by the **UI** with *no WASM dependency* (keeps the UI bundle light).
-- **`REGISTRY`** (`nodes.ts`) — the implementations: `(inputs, params) => GraphValue`.
-  Imported by the **worker**, where OpenCascade/Manifold are available.
+- **`NODE_SPECS`** (`specs.ts`) — métadonnées pures : label, entrées, type de sortie,
+  paramètres. Importé par l'**UI** *sans dépendance WASM* (garde le bundle UI léger).
+- **`REGISTRY`** (`nodes.ts`) — les implémentations : `(inputs, params) => GraphValue`.
+  Importé par le **worker**, où OpenCascade/Manifold sont disponibles.
 
-Adding a node = one entry in each (plus a category + description). See §12.
+Ajouter un nœud = une entrée dans chaque table (+ une catégorie + une description). Voir §12.
 
-### 4.3 Evaluation — topological, memoised, content-addressed
+### 4.3 Évaluation — topologique, mémoïsée, content-addressed
 
-`evalGraph(graph, vars)` walks the DAG lazily from the requested output:
+`evalGraph(graph, vars)` parcourt le DAG paresseusement depuis la sortie demandée :
 
-1. `resolveRef` pulls each input value (recursing into upstream nodes, memoised per run).
-2. `resolveInputs` merges wired inputs over params, coercing **numeric params that are
-   expressions** (e.g. `"width/2"`) via `expr.ts` and the user-parameter `vars` map.
-3. The node's `REGISTRY` impl runs; failures are wrapped by **`humanizeError`** (turns
-   cryptic OpenCascade aborts into "fillet radius too large", etc.) and tagged with the
-   node id so the editor can highlight it.
+1. `resolveRef` récupère chaque valeur d'entrée (en remontant les nœuds amont, mémoïsé par
+   run).
+2. `resolveInputs` fusionne les entrées câblées par-dessus les paramètres, en convertissant
+   les **paramètres numériques qui sont des expressions** (ex. `"width/2"`) via `expr.ts` et
+   la map des paramètres utilisateur `vars`.
+3. L'impl `REGISTRY` du nœud s'exécute ; les échecs sont enveloppés par **`humanizeError`**
+   (transforme les aborts cryptiques d'OpenCascade en « rayon de congé trop grand », etc.)
+   et taggés avec l'id du nœud pour que l'éditeur puisse le surligner.
 
-**Incremental cache** (`evalGraphCached`, `EvalCache`): each node gets a **content hash**
-(`fnv1a` of `type + params + the hashes of its inputs` + the user-vars key). Change one
-parameter and only that node's hash — and its descendants' — change; everything else is
-served from cache. A `run` counter drives a retention window so stale entries are dropped.
+**Cache incrémental** (`evalGraphCached`, `EvalCache`) : chaque nœud reçoit un **hash de
+contenu** (`fnv1a` de `type + params + les hashs de ses entrées` + la clé des vars
+utilisateur). Changer un paramètre ne change que le hash de ce nœud — et de ses descendants ;
+tout le reste est servi depuis le cache. Un compteur `run` pilote une fenêtre de rétention
+qui écarte les entrées périmées.
 
-### 4.4 Selections (face / edge) survive regeneration
+### 4.4 Les sélections (face / arête) survivent à la régénération
 
-Fillet/shell/bevel don't store face indices (which change when geometry regenerates).
-Instead a **Face/Edge Select** node emits a `selection` value: a *criteria closure*
-(`inPlane`, `parallelTo`, `top`, `cylindrical`, …) applied to whatever solid the
-downstream op receives. `forwardCrit` even re-maps a selection through a transform so a
-"top face" stays the top face after a move. This is what makes picking-in-the-viewport
-→ auto-wire a Face Select node work.
+Le congé/coque/chanfrein ne stocke pas d'indices de faces (qui changent quand la géométrie
+est régénérée). À la place, un nœud **Face/Edge Select** émet une valeur `selection` : une
+*closure de critères* (`inPlane`, `parallelTo`, `top`, `cylindrical`, …) appliquée au solide
+que reçoit l'opération aval. `forwardCrit` re-mappe même une sélection à travers un transform
+pour qu'une « face du dessus » reste la face du dessus après un déplacement. C'est ce qui
+fait marcher le picking-dans-le-viewport → câblage-auto d'un nœud Face Select.
 
-### 4.5 Expressions & user parameters (`expr.ts`)
+### 4.5 Expressions & paramètres utilisateur (`expr.ts`)
 
-A tiny recursive-descent evaluator (no `eval`) with a term→unary→power grammar so
-`-2^2 = -4`. Supports `+ - * / ^ %`, functions (`sqrt`, `sin/cos`, `sind/cosd`, `min`,
-`max`, `hypot`, `atan2`, …) and constants (`pi`, `tau`, `e`). Global **user parameters**
-(the `ƒ` panel) resolve in order into a `vars` map that any numeric field can reference.
-
----
-
-## 5. The two geometry kernels
-
-Both boot lazily inside the worker (`worker.ts` → `ensureKernels()`); the UI thread
-never touches WASM.
-
-### 5.1 replicad / OpenCascade — the B-rep kernel (exact)
-
-Most modelling is **boundary-representation** (exact NURBS/analytic surfaces): box,
-cylinder, extrude, revolve, loft, sweep, fillet, chamfer, shell, pocket, hole, boolean,
-thread… `nodes.ts` calls replicad's fluent API (`draw…`, `sketchOnPlane`, `.extrude`,
-`.fuse/.cut/.intersect`, `.fillet`, `.shell`). B-rep is what makes STEP export and clean
-edges possible. Meshing for display happens via `meshAndTag()` (→ `MeshPayload`), which
-also tags each triangle group as `top/side/bottom` (used for picking).
-
-### 5.2 Manifold — the mesh kernel (robust)
-
-When exactness isn't needed but **robustness** is, geometry drops to `MeshData`
-(`{vertices, indices}`) and uses Manifold (`kernel/manifold.ts`): mesh booleans
-(guaranteed-manifold, no OCCT boolean fragility), convex hull, Minkowski sum, decimate,
-subdivide, and the **collision** and **gyroid** nodes. `solidToMeshData` / `meshToSolid`
-bridge the two domains.
-
-### 5.3 The Web Worker boundary
-
-`client.ts` wraps the worker with comlink so the UI calls `kernel.evalGraph(...)` as if
-local. `MeshPayload` is built from transferable typed arrays. The same `nodes.ts` runs in
-Node for **tests** and **scene/thumbnail scripts** (they call `setOC`/`setManifold`
-manually, mirroring `ensureKernels`).
+Un petit évaluateur en descente récursive (sans `eval`) avec une grammaire term→unary→power
+pour que `-2^2 = -4`. Gère `+ - * / ^ %`, des fonctions (`sqrt`, `sin/cos`, `sind/cosd`,
+`min`, `max`, `hypot`, `atan2`, …) et des constantes (`pi`, `tau`, `e`). Les **paramètres
+utilisateur** globaux (le panneau `ƒ`) se résolvent dans l'ordre en une map `vars` que tout
+champ numérique peut référencer.
 
 ---
 
-## 6. The 2D constraint sketcher (`src/sketch/`)
+## 5. Les deux moteurs géométriques
 
-A self-contained, framework-free module (no React, no replicad) so the exact same code
-runs in the UI overlay and in the kernel.
+Les deux bootent paresseusement dans le worker (`worker.ts` → `ensureKernels()`) ; le thread
+UI ne touche jamais au WASM.
 
-- **`model.ts`** — `SketchDoc`: `points`, `entities` (line / arc / circle), `constraints`
-  (coincident, horizontal, vertical, parallel, perpendicular, equal, tangent, pointOn,
-  midpoint, symmetric, fixed) and **dimensions** (distance / radius / angle) that carry a
-  driving value. Also a base `plane` (XY/XZ/YZ) + offset, or an arbitrary `frame`
-  (origin/normal/xDir) for *sketch-on-a-tilted-face*.
-- **`solver.ts`** — minimises ‖r(x)‖² over the free coordinates (point x/y + circle radii)
-  with **Levenberg–Marquardt**, a **numerical Jacobian**, and a small dense linear solve.
-  Sketches are tiny so this is instant. Pins (fixed points) and dimension **overrides**
-  (from node params) feed in here, which is how editing a dimension re-solves live.
-- **`build.ts`** — turns a *solved* doc into a replicad `Drawing` (the profile that
-  extrude/pocket/revolve consume).
-- **`trim.ts`** — interactive edits: trim, split-at-click, fillet-corner (tangent arc).
+### 5.1 replicad / OpenCascade — le kernel B-rep (exact)
 
-The `sketch` node stores its `SketchDoc` in params, mirrors each dimension as an editable
-node field, and re-solves on every change.
+L'essentiel de la modélisation est en **représentation par frontières** (surfaces
+NURBS/analytiques exactes) : box, cylindre, extrusion, révolution, loft, sweep, congé,
+chanfrein, coque, poche, perçage, booléen, filetage… `nodes.ts` appelle l'API fluide de
+replicad (`draw…`, `sketchOnPlane`, `.extrude`, `.fuse/.cut/.intersect`, `.fillet`,
+`.shell`). Le B-rep est ce qui permet l'export STEP et des arêtes propres. Le maillage pour
+l'affichage passe par `meshAndTag()` (→ `MeshPayload`), qui tagge aussi chaque groupe de
+triangles en `top/side/bottom` (utilisé pour le picking).
 
----
+### 5.2 Manifold — le kernel mesh (robuste)
 
-## 7. The viewport (`viewport.ts`, Three.js)
+Quand l'exactitude n'est pas nécessaire mais que la **robustesse** l'est, la géométrie
+descend en `MeshData` (`{vertices, indices}`) et utilise Manifold (`kernel/manifold.ts`) :
+booléens mesh (garantis manifold, sans la fragilité des booléens OCCT), enveloppe convexe,
+somme de Minkowski, decimate, subdivide, et les nœuds **collision** et **gyroïde**.
+`solidToMeshData` / `meshToSolid` font le pont entre les deux domaines.
 
-One `WebGLRenderer` (antialias, `preserveDrawingBuffer` for snapshots, `localClipping`).
+### 5.3 La frontière Web Worker
 
-- **Shading** — a single neutral **gray** body material (Fusion look); the mesh is split
-  into `top/side/bottom` geometry groups only so **picking** can identify faces. A **Color**
-  node can override the whole-body tint. A 2D sketch renders as a **flat filled face**
-  (double-sided, translucent purple) + its outline — no fake thickness.
-- **View modes** — shaded / **edges** (default: shaded + real B-rep construction edges) /
-  wireframe.
-- **Picking** — raycasts for `pickFace`, `pickEdge`, `pickBorder`, `pickFacePlane`
-  (arbitrary tilted plane), `pickPoint` (for the Measure tool). A hit auto-wires the
-  matching Face/Edge Select node.
-- **Gizmos** — TransformControls bound to a Transform/Rotate/Scale node writes back to its
-  params live.
-- **Analysis overlays** — per-vertex vertex-colour passes for **overhang** (down-faces
-  steeper than an angle) and **wall thickness** (inward raycast to the far wall).
-- **Section** — a clipping plane along an axis.
-- **Measure** — persistent distance annotations (line + endpoint markers + a canvas-sprite
-  label).
-- **Turntable** — records a WebM by spinning the camera and pushing frames via
-  `captureStream` + `MediaRecorder`.
+`client.ts` enveloppe le worker avec comlink pour que l'UI appelle `kernel.evalGraph(...)`
+comme si c'était local. Le `MeshPayload` est construit à partir de tableaux typés
+transférables. Le même `nodes.ts` tourne dans Node pour les **tests** et les **scripts de
+scènes/vignettes** (qui appellent `setOC`/`setManifold` manuellement, à l'image de
+`ensureKernels`).
 
 ---
 
-## 8. The UI (`NodeEditor.tsx`, `App.tsx`)
+## 6. Le sketcher 2D à contraintes (`src/sketch/`)
 
-- **`App.tsx`** — the shell: mounts the viewport, debounces graph changes into
-  `kernel.evalGraph`, pushes the resulting `MeshPayload` into the viewport, and hosts the
-  toolbar (pick modes, view mode, Analyze, Props, Section, Turntable) + the Props panel
-  (volume/area/bbox/centroid, **watertight** check, resin cost/time estimate).
-- **`NodeEditor.tsx`** — the React Flow canvas: palette (categorised, colour-dotted by
-  output type), node bodies with inline param fields, the selection-outputs accordion,
-  the history timeline, quick-add, components (collapse a selection into a reusable
-  sub-graph), and persistence to `localStorage`.
+Un module autonome, sans framework (ni React, ni replicad) pour que le même code exact
+tourne dans l'overlay UI et dans le kernel.
 
-### 8.1 Simple / Expert modes (the configurator)
+- **`model.ts`** — `SketchDoc` : `points`, `entities` (ligne / arc / cercle), `constraints`
+  (coïncidence, horizontal, vertical, parallèle, perpendiculaire, égal, tangent, pointOn,
+  midpoint, symétrique, fixé) et **dimensions** (distance / rayon / angle) qui portent une
+  valeur directrice. Plus un `plane` de base (XY/XZ/YZ) + offset, ou un `frame` arbitraire
+  (origine/normale/xDir) pour l'*esquisse-sur-face-inclinée*.
+- **`solver.ts`** — minimise ‖r(x)‖² sur les coordonnées libres (x/y des points + rayons des
+  cercles) par **Levenberg–Marquardt**, avec un **Jacobien numérique** et une petite
+  résolution linéaire dense. Les esquisses sont minuscules, donc c'est instantané. Les pins
+  (points fixés) et les **overrides** de dimensions (venant des params de nœud) entrent ici,
+  c'est ainsi qu'éditer une cote re-résout en direct.
+- **`build.ts`** — transforme un doc *résolu* en `Drawing` replicad (le profil que
+  consomment extrude/pocket/revolve).
+- **`trim.ts`** — éditions interactives : trim, split-au-clic, congé-de-coin (arc tangent).
 
-Two tabs sit over the editor:
-
-- **Expert** = the full node graph. Each param has a `☆` to **expose** it.
-- **Simple** = a clean form: a **thumbnail gallery** of examples + only the exposed
-  params (+ global `ƒ` parameters), rendered with the very same `ParamField` controls, so
-  a non-node user just tweaks values and watches the model update. Exposed params +
-  user params travel *inside the saved graph* and inside example files, so an author
-  defines the Simple form for their model. Simple is the **default** view.
+Le nœud `sketch` stocke son `SketchDoc` dans ses params, reflète chaque dimension comme un
+champ de nœud éditable, et re-résout à chaque changement.
 
 ---
 
-## 9. Feature catalogue (node categories)
+## 7. Le viewport (`viewport.ts`, Three.js)
 
-| Category | Nodes (selection) |
+Un seul `WebGLRenderer` (antialias, `preserveDrawingBuffer` pour les captures,
+`localClipping`).
+
+- **Ombrage** — un unique matériau de corps **gris** neutre (look Fusion) ; le mesh n'est
+  découpé en groupes `top/side/bottom` que pour permettre au **picking** d'identifier les
+  faces. Un nœud **Color** peut surcharger la teinte du corps entier. Une esquisse 2D est
+  rendue comme une **face plate remplie** (double-face, violet translucide) + son contour —
+  aucune fausse épaisseur.
+- **Modes d'affichage** — shaded / **edges** (défaut : ombré + vraies arêtes de construction
+  B-rep) / wireframe.
+- **Picking** — raycasts pour `pickFace`, `pickEdge`, `pickBorder`, `pickFacePlane` (plan
+  incliné quelconque), `pickPoint` (pour l'outil Mesure). Un clic câble automatiquement le
+  nœud Face/Edge Select correspondant.
+- **Gizmos** — TransformControls liés à un nœud Transform/Rotate/Scale réécrit ses params en
+  direct.
+- **Overlays d'analyse** — passes de couleurs par vertex pour les **surplombs** (faces
+  tournées vers le bas plus raides qu'un angle) et l'**épaisseur de paroi** (raycast interne
+  vers la paroi opposée).
+- **Coupe** — un plan de clipping le long d'un axe.
+- **Mesure** — annotations de distance persistantes (ligne + marqueurs d'extrémités + une
+  étiquette sprite-canvas).
+- **Turntable** — enregistre un WebM en faisant tourner la caméra et en poussant les frames
+  via `captureStream` + `MediaRecorder`.
+
+---
+
+## 8. L'UI (`NodeEditor.tsx`, `App.tsx`)
+
+- **`App.tsx`** — la coquille : monte le viewport, débounce les changements de graphe vers
+  `kernel.evalGraph`, pousse le `MeshPayload` résultant dans le viewport, et héberge la
+  barre d'outils (modes de picking, mode d'affichage, Analyze, Props, Section, Turntable) +
+  le panneau Props (volume/aire/bbox/centroïde, contrôle **watertight**, estimation
+  coût/temps résine).
+- **`NodeEditor.tsx`** — le canvas React Flow : la palette (catégorisée, pastillée par type
+  de sortie), les corps de nœuds avec champs de params inline, l'accordéon des sorties de
+  sélection, la timeline d'historique, l'ajout rapide, les composants (regrouper une
+  sélection en un sous-graphe réutilisable), et la persistance en `localStorage`.
+
+### 8.1 Modes Simple / Expert (le configurateur)
+
+Deux onglets se posent au-dessus de l'éditeur :
+
+- **Expert** = le graphe de nœuds complet. Chaque paramètre a une `☆` pour l'**exposer**.
+- **Simple** = un formulaire propre : une **galerie de vignettes** d'exemples + uniquement
+  les paramètres exposés (+ les paramètres globaux `ƒ`), rendus avec les mêmes contrôles
+  `ParamField`, pour qu'un utilisateur non-nœuds ajuste juste des valeurs et regarde le
+  modèle se mettre à jour. Les paramètres exposés + les paramètres utilisateur voyagent
+  *dans le graphe sauvegardé* et dans les fichiers d'exemple, donc un auteur définit le
+  formulaire Simple de son modèle. Simple est la vue **par défaut**.
+
+---
+
+## 9. Catalogue de fonctionnalités (catégories de nœuds)
+
+| Catégorie | Nœuds (sélection) |
 |---|---|
 | **Value** | number, text, math, clamp, remap, random |
 | **2D Primitive** | sketch, rect, circle, ellipse, polygon, star, slot, gear, finger-joint box, **living hinge**, SVG input, **import DXF**, text→SVG |
-| **2D Op** | offset, kerf, fillet, bevel, boolean, mirror, transform, array (linear/radial), **nest**, **dogbone**, **tabs (hold-in-sheet)**, group, score/cut |
+| **2D Op** | offset, kerf, fillet, bevel, boolean, mirror, transform, array (linéaire/radiale), **nest**, **dogbone**, **tabs (hold-in-sheet)**, group, score/cut |
 | **3D Primitive** | box, cylinder, sphere, cone, torus, thread, internal thread, import STEP |
 | **Sketch → Solid** | extrude (taper/twist), pocket, hole (counterbore/countersink), revolve, loft, loft-sections, sweep, boss-on-cap, **text on face** |
-| **3D Op** | transform, rotate, scale, mirror, fillet (variable radius), bevel, shell, **hollow (resin)**, **infill lattice**, **gyroid**, **split**, **auto-orient**, **supports**, boolean, **collision**, **color**, assemble, array (linear/radial/**path**) |
+| **3D Op** | transform, rotate, scale, mirror, fillet (rayon variable), bevel, shell, **hollow (résine)**, **infill lattice**, **gyroïde**, **split**, **auto-orient**, **supports**, boolean, **collision**, **color**, assemble, array (linéaire/radiale/**sur chemin**) |
 | **Selector** | edge select, face select |
 | **Mesh** | tessellate, mesh→solid, import STL, repair, boolean, transform, convex hull, minkowski, decimate, subdivide |
 
-Print/laser analysis lives in the viewport toolbar (overhang, wall-thickness, section,
-measure) and the Props panel (watertight, resin cost/time).
+L'analyse impression/laser vit dans la barre d'outils du viewport (surplombs, épaisseur de
+paroi, coupe, mesure) et le panneau Props (watertight, coût/temps résine).
 
 ---
 
 ## 10. Export & import
 
-| Format | Path | Notes |
+| Format | Chemin | Notes |
 |---|---|---|
-| **STL** (binary) | `kernel/stl.ts` | mesh in/out |
-| **STEP** | replicad | exact B-rep, solids only |
-| **3MF** | `export3mf.ts` | hand-rolled OPC/ZIP (store-only + CRC-32) |
-| **SVG** | `model.ts` `exportGraphSVG` | 2D profiles |
-| **DXF** | `model.ts` `exportGraphDXF` + `dxfImport.ts` | CUT/SCORE layers; LINE/ARC/CIRCLE/LWPOLYLINE import |
-| **PNG** | viewport `snapshotPNG` | still render |
-| **WebM** | viewport turntable | spinning video |
+| **STL** (binaire) | `kernel/stl.ts` | mesh en entrée/sortie |
+| **STEP** | replicad | B-rep exact, solides uniquement |
+| **3MF** | `export3mf.ts` | OPC/ZIP fait main (store-only + CRC-32) |
+| **SVG** | `model.ts` `exportGraphSVG` | profils 2D |
+| **DXF** | `model.ts` `exportGraphDXF` + `dxfImport.ts` | calques CUT/SCORE ; import LINE/ARC/CIRCLE/LWPOLYLINE |
+| **PNG** | viewport `snapshotPNG` | rendu fixe |
+| **WebM** | turntable viewport | vidéo tournante |
 
 ---
 
-## 11. Thumbnails pipeline
+## 11. Pipeline de vignettes
 
-Each example gets a **real WebGL screenshot** (not a faked isometric SVG):
+Chaque exemple obtient un **vrai screenshot WebGL** (pas un faux SVG isométrique) :
 
-1. `?thumbs` mounts **`ThumbHarness`** instead of `<App>` — a fixed-size viewport that
-   exposes `window.__thumb.shoot(name)`.
-2. **`scripts/shoot-thumbs.ts`** spawns a Vite dev server, opens the harness in headless
-   Chromium (SwiftShader WebGL), and for each *missing* example loads it, frames it,
-   **supersamples 720→256px**, and writes `public/thumbs/<name>.png`.
-3. It's **missing-only by default** (fast no-op when all are committed) and never boots
-   the browser if nothing is missing. Run `npm run thumbs:examples` (or `:force`).
+1. `?thumbs` monte **`ThumbHarness`** au lieu de `<App>` — un viewport de taille fixe qui
+   expose `window.__thumb.shoot(name)`.
+2. **`scripts/shoot-thumbs.ts`** lance un serveur de dev Vite, ouvre le harnais dans un
+   Chromium headless (WebGL SwiftShader), et pour chaque exemple *manquant* le charge, le
+   cadre, **supersample 720→256px**, et écrit `public/thumbs/<name>.png`.
+3. C'est **manquantes seulement** par défaut (no-op rapide quand tout est commité) et le
+   navigateur n'est jamais booté s'il n'y a rien à faire. Lancer `npm run thumbs:examples`
+   (ou `:force`).
 
-The deploy CI runs it too, so a newly-added example gets a preview without a local
-pre-render.
-
----
-
-## 12. Extending it — add a node in 4 edits
-
-1. **`kernel/specs.ts`** — a `NODE_SPECS` entry (label, inputs, output, params), a line in
-   `NODE_CATEGORIES`, and a `NODE_DESCRIPTIONS` blurb.
-2. **`kernel/nodes.ts`** — a `REGISTRY` impl: `(inputs, params) => GraphValue`. Use
-   `expectSolid/expectSketch/expectMesh/asMeshData` to read inputs.
-3. If it needs face/edge targeting, emit or consume a `selection`.
-4. Add a test in `test/nodes.test.ts`.
-
-That's it — the palette, wiring, caching, Simple-mode exposure and export all work
-automatically because they're driven by the specs + value kinds.
+La CI de déploiement le lance aussi, pour qu'un exemple fraîchement ajouté obtienne une
+vignette sans pré-rendu local.
 
 ---
 
-## 13. Build, test, deploy
+## 12. L'étendre — ajouter un nœud en 4 éditions
 
-| Command | What |
+1. **`kernel/specs.ts`** — une entrée `NODE_SPECS` (label, entrées, sortie, params), une
+   ligne dans `NODE_CATEGORIES`, et un texte `NODE_DESCRIPTIONS`.
+2. **`kernel/nodes.ts`** — une impl `REGISTRY` : `(inputs, params) => GraphValue`. Utilise
+   `expectSolid/expectSketch/expectMesh/asMeshData` pour lire les entrées.
+3. S'il a besoin de cibler des faces/arêtes, émets ou consomme une `selection`.
+4. Ajoute un test dans `test/nodes.test.ts`.
+
+C'est tout — la palette, le câblage, le cache, l'exposition en mode Simple et l'export
+marchent automatiquement, car ils sont pilotés par les specs + les `kind` de valeurs.
+
+---
+
+## 13. Build, tests, déploiement
+
+| Commande | Rôle |
 |---|---|
-| `npm run dev` | Vite dev server |
-| `npm run build` | typecheck (`tsc -b`) + Vite build |
-| `npm test` / `test:watch` | Vitest suite (kernel eval, expr, mass props, solver, exports) |
-| `npm run thumbs:examples` | (re)generate missing example thumbnails |
-| `npm run scenes` | render the bundled scenes (smoke test) |
+| `npm run dev` | serveur de dev Vite |
+| `npm run build` | typecheck (`tsc -b`) + build Vite |
+| `npm test` / `test:watch` | suite Vitest (éval kernel, expr, mass props, solver, exports) |
+| `npm run thumbs:examples` | (re)génère les vignettes d'exemples manquantes |
+| `npm run scenes` | rend les scènes livrées (smoke test) |
 
-**CI** (`.github/workflows/deploy.yml`) on push to `main`: `npm ci` → **`npm test`
-(gates the deploy)** → install cached Playwright Chromium → generate missing thumbnails →
-`npm run build` → publish `dist/` to **GitHub Pages**. The Vitest suite boots both WASM
-kernels in Node exactly like the app does.
-
----
-
-## 14. Design decisions & known limits
-
-- **Two kernels on purpose.** B-rep for exactness/STEP/clean edges; Manifold for robust
-  booleans and implicit-surface work (gyroid). Bridging costs a tessellation but buys
-  reliability.
-- **No solid offset in OpenCascade** → *thicken* isn't offered; draft is done via
-  extrude taper instead.
-- **Hollow shell volume** can't be trusted from `meshMassProps` (inner-wall winding), so
-  the watertight/volume checks treat shells accordingly.
-- **Gyroid** outputs the clipped infill walls only; union your own shell via a mesh
-  Boolean if you want a skin (the shell-union was fragile).
-- **Turntable** relies on `MediaRecorder` video encoding, which is disabled in some
-  headless/automation browsers (falls back to a clear warning, never a 0-byte file).
-- The **thumbnail SVG-in-bundle** approach was replaced by lazy-loaded PNG files to keep
-  the JS bundle small as the library grows.
+**CI** (`.github/workflows/deploy.yml`) au push sur `main` : `npm ci` → **`npm test`
+(conditionne le déploiement)** → install de Chromium Playwright (caché) → génération des
+vignettes manquantes → `npm run build` → publication de `dist/` sur **GitHub Pages**. La
+suite Vitest boote les deux kernels WASM dans Node exactement comme l'app.
 
 ---
 
-*Generated as a living overview. When you add a subsystem, add a section here.*
+## 14. Décisions de design & limites connues
+
+- **Deux kernels, volontairement.** B-rep pour l'exactitude/STEP/arêtes propres ; Manifold
+  pour les booléens robustes et le travail sur surfaces implicites (gyroïde). Le pont coûte
+  une tessellation mais achète la fiabilité.
+- **Pas d'offset de solide dans OpenCascade** → le *thicken* n'est pas proposé ; le draft se
+  fait plutôt via le taper d'extrusion.
+- **Le volume d'une coque creuse** n'est pas fiable via `meshMassProps` (winding des parois
+  internes), donc les contrôles watertight/volume traitent les coques en conséquence.
+- **Le gyroïde** ne sort que les parois d'infill clippées ; unis ta propre coque via un
+  booléen mesh si tu veux une peau (l'union de coque était fragile).
+- **Le turntable** repose sur l'encodage vidéo `MediaRecorder`, désactivé dans certains
+  navigateurs headless/automatisés (repli sur un avertissement clair, jamais un fichier de
+  0 octet).
+- L'approche **vignettes SVG-dans-le-bundle** a été remplacée par des fichiers PNG chargés
+  paresseusement, pour garder le bundle JS léger à mesure que la bibliothèque grandit.
+
+---
+
+*Document vivant. Quand tu ajoutes un sous-système, ajoute une section ici.*
