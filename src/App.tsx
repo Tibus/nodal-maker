@@ -444,6 +444,19 @@ export default function App() {
                     </>
                   );
                 })()}
+                {(() => {
+                  // FDM estimate: 1.75 mm filament (2.405 mm² section), PLA 1.24 g/cm³, ~€20/kg
+                  const meters = props.volume / 2.405 / 1000;
+                  const grams = (props.volume / 1000) * 1.24;
+                  const euro = (grams / 1000) * 20;
+                  return (
+                    <>
+                      <tr className="propspanel__sep"><td colSpan={2}>FDM estimate (≈)</td></tr>
+                      <tr><td>Filament</td><td>{fmt(meters)} m · {fmt(grams)} g <span className="propspanel__dim">1.75 mm PLA</span></td></tr>
+                      <tr><td>Material cost</td><td>€{euro.toFixed(2)} <span className="propspanel__dim">@ €20/kg</span></td></tr>
+                    </>
+                  );
+                })()}
               </tbody>
             </table>
           </div>

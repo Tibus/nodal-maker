@@ -1174,6 +1174,34 @@ const REGISTRY: Record<string, NodeImpl> = {
     const out = op === "difference" ? a.cut(b) : op === "intersection" ? a.intersect(b) : a.fuse(b);
     return { kind: "solid", solid: out as Shape3D };
   },
+  /**
+   * Arrange several solids on the build plate (FDM/resin) — shelf-pack them on
+   * XY, wrapping rows at `bedWidth`, each dropped to rest on z=0. Output is one
+   * compound you can export as a full plate. `copies` repeats each body.
+   */
+  arrange3d: (inputs, params) => {
+    const items = ["s0", "s1", "s2", "s3", "s4", "s5"]
+      .map((k) => inputs[k])
+      .filter((v): v is Extract<GraphValue, { kind: "solid" }> => !!v && v.kind === "solid")
+      .map((v) => v.solid);
+    if (!items.length) throw new Error("[arrange3d] connect at least one solid (s0…)");
+    const bedW = Math.max(10, Number(params.bedWidth ?? 200));
+    const gap = Math.max(0, Number(params.gap ?? 4));
+    const copies = Math.max(1, Math.round(Number(params.copies ?? 1)));
+    const all: Shape3D[] = [];
+    for (const s of items) for (let i = 0; i < copies; i++) all.push(s);
+    const boxed = all.map((s) => { const [lo, hi] = s.boundingBox.bounds; return { s, lo, w: hi[0] - lo[0], d: hi[1] - lo[1] }; });
+    boxed.sort((a, b) => b.d - a.d); // deepest first → tighter rows
+    let cx = 0, cy = 0, rowD = 0;
+    const placed: Shape3D[] = [];
+    for (const it of boxed) {
+      if (cx > 0 && cx + it.w > bedW) { cy += rowD + gap; cx = 0; rowD = 0; }
+      placed.push(it.s.clone().translate([cx - it.lo[0], cy - it.lo[1], -it.lo[2]]) as Shape3D);
+      cx += it.w + gap;
+      rowD = Math.max(rowD, it.d);
+    }
+    return { kind: "solid", solid: makeCompound(placed) as unknown as Shape3D };
+  },
   /** Tint a solid for display (distinguish bodies in an assembly). Pass-through geometry. */
   color: (inputs, params) => {
     const solid = expectSolid(inputs.in, "color");
@@ -1297,6 +1325,22 @@ const REGISTRY: Record<string, NodeImpl> = {
    * engrave lines. The preview shows both fused; `exportGraphSVG` emits them on
    * separate red (cut) / blue (score) layers.
    */
+  /**
+   * CNC job: bundle a contour, a pocket region and a drills profile with their
+   * depths. Previews as the combined outline; **exportGraphDXF** emits one
+   * layer per operation (depths in the layer name) + drill POINT entities, ready
+   * for a CAM tool to assign toolpaths. Feeds an external CAM (Fusion, Carbide…).
+   */
+  cncJob: (inputs) => {
+    const drs = ["contour", "pocket", "drills"]
+      .map((k) => inputs[k])
+      .filter((v): v is Extract<GraphValue, { kind: "sketch2d" }> => !!v && v.kind === "sketch2d")
+      .map((v) => v.drawing);
+    if (!drs.length) throw new Error("[cncJob] connect at least a contour, pocket or drills profile");
+    let out = drs[0];
+    for (let i = 1; i < drs.length; i++) { try { out = out.fuse(drs[i]); } catch { /* keep previewing what fused */ } }
+    return { kind: "sketch2d", drawing: out };
+  },
   scoreCut: (inputs) => {
     const cut = expectSketch(inputs.cut, "scoreCut");
     const score = inputs.score;

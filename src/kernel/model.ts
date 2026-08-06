@@ -326,6 +326,16 @@ interface DxfLayer {
   name: string;
   color: number; // AutoCAD color index (1=red, 5=blue, 7=white/black)
   polylines: Pt2[][];
+  points?: Pt2[]; // DXF POINT entities (drill centres for CAM)
+}
+
+/** Centroid of each closed loop in a drawing — used to derive drill points. */
+function loopCentroids(d: Drawing): Pt2[] {
+  return drawingToPolylines(d).map((poly) => {
+    let x = 0, y = 0;
+    for (const [px, py] of poly) { x += px; y += py; }
+    return [x / poly.length, y / poly.length] as Pt2;
+  });
 }
 
 function buildDXF(layers: DxfLayer[]): string {
@@ -352,6 +362,7 @@ function buildDXF(layers: DxfLayer[]): string {
       p(90, poly.length); p(70, 1); p(43, 0); // closed, zero constant width
       for (const [x, y] of poly) { p(10, x); p(20, y); }
     }
+    for (const [x, y] of layer.points ?? []) { p(0, "POINT"); p(8, layer.name); p(10, x); p(20, y); p(30, 0); }
   }
   p(0, "ENDSEC");
   p(0, "EOF");
@@ -372,6 +383,22 @@ export function exportGraphDXF(graph: Graph, outputId: string): string {
     const layers: DxfLayer[] = [{ name: "CUT", color: 1, polylines: drawingToPolylines(cutV.drawing) }];
     if (scoreV && scoreV.kind === "sketch2d")
       layers.push({ name: "SCORE", color: 5, polylines: drawingToPolylines(scoreV.drawing) });
+    return buildDXF(layers);
+  }
+
+  // CNC job → one DXF layer per operation, depths encoded in the layer name and
+  // drills as POINT entities, so a CAM tool can assign toolpaths per layer.
+  if (node?.type === "cncJob") {
+    const g = (port: string) => { const v = node.inputs?.[port] ? outputs[node.inputs[port]] : undefined; return v && v.kind === "sketch2d" ? v.drawing : undefined; };
+    const depth = (k: string, d: number) => Number(node.params?.[k] ?? d);
+    const layers: DxfLayer[] = [];
+    const contour = g("contour");
+    if (contour) layers.push({ name: `CONTOUR_${depth("contourDepth", 3).toFixed(1)}`, color: 1, polylines: drawingToPolylines(contour) });
+    const pocket = g("pocket");
+    if (pocket) layers.push({ name: `POCKET_${depth("pocketDepth", 2).toFixed(1)}`, color: 3, polylines: drawingToPolylines(pocket) });
+    const drills = g("drills");
+    if (drills) layers.push({ name: "DRILL", color: 5, polylines: drawingToPolylines(drills), points: loopCentroids(drills) });
+    if (!layers.length) throw new Error("CNC job: connect at least a contour, pocket or drills profile");
     return buildDXF(layers);
   }
 

@@ -100,6 +100,7 @@ export const NODE_DESCRIPTIONS: Record<string, string> = {
   arrayRadial2d: "Repeat a profile around a circle.",
   group: "Union up to four profiles into one outline.",
   scoreCut: "Layer a cut outline (red) and score/fold lines (blue) for laser export.",
+  cncJob: "Bundle a contour, a pocket and drill circles with their depths. DXF export writes one layer per operation (depth in the name) + drill POINT entities for CAM.",
   box: "A rectangular box. Exposes its 6 faces + edges as selection ports.",
   cylinder: "A cylinder. Exposes cap / bottom / side + cap edges.",
   sphere: "A sphere of the given radius.",
@@ -132,6 +133,7 @@ export const NODE_DESCRIPTIONS: Record<string, string> = {
   supports: "Auto-generate a resin support forest: thin pillars from every overhang steeper than the angle down to the build plate.",
   collision: "Interference check: outputs the overlap region between two bodies (empty = no clash). Read its volume in Props.",
   color: "Tint a solid for display (hex) to tell bodies apart in an assembly. Geometry passes through unchanged.",
+  arrange3d: "Arrange several solids on the build plate (shelf-pack on XY, each dropped to z=0) — one compound to export as a full FDM/resin plate.",
   dogbone: "Relieve inside corners of a pocket so a round router bit can reach them (CNC): dogbone (diagonal) or T-bone (along a wall).",
   tabs: "Hold-in-sheet micro-joints: keep a laser part attached to the surrounding stock by tabs until you pop it out.",
   arrayPath: "Repeat a solid along a 2D path at even spacing, optionally rotating each copy to follow the path tangent.",
@@ -157,10 +159,10 @@ export const NODE_DESCRIPTIONS: Record<string, string> = {
 export const NODE_CATEGORIES: { name: string; types: string[] }[] = [
   { name: "Value", types: ["numberValue", "textValue", "math", "mathUnary", "clamp", "remap", "random"] },
   { name: "2D Primitive", types: ["sketch", "rect", "circle", "ellipse", "polygon", "star", "slot", "gear", "fingerBox", "livingHinge", "svgInput", "importDXF", "textToSvg"] },
-  { name: "2D Op", types: ["offset2d", "kerf", "fillet2d", "bevel2d", "boolean2d", "mirror2d", "transform2d", "arrayLinear2d", "arrayRadial2d", "nest", "dogbone", "tabs", "group", "scoreCut"] },
+  { name: "2D Op", types: ["offset2d", "kerf", "fillet2d", "bevel2d", "boolean2d", "mirror2d", "transform2d", "arrayLinear2d", "arrayRadial2d", "nest", "dogbone", "tabs", "cncJob", "group", "scoreCut"] },
   { name: "3D Primitive", types: ["box", "cylinder", "sphere", "cone", "torus", "thread", "internalThread", "importSTEP"] },
   { name: "Sketch → Solid", types: ["extrude", "pocket", "hole", "revolve", "loft", "loftSections", "sweep", "bossOnCap", "textOnFace"] },
-  { name: "3D Op", types: ["transform", "rotate3d", "scale3d", "mirror3d", "fillet", "bevel", "shell", "hollow", "infill", "gyroid", "split", "autoOrient", "supports", "boolean3d", "collision", "color", "assemble", "arrayLinear3d", "arrayRadial3d", "arrayPath"] },
+  { name: "3D Op", types: ["transform", "rotate3d", "scale3d", "mirror3d", "fillet", "bevel", "shell", "hollow", "infill", "gyroid", "split", "autoOrient", "supports", "boolean3d", "collision", "color", "arrange3d", "assemble", "arrayLinear3d", "arrayRadial3d", "arrayPath"] },
   { name: "Selector", types: ["edgeSelect", "faceSelect"] },
   { name: "Mesh", types: ["tessellate", "meshToSolid", "importSTL", "repair", "boolean", "transformMesh", "convexHull", "minkowski", "decimate", "subdivide"] },
 ];
@@ -697,6 +699,20 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
       { name: "mode", kind: "select", default: "outer", options: ["outer", "inner"] },
     ],
   },
+  cncJob: {
+    type: "cncJob",
+    label: "CNC job",
+    inputs: [
+      { name: "contour", type: "sketch2d" },
+      { name: "pocket", type: "sketch2d" },
+      { name: "drills", type: "sketch2d" },
+    ],
+    output: "sketch2d",
+    params: [
+      { name: "contourDepth", kind: "number", label: "contour depth", default: 3, min: 0, max: 100, step: 0.5 },
+      { name: "pocketDepth", kind: "number", label: "pocket depth", default: 2, min: 0, max: 100, step: 0.5 },
+    ],
+  },
   scoreCut: {
     type: "scoreCut",
     label: "Score / Cut",
@@ -858,6 +874,24 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
       { name: "count", kind: "number", default: 5, min: 1, max: 200, step: 1 },
       { name: "orient", kind: "select", label: "follow tangent", default: "yes", options: ["yes", "no"] },
       { name: "merge", kind: "select", label: "fuse", default: "no", options: ["yes", "no"] },
+    ],
+  },
+  arrange3d: {
+    type: "arrange3d",
+    label: "Arrange on plate",
+    inputs: [
+      { name: "s0", type: "solid" },
+      { name: "s1", type: "solid" },
+      { name: "s2", type: "solid" },
+      { name: "s3", type: "solid" },
+      { name: "s4", type: "solid" },
+      { name: "s5", type: "solid" },
+    ],
+    output: "solid",
+    params: [
+      { name: "bedWidth", kind: "number", label: "bed width", default: 200, min: 10, max: 1000, step: 5 },
+      { name: "gap", kind: "number", default: 4, min: 0, max: 50, step: 1 },
+      { name: "copies", kind: "number", label: "copies each", default: 1, min: 1, max: 50, step: 1 },
     ],
   },
   color: {

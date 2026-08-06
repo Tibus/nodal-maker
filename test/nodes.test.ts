@@ -176,4 +176,26 @@ describe("mesh domain & exports", () => {
     expect(svg).toContain("<svg");
     expect(svg).toContain("path");
   });
+
+  it("arrange3d packs solids onto the plate (within bed width, resting on z=0)", () => {
+    const g: Graph = [box("a", 20, 20, 20), box("b", 20, 20, 30), box("c", 20, 20, 10), { id: "arr", type: "arrange3d", params: { bedWidth: 60, gap: 5, copies: 1 }, inputs: { s0: "a", s1: "b", s2: "c" } }];
+    expect(tris(g, "arr")).toBe(3 * 12);
+    expect(bbox(g, "arr").hi[0]).toBeLessThanOrEqual(60);
+    expect(bbox(g, "arr").lo[2]).toBeCloseTo(0, 1);
+  });
+
+  it("cncJob exports depth-named layers + drill POINT entities to DXF", () => {
+    const g: Graph = [
+      { id: "outer", type: "rect", params: { width: 80, height: 60 }, inputs: {} },
+      { id: "pk", type: "rect", params: { width: 30, height: 20 }, inputs: {} },
+      { id: "d1", type: "circle", params: { radius: 3 }, inputs: {} },
+      { id: "dh", type: "transform2d", params: { tx: 25, ty: 15, rotate: 0, scale: 1 }, inputs: { in: "d1" } },
+      { id: "job", type: "cncJob", params: { contourDepth: 6, pocketDepth: 2.5 }, inputs: { contour: "outer", pocket: "pk", drills: "dh" } },
+    ];
+    const dxf = exportGraphDXF(g, "job");
+    expect(dxf).toContain("CONTOUR_6.0");
+    expect(dxf).toContain("POCKET_2.5");
+    expect(dxf).toContain("DRILL");
+    expect(dxf).toContain("POINT");
+  });
 });
