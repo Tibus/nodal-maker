@@ -83,22 +83,26 @@ export class Viewport {
       0.1,
       5000,
     );
-    this.camera.position.set(120, 90, 120);
+    // Z-up world (CAD convention): the model's +Z is up on screen
+    this.camera.up.set(0, 0, 1);
+    this.camera.position.set(150, -150, 120);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
 
+    // ground grid lies in the XY plane (the Z-up floor)
     const grid = new THREE.GridHelper(400, 40, 0x333842, 0x2a2e36);
+    grid.rotation.x = Math.PI / 2;
     this.scene.add(grid);
     this.grid = grid;
 
     const hemi = new THREE.HemisphereLight(0xffffff, 0x33383f, 1.0);
     this.scene.add(hemi);
     const key = new THREE.DirectionalLight(0xffffff, 1.4);
-    key.position.set(80, 160, 100);
+    key.position.set(100, -120, 180); // above (+Z) and to the front
     this.scene.add(key);
     const fill = new THREE.DirectionalLight(0xffffff, 0.5);
-    fill.position.set(-100, 40, -80);
+    fill.position.set(-100, 80, 60);
     this.scene.add(fill);
 
     // materials indexed to match the geometry groups we build below — all the
@@ -595,10 +599,11 @@ export class Viewport {
     const center = box.getCenter(new THREE.Vector3());
     const radius = Math.max(size.x, size.y, size.z, 1);
     this.controls.target.copy(center);
+    this.camera.up.set(0, 0, 1); // restore Z-up (topView may have set Y-up)
     this.camera.position.set(
       center.x + radius * 1.6,
-      center.y + radius * 1.4,
-      center.z + radius * 1.6,
+      center.y - radius * 1.6,
+      center.z + radius * 1.4,
     );
     this.camera.near = radius / 100;
     this.camera.far = radius * 100;
