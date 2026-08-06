@@ -73,6 +73,18 @@ describe("graph evaluation (real geometry)", () => {
     expect(() => evalToPayload(g, "e")).toThrow(/\[extrude\]/);
   });
 
+  it("an internal thread can be placed on a picked bore (off-centre, any axis)", () => {
+    // box spans x,y ∈ [-20,20], z ∈ [0,20]
+    const box = { id: "b", type: "box", params: { x: 40, y: 40, z: 20 }, inputs: {} };
+    // Z-axis bore, off-centre at (8,8), full height
+    const gZ: Graph = [box, { id: "t", type: "internalThread", params: { standard: "custom", pitch: 2, place: { center: [8, 8, 0], axis: [0, 0, 1], length: 20, diameter: 8 } }, inputs: { in: "b" } }];
+    const pz = evalToPayload(gZ, "t");
+    expect(pz.mesh.indices.length / 3).toBeGreaterThan(50); // bored body + helical ridge
+    // X-axis bore exercises the rotate-onto-axis path
+    const gX: Graph = [box, { id: "t", type: "internalThread", params: { standard: "custom", pitch: 2, place: { center: [-20, 8, 8], axis: [1, 0, 0], length: 40, diameter: 8 } }, inputs: { in: "b" } }];
+    expect(() => evalToPayload(gX, "t")).not.toThrow();
+  });
+
   it("a fillet accepts several selection nodes (union of edges)", () => {
     // box 20³; select the top 4 edges and the bottom 4 edges as TWO edgeSelect
     // nodes wired into one fillet. Filleting rounds convex edges → removes volume,

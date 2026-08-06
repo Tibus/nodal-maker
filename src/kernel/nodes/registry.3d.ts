@@ -87,10 +87,18 @@ export const nodes3d: Record<string, NodeImpl> = {
     const body = expectSolid(inputs.in, "internalThread");
     const std = String(params.standard ?? "custom");
     const preset = THREAD_STANDARDS[std];
-    const diameter = preset ? preset.diameter : Number(params.diameter ?? 16);
     const pitch = preset ? preset.pitch : Number(params.pitch ?? 2);
     const clearance = Number(params.clearance ?? 0.4);
     const lefthand = String(params.hand ?? "right") === "left";
+    // A picked internal cylindrical face sets where the thread goes: its axis
+    // base point, direction, length and bore Ø (which overrides the nominal).
+    const pl = params.place as
+      | { center: [number, number, number]; axis: [number, number, number]; length: number; diameter: number }
+      | undefined;
+    if (pl && Array.isArray(pl.center) && Array.isArray(pl.axis)) {
+      return { kind: "solid", solid: buildNutBRep(body, pl.diameter, pitch, clearance, lefthand, pl) };
+    }
+    const diameter = preset ? preset.diameter : Number(params.diameter ?? 16);
     return { kind: "solid", solid: buildNutBRep(body, diameter, pitch, clearance, lefthand) };
   },
   cone: (_inputs, params) => {

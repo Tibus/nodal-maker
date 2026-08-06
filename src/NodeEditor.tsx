@@ -579,6 +579,9 @@ export interface EditorApi {
   addSketchOnPlane: (base: "XY" | "XZ" | "YZ", offset: number, reference?: [number, number][][]) => void;
   /** create a new Sketch node on an arbitrary (tilted) face plane, and open it */
   addSketchOnPlaneFrame: (frame: { origin: [number, number, number]; normal: [number, number, number]; xDir: [number, number, number] }) => void;
+  /** place an Internal Thread on a picked cylindrical bore: relocate the viewed
+   *  internalThread node, or create one consuming the viewed body */
+  placeThreadBore: (place: { center: [number, number, number]; axis: [number, number, number]; length: number; diameter: number }) => void;
 }
 
 export interface NodeEditorProps {
@@ -1270,9 +1273,31 @@ export default function NodeEditor({
     setEditingSketchId(nid);
   }, [nodes, setNodes]);
 
+  const placeThreadBore = useCallback((place: { center: [number, number, number]; axis: [number, number, number]; length: number; diameter: number }) => {
+    const viewed = nodes.find((n) => n.id === outputId);
+    // already on an Internal Thread → just relocate its bore
+    if (viewed && !viewed.data.component && viewed.data.nodeType === "internalThread") {
+      setParam(viewed.id, "place", place);
+      return;
+    }
+    if (!viewed) return;
+    // otherwise cut a new Internal Thread into the viewed body at that bore
+    const id = newId("internalThread");
+    const params: Record<string, unknown> = {};
+    for (const p of NODE_SPECS.internalThread.params) params[p.name] = p.default;
+    params.place = place;
+    const position = { x: viewed.position.x + 40, y: viewed.position.y + 200 };
+    setNodes((prev) => [
+      ...prev.map((n) => ({ ...n, selected: false })),
+      { id, type: "geo", position, selected: true, data: { nodeType: "internalThread", params } },
+    ]);
+    setEdges((es) => addEdge({ source: viewed.id, sourceHandle: "out", target: id, targetHandle: "in", style: { stroke: SOCKET_COLORS.solid } }, es));
+    setOutputId(id);
+  }, [nodes, outputId, setParam, setNodes, setEdges]);
+
   useEffect(() => {
-    onReady?.({ setParam, addFaceSelect, addEdgeSelect, addSketchOnPlane, addSketchOnPlaneFrame });
-  }, [onReady, setParam, addFaceSelect, addEdgeSelect, addSketchOnPlane, addSketchOnPlaneFrame]);
+    onReady?.({ setParam, addFaceSelect, addEdgeSelect, addSketchOnPlane, addSketchOnPlaneFrame, placeThreadBore });
+  }, [onReady, setParam, addFaceSelect, addEdgeSelect, addSketchOnPlane, addSketchOnPlaneFrame, placeThreadBore]);
 
   const onConnect = useCallback(
     (c: Connection) => {

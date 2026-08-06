@@ -259,20 +259,52 @@ export function buildThreadBRep(diameter: number, pitch: number, length: number,
  * helical ridges are added as a COMPOUND — so no helical boolean is ever needed.
  * Genuine B-rep, STEP-exportable. `zBase`/`H` come from the body's bounds.
  */
-export function buildNutBRep(body: Shape3D, diameter: number, pitch: number, clearance: number, lefthand: boolean): Shape3D {
+export function buildNutBRep(
+  body: Shape3D, diameter: number, pitch: number, clearance: number, lefthand: boolean,
+  /** Optional placement from a picked cylindrical face: a base point on the bore
+   *  axis (its low end), the axis direction, and the threaded length. Without it
+   *  the bore sits on the world Z axis at the origin, spanning the body's height. */
+  place?: { center: [number, number, number]; axis: [number, number, number]; length: number },
+): Shape3D {
   const p = Math.max(0.2, pitch);
   const depth = p * 0.613;
   const rBore = Math.max(0.5, diameter / 2); // internal root = nominal major radius
   const rCrest = Math.max(0.3, rBore - depth + clearance); // teeth tips, toward the axis
   const rOuter = rBore + 0.15; // ridge root overlaps the surrounding material
   const flat = p / 8;
-  const [lo, hi] = body.boundingBox.bounds;
-  const H = hi[2] - lo[2];
-
-  const bore = (makeCylinder(rBore, H + 4) as Shape3D).clone().translate(0, 0, lo[2] - 2) as Shape3D;
-  const bodyWithHole = body.cut(bore) as Shape3D; // simple boolean — no helix, fast
   const profile: RPt[] = [[rOuter, -p / 2], [rCrest, -flat], [rCrest, flat], [rOuter, p / 2]];
-  const ridge = sweepHelicalRidge(rOuter, profile, p, H, lefthand, lo[2]);
+  const [lo, hi] = body.boundingBox.bounds;
+
+  if (!place) {
+    // world Z axis, origin, full body height (original behaviour)
+    const H = hi[2] - lo[2];
+    const bore = (makeCylinder(rBore, H + 4) as Shape3D).clone().translate(0, 0, lo[2] - 2) as Shape3D;
+    const bodyWithHole = body.cut(bore) as Shape3D; // simple boolean — no helix, fast
+    const ridge = sweepHelicalRidge(rOuter, profile, p, H, lefthand, lo[2]);
+    return makeCompound([bodyWithHole, ridge]) as Shape3D;
+  }
+
+  // placed bore: build the bore + ridge in a local Z frame, then rotate the Z
+  // axis onto the picked axis and translate its base to the picked point.
+  const L = Math.max(p, place.length);
+  const a = place.axis;
+  const al = Math.hypot(a[0], a[1], a[2]) || 1;
+  const A: [number, number, number] = [a[0] / al, a[1] / al, a[2] / al];
+  const orient = (s: Shape3D): Shape3D => {
+    const dot = Math.max(-1, Math.min(1, A[2])); // Z·A
+    let r = s;
+    if (dot < 0.9999) {
+      if (dot < -0.9999) r = s.rotate(180, [0, 0, 0], [1, 0, 0]) as Shape3D; // A = -Z
+      else {
+        const axL = Math.hypot(A[1], A[0]) || 1; // Z×A = (-Ay, Ax, 0)
+        r = s.rotate((Math.acos(dot) * 180) / Math.PI, [0, 0, 0], [-A[1] / axL, A[0] / axL, 0]) as Shape3D;
+      }
+    }
+    return r.translate(place.center) as Shape3D;
+  };
+  const boreLocal = (makeCylinder(rBore, L + 4) as Shape3D).clone().translate(0, 0, -2) as Shape3D;
+  const bodyWithHole = body.cut(orient(boreLocal)) as Shape3D;
+  const ridge = orient(sweepHelicalRidge(rOuter, profile, p, L, lefthand, 0));
   return makeCompound([bodyWithHole, ridge]) as Shape3D;
 }
 
