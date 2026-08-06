@@ -23,6 +23,7 @@ import {
   exportMeshSTL,
   evalToPayload,
   describePortGeometry,
+  describeFeatureGeometry,
   exportGraphSTL,
   exportGraphSVG,
   exportGraphDXF,
@@ -82,6 +83,14 @@ const api = {
     await ensureKernels();
     try {
       return describePortGeometry(graph, outputId, sourceNodeId, port, graphCache, userParams);
+    } catch {
+      return { tris: new Float32Array(0), segs: new Float32Array(0) };
+    }
+  },
+  async describeFeature(graph: Graph, nodeId: string, userParams?: Record<string, number>) {
+    await ensureKernels();
+    try {
+      return describeFeatureGeometry(graph, nodeId, graphCache, userParams);
     } catch {
       return { tris: new Float32Array(0), segs: new Float32Array(0) };
     }

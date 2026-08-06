@@ -603,6 +603,9 @@ export interface NodeEditorProps {
   onSelectPreview?: (desc: { kind: "edge" | "face"; where: string; offset: number; near?: [number, number, number] } | null) => void;
   /** hover a selection-output port → highlight its geometry on the model */
   onPortHover?: (info: { nodeId: string; port: string } | null) => void;
+  /** a modifier node (fillet/bevel/shell/internalThread) got selected → highlight
+   *  the edges/faces it acts on (null clears) */
+  onFeaturePreview?: (nodeId: string | null) => void;
   errorNodeId?: string | null;
   errorMessage?: string | null;
   values?: Record<string, string>;
@@ -848,6 +851,7 @@ export default function NodeEditor({
   onReady,
   onSelectPreview,
   onPortHover,
+  onFeaturePreview,
   errorNodeId,
   errorMessage,
   values,
@@ -1041,11 +1045,16 @@ export default function NodeEditor({
   // node is highlighted, hand its descriptor to the parent (→ viewport overlay).
   const onSelectPreviewRef = useRef(onSelectPreview);
   onSelectPreviewRef.current = onSelectPreview;
+  const onFeaturePreviewRef = useRef(onFeaturePreview);
+  onFeaturePreviewRef.current = onFeaturePreview;
   const lastPreviewSig = useRef<string>("");
+  const lastFeatureSig = useRef<string>("");
+  const FEATURE_NODES = useMemo(() => new Set(["fillet", "bevel", "shell", "internalThread"]), []);
   useEffect(() => {
     const sel = nodes.filter((n) => n.selected && !isNote(n));
     const one = sel.length === 1 ? sel[0] : null;
     const t = one?.data.nodeType;
+    // (a) an Edge/Face Select node → descriptor preview of its own selection
     let desc: { kind: "edge" | "face"; where: string; offset: number; near?: [number, number, number] } | null = null;
     if (one && (t === "edgeSelect" || t === "faceSelect")) {
       const p = one.data.params ?? {};
@@ -1053,10 +1062,11 @@ export default function NodeEditor({
       desc = { kind: t === "faceSelect" ? "face" : "edge", where: String(p.where ?? "all"), offset: Number(p.offset ?? 0), near };
     }
     const sig = JSON.stringify(desc);
-    if (sig === lastPreviewSig.current) return; // avoid re-emitting on every drag
-    lastPreviewSig.current = sig;
-    onSelectPreviewRef.current?.(desc);
-  }, [nodes]);
+    if (sig !== lastPreviewSig.current) { lastPreviewSig.current = sig; onSelectPreviewRef.current?.(desc); }
+    // (b) a modifier node → highlight the edges/faces it acts on
+    const featNode = one && !one.data.component && t && FEATURE_NODES.has(t) ? one.id : null;
+    if ((featNode ?? "") !== lastFeatureSig.current) { lastFeatureSig.current = featNode ?? ""; onFeaturePreviewRef.current?.(featNode); }
+  }, [nodes, FEATURE_NODES]);
 
   const undo = useCallback(() => {
     const snap = undoStack.current.pop();

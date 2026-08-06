@@ -1145,11 +1145,26 @@ export class Viewport {
       group.add(mesh);
     }
     if (segs.length) {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute("position", new THREE.BufferAttribute(segs, 3));
-      const lines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0x39d98a, depthTest: false }));
-      lines.renderOrder = 999;
-      group.add(lines);
+      // thick tubes read far better than hairlines; fall back to plain lines only
+      // for pathologically large sets (keeps the transient highlight cheap)
+      if (segs.length / 6 <= 600) {
+        const r = Math.max(0.4, this.modelDiag * 0.006);
+        const mat = new THREE.MeshBasicMaterial({ color: 0x39d98a, depthTest: false });
+        for (let i = 0; i + 5 < segs.length; i += 6) {
+          const a = new THREE.Vector3(segs[i], segs[i + 1], segs[i + 2]);
+          const b = new THREE.Vector3(segs[i + 3], segs[i + 4], segs[i + 5]);
+          if (a.distanceToSquared(b) < 1e-9) continue;
+          const tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(a, b), 1, r, 5, false), mat);
+          tube.renderOrder = 999;
+          group.add(tube);
+        }
+      } else {
+        const g = new THREE.BufferGeometry();
+        g.setAttribute("position", new THREE.BufferAttribute(segs, 3));
+        const lines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0x39d98a, depthTest: false }));
+        lines.renderOrder = 999;
+        group.add(lines);
+      }
     }
     if (!group.children.length) return;
     this.scene.add(group);

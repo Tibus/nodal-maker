@@ -16,8 +16,10 @@ import {
   type MeshPayload,
 } from "./nodes";
 import { writeBinarySTL } from "./stl";
-import { resolveCrit, critApply } from "./nodes/selection";
+import { resolveCrit, critApply, resolvePort } from "./nodes/selection";
+import { rebindEdge, rebindFace } from "./nodes/helpers";
 import { FaceFinder, EdgeFinder, type Shape3D, type Drawing, type Face, type Edge } from "replicad";
+import type { SelRef } from "./nodes/types";
 
 /** A single-geometry port carries one ref; take it (ignoring the multi form). */
 const oneRef = (r?: string | string[]): string | undefined => (Array.isArray(r) ? r[0] : r);
@@ -255,6 +257,36 @@ export function evalToPayload(
   throw new Error(`output node "${outputId}" is a ${v.kind}; connect it to geometry to preview`);
 }
 
+const EMPTY_HL = () => ({ tris: new Float32Array(0), segs: new Float32Array(0) });
+
+/** Tessellate faces → flat triangle positions (the solid must be meshed first). */
+function facesToTris(faces: Face[]): Float32Array {
+  const tris: number[] = [];
+  for (const f of faces) {
+    const t = f.triangulation();
+    if (!t) continue;
+    for (const idx of t.trianglesIndexes) tris.push(t.vertices[idx * 3], t.vertices[idx * 3 + 1], t.vertices[idx * 3 + 2]);
+  }
+  return new Float32Array(tris);
+}
+
+/** Sample edges into polyline segments (pairs of endpoints). */
+function edgesToSegs(edges: Edge[]): Float32Array {
+  const segs: number[] = [];
+  for (const e of edges) {
+    let prev: { x: number; y: number; z: number } | null = null;
+    for (let i = 0; i <= 24; i++) {
+      const p = e.pointAt(i / 24);
+      if (prev) segs.push(prev.x, prev.y, prev.z, p.x, p.y, p.z);
+      prev = p;
+    }
+  }
+  return new Float32Array(segs);
+}
+
+const meshSolid = (s: Shape3D) =>
+  (s as unknown as { mesh: (o: { tolerance: number; angularTolerance: number }) => unknown }).mesh({ tolerance: 0.1, angularTolerance: 20 });
+
 /**
  * Geometry to highlight when hovering a node's selection OUTPUT port (extrude
  * cap, box top, cylinder side…): resolve that port's criteria and apply it to
@@ -269,10 +301,9 @@ export function describePortGeometry(
   cache?: EvalCache,
   vars?: Record<string, number>,
 ): { tris: Float32Array; segs: Float32Array } {
-  const empty = { tris: new Float32Array(0), segs: new Float32Array(0) };
   const { outputs } = cache ? evalGraphCached(graph, cache, vars) : evalGraph(graph, vars);
   const v = outputs[outputId];
-  if (!v || v.kind !== "solid") return empty;
+  if (!v || v.kind !== "solid") return EMPTY_HL();
   const byId = new Map(graph.map((n) => [n.id, n]));
   const evalNode = (id: string): GraphValue => {
     const o = outputs[id];
@@ -283,33 +314,77 @@ export function describePortGeometry(
   try {
     crit = resolveCrit(`${sourceNodeId}#${port}`, byId, evalNode);
   } catch {
-    return empty; // port not resolvable against this geometry
+    return EMPTY_HL(); // port not resolvable against this geometry
   }
   const apply = critApply(crit);
   if (crit.target === "face") {
-    // triangulation() only returns data once the shape is meshed
-    (v.solid as unknown as { mesh: (o: { tolerance: number; angularTolerance: number }) => unknown }).mesh({ tolerance: 0.1, angularTolerance: 20 });
+    meshSolid(v.solid); // triangulation() only returns data once meshed
     const faces = (apply(new FaceFinder()) as FaceFinder).find(v.solid as Parameters<FaceFinder["find"]>[0]) as Face[];
-    const tris: number[] = [];
-    for (const f of faces) {
-      const t = f.triangulation();
-      if (!t) continue;
-      for (const idx of t.trianglesIndexes) tris.push(t.vertices[idx * 3], t.vertices[idx * 3 + 1], t.vertices[idx * 3 + 2]);
-    }
-    return { tris: new Float32Array(tris), segs: new Float32Array(0) };
+    return { tris: facesToTris(faces), segs: new Float32Array(0) };
   }
   const edges = (apply(new EdgeFinder()) as EdgeFinder).find(v.solid as Parameters<EdgeFinder["find"]>[0]) as Edge[];
-  const segs: number[] = [];
-  for (const e of edges) {
-    const N = 24;
-    let prev: { x: number; y: number; z: number } | null = null;
-    for (let i = 0; i <= N; i++) {
-      const p = e.pointAt(i / N);
-      if (prev) segs.push(prev.x, prev.y, prev.z, p.x, p.y, p.z);
-      prev = p;
-    }
+  return { tris: new Float32Array(0), segs: edgesToSegs(edges) };
+}
+
+/** Which input port + kind a modifier's targeted feature comes from. */
+const FEATURE_SEL: Record<string, { port: string; kind: "edge" | "face" }> = {
+  fillet: { port: "sel", kind: "edge" },
+  bevel: { port: "sel", kind: "edge" },
+  shell: { port: "faces", kind: "face" },
+  internalThread: { port: "face", kind: "face" },
+};
+
+/**
+ * Geometry a modifier node ACTS ON, to flash when the node is selected: resolve
+ * its selection input against its INPUT solid (the sharp edges a fillet rounds,
+ * the faces a shell opens, the bore an internal thread cuts). A fillet/bevel with
+ * no selection targets every edge.
+ */
+export function describeFeatureGeometry(
+  graph: Graph,
+  nodeId: string,
+  cache?: EvalCache,
+  vars?: Record<string, number>,
+): { tris: Float32Array; segs: Float32Array } {
+  const node = graph.find((n) => n.id === nodeId);
+  const feat = node && FEATURE_SEL[node.type];
+  if (!node || !feat) return EMPTY_HL();
+  const { outputs } = cache ? evalGraphCached(graph, cache, vars) : evalGraph(graph, vars);
+  const byId = new Map(graph.map((n) => [n.id, n]));
+  const evalNode = (id: string): GraphValue => {
+    const o = outputs[id];
+    if (!o) throw new Error(`unknown node ${id}`);
+    return o;
+  };
+  const inRef = node.inputs?.in;
+  if (!inRef) return EMPTY_HL();
+  let inSolid: Shape3D;
+  try {
+    const inV = resolvePort(inRef, byId, evalNode);
+    if (inV.kind !== "solid") return EMPTY_HL();
+    inSolid = inV.solid;
+  } catch { return EMPTY_HL(); }
+
+  const selRef = node.inputs?.[feat.port];
+  let sel: Extract<GraphValue, { kind: "selection" }> | null = null;
+  if (selRef != null) {
+    try { const sv = resolvePort(selRef, byId, evalNode); if (sv.kind === "selection") sel = sv; } catch { /* unresolved → treat as none */ }
   }
-  return { tris: new Float32Array(0), segs: new Float32Array(segs) };
+
+  try {
+    if (feat.kind === "edge") {
+      let edges: Edge[];
+      if (sel?.ref?.kind === "edge") { const e = rebindEdge(inSolid, sel.ref as Extract<SelRef, { kind: "edge" }>); edges = e ? [e] : []; }
+      else if (sel) edges = (sel.apply(new EdgeFinder()) as EdgeFinder).find(inSolid as Parameters<EdgeFinder["find"]>[0]) as Edge[];
+      else edges = (inSolid as unknown as { edges: Edge[] }).edges; // fillet-all
+      return { tris: new Float32Array(0), segs: edgesToSegs(edges) };
+    }
+    meshSolid(inSolid);
+    let faces: Face[] = [];
+    if (sel?.ref?.kind === "face") { const f = rebindFace(inSolid, sel.ref as Extract<SelRef, { kind: "face" }>); faces = f ? [f] : []; }
+    else if (sel) faces = (sel.apply(new FaceFinder()) as FaceFinder).find(inSolid as Parameters<FaceFinder["find"]>[0]) as Face[];
+    return { tris: facesToTris(faces), segs: new Float32Array(0) };
+  } catch { return EMPTY_HL(); }
 }
 
 /** Export the displayed node as SVG (2D profiles only). Curves are preserved. */

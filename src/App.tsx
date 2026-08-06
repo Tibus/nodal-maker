@@ -198,6 +198,20 @@ export default function App() {
     viewportRef.current?.setClip(clipAxis, clipPos, clipFlip);
   }, [clipAxis, clipPos, clipFlip]);
 
+  // highlight the feature a modifier node acts on, when it's selected
+  const onFeaturePreview = useCallback((nodeId: string | null) => {
+    window.clearTimeout(portHoverTimer.current);
+    if (!nodeId) { viewportRef.current?.clearPortHighlight(); return; }
+    portHoverTimer.current = window.setTimeout(async () => {
+      const g = lastGraph.current;
+      if (!g) return;
+      try {
+        const r = await kernel.describeFeature(g, nodeId, lastVars.current);
+        viewportRef.current?.showPortHighlight(r.tris, r.segs);
+      } catch { /* ignore */ }
+    }, 40);
+  }, []);
+
   // highlight the geometry a node's selection-output port targets, on hover
   const onPortHover = useCallback((info: { nodeId: string; port: string } | null) => {
     window.clearTimeout(portHoverTimer.current);
@@ -282,6 +296,7 @@ export default function App() {
         }}
         onSelectPreview={(desc) => viewportRef.current?.setSelectionPreview(desc)}
         onPortHover={onPortHover}
+        onFeaturePreview={onFeaturePreview}
         onFit={() => viewportRef.current?.fit()}
         onTopView={() => viewportRef.current?.topView()}
         onExportPNG={() => {

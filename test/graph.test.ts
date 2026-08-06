@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { initKernel } from "./kernel";
-import { evalToPayload, describePortGeometry } from "../src/kernel/model";
+import { evalToPayload, describePortGeometry, describeFeatureGeometry } from "../src/kernel/model";
 import { meshMassProps } from "../src/massprops";
 import { evalGraphCached, makeEvalCache, meshAndTag, type Graph } from "../src/kernel/nodes";
 
@@ -121,6 +121,23 @@ describe("graph evaluation (real geometry)", () => {
     const vedges = describePortGeometry(g, "b", "b", "verticalEdges");
     expect(vedges.segs.length).toBeGreaterThan(0); // the 4 vertical edges as polylines
     expect(vedges.tris.length).toBe(0);
+  });
+
+  it("describeFeature returns the edges a fillet acts on", () => {
+    const g: Graph = [
+      { id: "b", type: "box", params: { x: 20, y: 20, z: 20 }, inputs: {} },
+      { id: "s", type: "edgeSelect", params: { where: "atZ", offset: 20 }, inputs: {} },
+      { id: "f", type: "fillet", params: { radius: 2 }, inputs: { in: "b", sel: "s" } },
+    ];
+    const withSel = describeFeatureGeometry(g, "f");
+    expect(withSel.segs.length).toBeGreaterThan(0); // the top 4 edges as polylines
+    expect(withSel.tris.length).toBe(0);
+    // no selection → fillet targets every edge (still non-empty)
+    const g2: Graph = [
+      { id: "b", type: "box", params: { x: 20, y: 20, z: 20 }, inputs: {} },
+      { id: "f", type: "fillet", params: { radius: 2 }, inputs: { in: "b" } },
+    ];
+    expect(describeFeatureGeometry(g2, "f").segs.length).toBeGreaterThan(0);
   });
 
   it("a cone exposes named selection ports (fillet its base rim)", () => {
