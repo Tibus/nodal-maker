@@ -6,6 +6,10 @@ committing to the full build.
 
 ![PoC screenshot](./poc-screenshot.png)
 
+> **📐 Full architecture & how it works:** [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
+> — the node graph engine, the two geometry kernels, the constraint solver, the
+> viewport, the Simple/Expert configurator, exports, thumbnails, build/test/deploy.
+
 ## What this proves
 
 1. **SVG pipeline** — an SVG `<path d="…">` is parsed and turned into a 2D
