@@ -264,8 +264,11 @@ export function buildNutBRep(
   body: Shape3D, diameter: number, pitch: number, clearance: number, lefthand: boolean,
   /** Optional placement from a picked cylindrical face: a base point on the bore
    *  axis (its low end), the axis direction, and the threaded length. Without it
-   *  the bore sits on the world Z axis at the origin, spanning the body's height. */
-  place?: { center: [number, number, number]; axis: [number, number, number]; length: number },
+   *  the bore sits on the world Z axis at the origin, spanning the body's height.
+   *  `fillRadius` plugs the picked hole first (fuse a cylinder of that radius) so
+   *  the thread is re-cut at the requested `diameter` regardless of the hole's
+   *  original size — "delete the face, recreate its hole at the standard Ø". */
+  place?: { center: [number, number, number]; axis: [number, number, number]; length: number; fillRadius?: number },
 ): Shape3D {
   const p = Math.max(0.2, pitch);
   const depth = p * 0.613;
@@ -303,8 +306,15 @@ export function buildNutBRep(
     }
     return r.translate(place.center) as Shape3D;
   };
+  // plug the picked hole first (fuse a cylinder spanning it) so the thread can be
+  // re-cut at the requested Ø even if it differs from the hole's original size
+  let target = body;
+  if (place.fillRadius && place.fillRadius > 0) {
+    const fill = orient(makeCylinder(place.fillRadius, L) as Shape3D); // no axial overhang → flush with the ends
+    target = target.fuse(fill) as Shape3D;
+  }
   const boreLocal = (makeCylinder(rBore, L + 4) as Shape3D).clone().translate(0, 0, -2) as Shape3D;
-  const bodyWithHole = body.cut(orient(boreLocal)) as Shape3D;
+  const bodyWithHole = target.cut(orient(boreLocal)) as Shape3D;
   const ridge = orient(sweepHelicalRidge(rOuter, profile, p, L, lefthand, 0));
   return makeCompound([bodyWithHole, ridge]) as Shape3D;
 }

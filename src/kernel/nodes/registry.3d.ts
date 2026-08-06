@@ -102,8 +102,13 @@ export const nodes3d: Record<string, NodeImpl> = {
       const faces = ff.find(body as Parameters<FaceFinder["find"]>[0]) as Face[];
       const bores = faces.map(cylinderFromFace).filter((c): c is NonNullable<typeof c> => c != null);
       if (!bores.length) throw new Error("[internalThread] the selected face is not a cylindrical bore");
+      // Use the STANDARD (or custom) Ø, only borrowing the face's location/axis:
+      // plug the existing hole and re-cut it at the nominal diameter there.
+      const diameter = preset ? preset.diameter : Number(params.diameter ?? 16);
       let out = body;
-      for (const b of bores) out = buildNutBRep(out, b.radius * 2, pitch, clearance, lefthand, b);
+      for (const b of bores) {
+        out = buildNutBRep(out, diameter, pitch, clearance, lefthand, { center: b.center, axis: b.axis, length: b.length, fillRadius: b.radius + 0.15 });
+      }
       return { kind: "solid", solid: out };
     }
 

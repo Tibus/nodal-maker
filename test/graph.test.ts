@@ -86,6 +86,14 @@ describe("graph evaluation (real geometry)", () => {
     const bored = evalToPayload(g, "bored").mesh.indices.length / 3;
     const threaded = evalToPayload(g, "t").mesh.indices.length / 3;
     expect(threaded).toBeGreaterThan(bored); // helical ridge cut into the selected bore
+
+    // override Ø: an M6 thread on the Ø12 bore plugs the hole and re-cuts it at
+    // the standard Ø6 → strictly LESS material removed than the raw Ø12 bore
+    const gStd: Graph = [
+      ...g.slice(0, 5),
+      { id: "t", type: "internalThread", params: { standard: "M6" }, inputs: { in: "bored", face: "fs" } },
+    ];
+    expect(volumeOf(gStd, "t")).toBeGreaterThan(volumeOf(g, "bored"));
   });
 
   it("a fillet accepts several selection nodes (union of edges)", () => {
