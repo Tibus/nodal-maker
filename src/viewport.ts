@@ -43,6 +43,7 @@ export class Viewport {
   // section-cap: fills the cut surface via the stencil buffer (a solid section,
   // not a hollow hole). Holds two stencil passes + the cap plane.
   private capGroup: THREE.Group | null = null;
+  private outlineObj: THREE.LineSegments | null = null;
   // flat fill for 2D sketch previews (double-sided so it shows from any angle)
   private sketchMat = new THREE.MeshBasicMaterial({ color: 0xc678dd, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false });
   // 3D translation gizmo (edits a Transform node's tx/ty/tz)
@@ -378,6 +379,53 @@ export class Viewport {
       if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) (o.material as THREE.Material).clippingPlanes = planes;
     });
     this.buildCap();
+    this.buildSectionOutline();
+  }
+
+  private clearOutline() {
+    if (!this.outlineObj) return;
+    this.scene.remove(this.outlineObj);
+    this.outlineObj.geometry.dispose();
+    (this.outlineObj.material as THREE.Material).dispose();
+    this.outlineObj = null;
+  }
+
+  /**
+   * The section outline: for every mesh triangle the clip plane crosses, add the
+   * segment where the plane cuts it. Together they trace the exact cross-section
+   * boundary — a crisp wireframe on the cut, recomputed as the plane moves.
+   */
+  private buildSectionOutline() {
+    this.clearOutline();
+    if (!this.mesh || this.clip.length === 0 || this.isSketchView) return;
+    const plane = this.clip[0];
+    const geom = this.mesh.geometry;
+    const pos = geom.getAttribute("position") as THREE.BufferAttribute;
+    const index = geom.getIndex();
+    const count = index ? index.count : pos.count;
+    const vi = (i: number) => (index ? index.getX(i) : i);
+    const pts: number[] = [];
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    const eps = this.modelDiag * 0.0015; // lift toward the viewer so it beats the cap fill
+    const edge = (p: THREE.Vector3, dp: number, q: THREE.Vector3, dq: number) => {
+      if ((dp < 0) === (dq < 0)) return; // no sign change → plane doesn't cross this edge
+      const t = dp / (dp - dq);
+      pts.push(p.x + (q.x - p.x) * t - plane.normal.x * eps, p.y + (q.y - p.y) * t - plane.normal.y * eps, p.z + (q.z - p.z) * t - plane.normal.z * eps);
+    };
+    for (let t = 0; t + 2 < count; t += 3) {
+      a.fromBufferAttribute(pos, vi(t)); b.fromBufferAttribute(pos, vi(t + 1)); c.fromBufferAttribute(pos, vi(t + 2));
+      const da = plane.distanceToPoint(a), db = plane.distanceToPoint(b), dc = plane.distanceToPoint(c);
+      const before = pts.length;
+      edge(a, da, b, db); edge(b, db, c, dc); edge(c, dc, a, da);
+      if (pts.length - before !== 6) pts.length = before; // keep only clean 2-point crossings
+    }
+    if (!pts.length) return;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
+    const line = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xffcc00 }));
+    line.renderOrder = 3;
+    this.scene.add(line);
+    this.outlineObj = line;
   }
 
   private clearCap() {
