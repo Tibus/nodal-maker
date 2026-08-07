@@ -1,0 +1,214 @@
+/**
+ * Generate complex bundled examples: build each graph in code, EVALUATE it with
+ * the real kernel to guarantee it produces valid geometry (no node errors), lay
+ * it out in Sugiyama-style columns, then emit examples/<name>.json in the app's
+ * SceneDoc format. Run with:  npx vite-node scripts/gen-examples.ts
+ */
+import { writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+import { initKernel } from "../test/kernel";
+import { evalToPayload } from "../src/kernel/model";
+import { NODE_SPECS, SOCKET_COLORS } from "../src/kernel/specs";
+import type { Graph } from "../src/kernel/nodes";
+
+type In = Record<string, string | string[]>;
+interface N { id: string; type: string; params?: Record<string, unknown>; inputs?: In }
+interface Ex { name: string; title: string; outputId: string; nodes: N[] }
+
+/* ------------------------------------------------------------------ */
+/* Example definitions                                                 */
+/* ------------------------------------------------------------------ */
+
+const EXAMPLES: Ex[] = [];
+
+// 1) Gearbox faceplate — a round flange with a raised hub, pilot bore + keyway,
+//    6 counterbored bolt holes (polar), 4 gusset ribs, and rounded rims.
+EXAMPLES.push({
+  name: "gearbox-faceplate",
+  title: "Gearbox faceplate — hub, keyed pilot bore, 6 counterbored bolts, 4 ribs",
+  outputId: "final",
+  nodes: [
+    { id: "plate", type: "cylinder", params: { radius: 60, height: 10 } },
+    { id: "rimTop", type: "edgeSelect", params: { where: "atZ", offset: 10 } },
+    { id: "plateF", type: "fillet", params: { radius: 3 }, inputs: { in: "plate", sel: "rimTop" } },
+    { id: "rimBot", type: "edgeSelect", params: { where: "atZ", offset: 0 } },
+    { id: "plateB", type: "bevel", params: { distance: 1.5 }, inputs: { in: "plateF", sel: "rimBot" } },
+    { id: "hub", type: "cylinder", params: { radius: 22, height: 24 } },
+    { id: "withHub", type: "boolean3d", params: { op: "union" }, inputs: { base: "plateB", tool: "hub" } },
+    { id: "pilot", type: "cylinder", params: { radius: 12, height: 60 } },
+    { id: "pilotP", type: "transform", params: { tz: -10 }, inputs: { in: "pilot" } },
+    { id: "bored", type: "boolean3d", params: { op: "difference" }, inputs: { base: "withHub", tool: "pilotP" } },
+    { id: "key", type: "box", params: { x: 5, y: 8, z: 60 } },
+    { id: "keyP", type: "transform", params: { ty: 13 }, inputs: { in: "key" } },
+    { id: "keyed", type: "boolean3d", params: { op: "difference" }, inputs: { base: "bored", tool: "keyP" } },
+    { id: "bolt", type: "cylinder", params: { radius: 3.5, height: 60 } },
+    { id: "boltP", type: "transform", params: { tx: 46, tz: -10 }, inputs: { in: "bolt" } },
+    { id: "boltA", type: "arrayRadial3d", params: { count: 6, angle: 360 }, inputs: { in: "boltP" } },
+    { id: "d1", type: "boolean3d", params: { op: "difference" }, inputs: { base: "keyed", tool: "boltA" } },
+    { id: "cbore", type: "cylinder", params: { radius: 7, height: 8 } },
+    { id: "cboreP", type: "transform", params: { tx: 46, tz: 4 }, inputs: { in: "cbore" } },
+    { id: "cboreA", type: "arrayRadial3d", params: { count: 6, angle: 360 }, inputs: { in: "cboreP" } },
+    { id: "d2", type: "boolean3d", params: { op: "difference" }, inputs: { base: "d1", tool: "cboreA" } },
+    { id: "rib", type: "box", params: { x: 4, y: 34, z: 16 } },
+    { id: "ribP", type: "transform", params: { ty: 40, tz: 3 }, inputs: { in: "rib" } },
+    { id: "ribA", type: "arrayRadial3d", params: { count: 4, angle: 360 }, inputs: { in: "ribP" } },
+    { id: "final", type: "boolean3d", params: { op: "union" }, inputs: { base: "d2", tool: "ribA" } },
+  ],
+});
+
+// 2) Radial impeller — showcases the new Axis node: the rotation axis is DERIVED
+//    from the hub's cylindrical face, then feeds Array Radial to spin the blades.
+EXAMPLES.push({
+  name: "radial-impeller",
+  title: "Radial impeller — 9 blades spun about an axis derived from the hub's cylindrical face",
+  outputId: "final",
+  nodes: [
+    { id: "hub", type: "cylinder", params: { radius: 12, height: 34 } },
+    { id: "blade", type: "box", params: { x: 3, y: 22, z: 26 } },
+    { id: "bladeP", type: "transform", params: { tx: 18, tz: 5 }, inputs: { in: "blade" } },
+    { id: "bladeT", type: "rotate3d", params: { axis: "Z", angle: 26 }, inputs: { in: "bladeP" } },
+    { id: "hubFace", type: "faceSelect", params: { where: "cylindrical" } },
+    { id: "spin", type: "axis", params: {}, inputs: { on: "hub", face: "hubFace" } },
+    { id: "blades", type: "arrayRadial3d", params: { count: 9, angle: 360 }, inputs: { in: "bladeT", axis: "spin" } },
+    { id: "wheel", type: "boolean3d", params: { op: "union" }, inputs: { base: "hub", tool: "blades" } },
+    { id: "bore", type: "cylinder", params: { radius: 4, height: 50 } },
+    { id: "boreP", type: "transform", params: { tz: -8 }, inputs: { in: "bore" } },
+    { id: "bored", type: "boolean3d", params: { op: "difference" }, inputs: { base: "wheel", tool: "boreP" } },
+    { id: "rim", type: "edgeSelect", params: { where: "atZ", offset: 34 } },
+    { id: "final", type: "fillet", params: { radius: 1.5 }, inputs: { in: "bored", sel: "rim" } },
+  ],
+});
+
+// 3) Vented lid — rounded plate, a linear array of ventilation slots, and four
+//    corner screw holes (two crossed linear arrays).
+EXAMPLES.push({
+  name: "vented-lid",
+  title: "Vented lid — rounded plate, 13 vent slots, 4 corner screw holes",
+  outputId: "final",
+  nodes: [
+    { id: "lid", type: "box", params: { x: 80, y: 60, z: 6 } },
+    { id: "vEdges", type: "edgeSelect", params: { where: "vertical" } },
+    { id: "lidF", type: "fillet", params: { radius: 6 }, inputs: { in: "lid", sel: "vEdges" } },
+    { id: "vent", type: "box", params: { x: 3, y: 36, z: 20 } },
+    { id: "ventP", type: "transform", params: { tx: -30 }, inputs: { in: "vent" } },
+    { id: "vents", type: "arrayLinear3d", params: { count: 13, dx: 5, dy: 0, dz: 0 }, inputs: { in: "ventP" } },
+    { id: "vented", type: "boolean3d", params: { op: "difference" }, inputs: { base: "lidF", tool: "vents" } },
+    { id: "hole", type: "cylinder", params: { radius: 2, height: 20 } },
+    { id: "holeP", type: "transform", params: { tx: -34, ty: -24, tz: -10 }, inputs: { in: "hole" } },
+    { id: "holeRow", type: "arrayLinear3d", params: { count: 2, dx: 68, dy: 0, dz: 0 }, inputs: { in: "holeP" } },
+    { id: "holeGrid", type: "arrayLinear3d", params: { count: 2, dx: 0, dy: 48, dz: 0 }, inputs: { in: "holeRow" } },
+    { id: "final", type: "boolean3d", params: { op: "difference" }, inputs: { base: "vented", tool: "holeGrid" } },
+  ],
+});
+
+// 4) Junction manifold block — a rounded block cross-drilled on all three axes
+//    (a 3-way port), a top counterbore, four corner mounting holes, and two side
+//    bosses around the Y port. Deep boolean chain — lots of nodes.
+EXAMPLES.push({
+  name: "manifold-block",
+  title: "Junction manifold — 3-axis cross bores, counterbore, 4 mounts, 2 side bosses",
+  outputId: "final",
+  nodes: [
+    { id: "block", type: "box", params: { x: 80, y: 50, z: 40 } },
+    { id: "vE", type: "edgeSelect", params: { where: "vertical" } },
+    { id: "blockF", type: "fillet", params: { radius: 8 }, inputs: { in: "block", sel: "vE" } },
+    // Z through bore
+    { id: "zc", type: "cylinder", params: { radius: 7, height: 60 } },
+    { id: "zcC", type: "transform", params: { tz: -30 }, inputs: { in: "zc" } },
+    { id: "b1", type: "boolean3d", params: { op: "difference" }, inputs: { base: "blockF", tool: "zcC" } },
+    // X cross bore (centre the cylinder, then lay it along X)
+    { id: "xc", type: "cylinder", params: { radius: 5, height: 100 } },
+    { id: "xcC", type: "transform", params: { tz: -50 }, inputs: { in: "xc" } },
+    { id: "xcR", type: "rotate3d", params: { axis: "Y", angle: 90 }, inputs: { in: "xcC" } },
+    { id: "b2", type: "boolean3d", params: { op: "difference" }, inputs: { base: "b1", tool: "xcR" } },
+    // Y cross bore
+    { id: "yc", type: "cylinder", params: { radius: 5, height: 100 } },
+    { id: "ycC", type: "transform", params: { tz: -50 }, inputs: { in: "yc" } },
+    { id: "ycR", type: "rotate3d", params: { axis: "X", angle: 90 }, inputs: { in: "ycC" } },
+    { id: "b3", type: "boolean3d", params: { op: "difference" }, inputs: { base: "b2", tool: "ycR" } },
+    // top counterbore for the Z port
+    { id: "cb", type: "cylinder", params: { radius: 11, height: 10 } },
+    { id: "cbC", type: "transform", params: { tz: 13 }, inputs: { in: "cb" } },
+    { id: "b4", type: "boolean3d", params: { op: "difference" }, inputs: { base: "b3", tool: "cbC" } },
+    // 4 corner mounting holes (two crossed linear arrays)
+    { id: "mh", type: "cylinder", params: { radius: 3, height: 60 } },
+    { id: "mhC", type: "transform", params: { tx: -34, ty: -19, tz: -30 }, inputs: { in: "mh" } },
+    { id: "mhRow", type: "arrayLinear3d", params: { count: 2, dx: 68, dy: 0, dz: 0 }, inputs: { in: "mhC" } },
+    { id: "mhGrid", type: "arrayLinear3d", params: { count: 2, dx: 0, dy: 38, dz: 0 }, inputs: { in: "mhRow" } },
+    { id: "b5", type: "boolean3d", params: { op: "difference" }, inputs: { base: "b4", tool: "mhGrid" } },
+    // two bosses around the Y port (one per Y face), then re-open the port
+    { id: "boss", type: "cylinder", params: { radius: 9, height: 6 } },
+    { id: "bossC", type: "transform", params: { tz: -3 }, inputs: { in: "boss" } },
+    { id: "bossR", type: "rotate3d", params: { axis: "X", angle: 90 }, inputs: { in: "bossC" } },
+    { id: "bossP", type: "transform", params: { ty: 25 }, inputs: { in: "bossR" } },
+    { id: "bosses", type: "arrayLinear3d", params: { count: 2, dx: 0, dy: -50, dz: 0 }, inputs: { in: "bossP" } },
+    { id: "b6", type: "boolean3d", params: { op: "union" }, inputs: { base: "b5", tool: "bosses" } },
+    { id: "final", type: "boolean3d", params: { op: "difference" }, inputs: { base: "b6", tool: "ycR" } },
+  ],
+});
+
+/* ------------------------------------------------------------------ */
+/* Build → validate → layout → emit                                    */
+/* ------------------------------------------------------------------ */
+
+const toGraph = (nodes: N[]): Graph =>
+  nodes.map((n) => ({ id: n.id, type: n.type, params: n.params ?? {}, inputs: (n.inputs ?? {}) as Graph[number]["inputs"] }));
+
+// longest-path layered layout so the emitted example opens tidy
+function layout(nodes: N[]): Map<string, { x: number; y: number }> {
+  const ids = new Set(nodes.map((n) => n.id));
+  const preds = new Map<string, string[]>(nodes.map((n) => [n.id, []]));
+  const succ = new Map<string, string[]>(nodes.map((n) => [n.id, []]));
+  for (const n of nodes)
+    for (const v of Object.values(n.inputs ?? {}))
+      for (const s of Array.isArray(v) ? v : [v]) if (ids.has(s)) { preds.get(n.id)!.push(s); succ.get(s)!.push(n.id); }
+  const indeg = new Map(nodes.map((n) => [n.id, preds.get(n.id)!.length]));
+  const layer = new Map(nodes.map((n) => [n.id, 0]));
+  const q = nodes.filter((n) => indeg.get(n.id) === 0).map((n) => n.id);
+  while (q.length) {
+    const id = q.shift()!;
+    for (const t of succ.get(id)!) {
+      layer.set(t, Math.max(layer.get(t)!, layer.get(id)! + 1));
+      indeg.set(t, indeg.get(t)! - 1);
+      if (indeg.get(t) === 0) q.push(t);
+    }
+  }
+  const cols = new Map<number, string[]>();
+  for (const n of nodes) { const l = layer.get(n.id)!; (cols.get(l) ?? cols.set(l, []).get(l)!).push(n.id); }
+  const pos = new Map<string, { x: number; y: number }>();
+  for (const [l, col] of cols) col.forEach((id, i) => pos.set(id, { x: l * 260, y: i * 150 }));
+  return pos;
+}
+
+function toDoc(ex: Ex) {
+  const pos = layout(ex.nodes);
+  const nodes = ex.nodes.map((n) => ({ id: n.id, position: pos.get(n.id)!, data: { nodeType: n.type, params: n.params ?? {} } }));
+  const edges: unknown[] = [];
+  let e = 0;
+  for (const n of ex.nodes)
+    for (const [port, v] of Object.entries(n.inputs ?? {}))
+      for (const src of Array.isArray(v) ? v : [v]) {
+        const srcType = ex.nodes.find((x) => x.id === src)!.type;
+        const stroke = SOCKET_COLORS[NODE_SPECS[srcType].output];
+        edges.push({ id: `e${e++}`, source: src, sourceHandle: "out", target: n.id, targetHandle: port, style: { stroke } });
+      }
+  return { version: 1, title: ex.title, outputId: ex.outputId, nodes, edges };
+}
+
+async function main() {
+  await initKernel();
+  const outDir = join(dirname(fileURLToPath(import.meta.url)), "..", "examples");
+  for (const ex of EXAMPLES) {
+    const res = evalToPayload(toGraph(ex.nodes), ex.outputId);
+    const errs = res.nodeErrors ?? {};
+    const nErr = Object.keys(errs).length;
+    const tris = res.mesh ? res.mesh.indices.length / 3 : 0;
+    if (nErr > 0) { console.error(`❌ ${ex.name}: ${nErr} node error(s):`, errs); process.exitCode = 1; continue; }
+    if (tris < 12) { console.error(`❌ ${ex.name}: suspiciously empty (${tris} tris)`); process.exitCode = 1; continue; }
+    writeFileSync(join(outDir, `${ex.name}.json`), JSON.stringify(toDoc(ex), null, 2) + "\n");
+    console.log(`✅ ${ex.name}: ${ex.nodes.length} nodes, ${tris} tris → examples/${ex.name}.json`);
+  }
+}
+
+main();

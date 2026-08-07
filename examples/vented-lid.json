@@ -1,0 +1,291 @@
+{
+  "version": 1,
+  "title": "Vented lid — rounded plate, 13 vent slots, 4 corner screw holes",
+  "outputId": "final",
+  "nodes": [
+    {
+      "id": "lid",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "box",
+        "params": {
+          "x": 80,
+          "y": 60,
+          "z": 6
+        }
+      }
+    },
+    {
+      "id": "vEdges",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "edgeSelect",
+        "params": {
+          "where": "vertical"
+        }
+      }
+    },
+    {
+      "id": "lidF",
+      "position": {
+        "x": 260,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "fillet",
+        "params": {
+          "radius": 6
+        }
+      }
+    },
+    {
+      "id": "vent",
+      "position": {
+        "x": 0,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "box",
+        "params": {
+          "x": 3,
+          "y": 36,
+          "z": 20
+        }
+      }
+    },
+    {
+      "id": "ventP",
+      "position": {
+        "x": 260,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": -30
+        }
+      }
+    },
+    {
+      "id": "vents",
+      "position": {
+        "x": 520,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "arrayLinear3d",
+        "params": {
+          "count": 13,
+          "dx": 5,
+          "dy": 0,
+          "dz": 0
+        }
+      }
+    },
+    {
+      "id": "vented",
+      "position": {
+        "x": 780,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "hole",
+      "position": {
+        "x": 0,
+        "y": 450
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 2,
+          "height": 20
+        }
+      }
+    },
+    {
+      "id": "holeP",
+      "position": {
+        "x": 260,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": -34,
+          "ty": -24,
+          "tz": -10
+        }
+      }
+    },
+    {
+      "id": "holeRow",
+      "position": {
+        "x": 520,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "arrayLinear3d",
+        "params": {
+          "count": 2,
+          "dx": 68,
+          "dy": 0,
+          "dz": 0
+        }
+      }
+    },
+    {
+      "id": "holeGrid",
+      "position": {
+        "x": 780,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "arrayLinear3d",
+        "params": {
+          "count": 2,
+          "dx": 0,
+          "dy": 48,
+          "dz": 0
+        }
+      }
+    },
+    {
+      "id": "final",
+      "position": {
+        "x": 1040,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "lid",
+      "sourceHandle": "out",
+      "target": "lidF",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "vEdges",
+      "sourceHandle": "out",
+      "target": "lidF",
+      "targetHandle": "sel",
+      "style": {
+        "stroke": "#d19a66"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "vent",
+      "sourceHandle": "out",
+      "target": "ventP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "ventP",
+      "sourceHandle": "out",
+      "target": "vents",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "lidF",
+      "sourceHandle": "out",
+      "target": "vented",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e5",
+      "source": "vents",
+      "sourceHandle": "out",
+      "target": "vented",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e6",
+      "source": "hole",
+      "sourceHandle": "out",
+      "target": "holeP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e7",
+      "source": "holeP",
+      "sourceHandle": "out",
+      "target": "holeRow",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e8",
+      "source": "holeRow",
+      "sourceHandle": "out",
+      "target": "holeGrid",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e9",
+      "source": "vented",
+      "sourceHandle": "out",
+      "target": "final",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e10",
+      "source": "holeGrid",
+      "sourceHandle": "out",
+      "target": "final",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    }
+  ]
+}

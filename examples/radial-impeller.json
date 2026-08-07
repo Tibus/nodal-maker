@@ -1,0 +1,314 @@
+{
+  "version": 1,
+  "title": "Radial impeller — 9 blades spun about an axis derived from the hub's cylindrical face",
+  "outputId": "final",
+  "nodes": [
+    {
+      "id": "hub",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 12,
+          "height": 34
+        }
+      }
+    },
+    {
+      "id": "blade",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "box",
+        "params": {
+          "x": 3,
+          "y": 22,
+          "z": 26
+        }
+      }
+    },
+    {
+      "id": "bladeP",
+      "position": {
+        "x": 260,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 18,
+          "tz": 5
+        }
+      }
+    },
+    {
+      "id": "bladeT",
+      "position": {
+        "x": 520,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "rotate3d",
+        "params": {
+          "axis": "Z",
+          "angle": 26
+        }
+      }
+    },
+    {
+      "id": "hubFace",
+      "position": {
+        "x": 0,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "faceSelect",
+        "params": {
+          "where": "cylindrical"
+        }
+      }
+    },
+    {
+      "id": "spin",
+      "position": {
+        "x": 260,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "axis",
+        "params": {}
+      }
+    },
+    {
+      "id": "blades",
+      "position": {
+        "x": 780,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "arrayRadial3d",
+        "params": {
+          "count": 9,
+          "angle": 360
+        }
+      }
+    },
+    {
+      "id": "wheel",
+      "position": {
+        "x": 1040,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "union"
+        }
+      }
+    },
+    {
+      "id": "bore",
+      "position": {
+        "x": 0,
+        "y": 450
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 4,
+          "height": 50
+        }
+      }
+    },
+    {
+      "id": "boreP",
+      "position": {
+        "x": 260,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tz": -8
+        }
+      }
+    },
+    {
+      "id": "bored",
+      "position": {
+        "x": 1300,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "rim",
+      "position": {
+        "x": 0,
+        "y": 600
+      },
+      "data": {
+        "nodeType": "edgeSelect",
+        "params": {
+          "where": "atZ",
+          "offset": 34
+        }
+      }
+    },
+    {
+      "id": "final",
+      "position": {
+        "x": 1560,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "fillet",
+        "params": {
+          "radius": 1.5
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "blade",
+      "sourceHandle": "out",
+      "target": "bladeP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "bladeP",
+      "sourceHandle": "out",
+      "target": "bladeT",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "hub",
+      "sourceHandle": "out",
+      "target": "spin",
+      "targetHandle": "on",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "hubFace",
+      "sourceHandle": "out",
+      "target": "spin",
+      "targetHandle": "face",
+      "style": {
+        "stroke": "#61afef"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "bladeT",
+      "sourceHandle": "out",
+      "target": "blades",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e5",
+      "source": "spin",
+      "sourceHandle": "out",
+      "target": "blades",
+      "targetHandle": "axis",
+      "style": {
+        "stroke": "#e06c75"
+      }
+    },
+    {
+      "id": "e6",
+      "source": "hub",
+      "sourceHandle": "out",
+      "target": "wheel",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e7",
+      "source": "blades",
+      "sourceHandle": "out",
+      "target": "wheel",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e8",
+      "source": "bore",
+      "sourceHandle": "out",
+      "target": "boreP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e9",
+      "source": "wheel",
+      "sourceHandle": "out",
+      "target": "bored",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e10",
+      "source": "boreP",
+      "sourceHandle": "out",
+      "target": "bored",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e11",
+      "source": "bored",
+      "sourceHandle": "out",
+      "target": "final",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e12",
+      "source": "rim",
+      "sourceHandle": "out",
+      "target": "final",
+      "targetHandle": "sel",
+      "style": {
+        "stroke": "#d19a66"
+      }
+    }
+  ]
+}

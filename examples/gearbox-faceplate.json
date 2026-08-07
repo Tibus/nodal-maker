@@ -1,0 +1,591 @@
+{
+  "version": 1,
+  "title": "Gearbox faceplate — hub, keyed pilot bore, 6 counterbored bolts, 4 ribs",
+  "outputId": "final",
+  "nodes": [
+    {
+      "id": "plate",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 60,
+          "height": 10
+        }
+      }
+    },
+    {
+      "id": "rimTop",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "edgeSelect",
+        "params": {
+          "where": "atZ",
+          "offset": 10
+        }
+      }
+    },
+    {
+      "id": "plateF",
+      "position": {
+        "x": 260,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "fillet",
+        "params": {
+          "radius": 3
+        }
+      }
+    },
+    {
+      "id": "rimBot",
+      "position": {
+        "x": 0,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "edgeSelect",
+        "params": {
+          "where": "atZ",
+          "offset": 0
+        }
+      }
+    },
+    {
+      "id": "plateB",
+      "position": {
+        "x": 520,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "bevel",
+        "params": {
+          "distance": 1.5
+        }
+      }
+    },
+    {
+      "id": "hub",
+      "position": {
+        "x": 0,
+        "y": 450
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 22,
+          "height": 24
+        }
+      }
+    },
+    {
+      "id": "withHub",
+      "position": {
+        "x": 780,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "union"
+        }
+      }
+    },
+    {
+      "id": "pilot",
+      "position": {
+        "x": 0,
+        "y": 600
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 12,
+          "height": 60
+        }
+      }
+    },
+    {
+      "id": "pilotP",
+      "position": {
+        "x": 260,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tz": -10
+        }
+      }
+    },
+    {
+      "id": "bored",
+      "position": {
+        "x": 1040,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "key",
+      "position": {
+        "x": 0,
+        "y": 750
+      },
+      "data": {
+        "nodeType": "box",
+        "params": {
+          "x": 5,
+          "y": 8,
+          "z": 60
+        }
+      }
+    },
+    {
+      "id": "keyP",
+      "position": {
+        "x": 260,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "ty": 13
+        }
+      }
+    },
+    {
+      "id": "keyed",
+      "position": {
+        "x": 1300,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "bolt",
+      "position": {
+        "x": 0,
+        "y": 900
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 3.5,
+          "height": 60
+        }
+      }
+    },
+    {
+      "id": "boltP",
+      "position": {
+        "x": 260,
+        "y": 450
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 46,
+          "tz": -10
+        }
+      }
+    },
+    {
+      "id": "boltA",
+      "position": {
+        "x": 520,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "arrayRadial3d",
+        "params": {
+          "count": 6,
+          "angle": 360
+        }
+      }
+    },
+    {
+      "id": "d1",
+      "position": {
+        "x": 1560,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "cbore",
+      "position": {
+        "x": 0,
+        "y": 1050
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 7,
+          "height": 8
+        }
+      }
+    },
+    {
+      "id": "cboreP",
+      "position": {
+        "x": 260,
+        "y": 600
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 46,
+          "tz": 4
+        }
+      }
+    },
+    {
+      "id": "cboreA",
+      "position": {
+        "x": 520,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "arrayRadial3d",
+        "params": {
+          "count": 6,
+          "angle": 360
+        }
+      }
+    },
+    {
+      "id": "d2",
+      "position": {
+        "x": 1820,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "rib",
+      "position": {
+        "x": 0,
+        "y": 1200
+      },
+      "data": {
+        "nodeType": "box",
+        "params": {
+          "x": 4,
+          "y": 34,
+          "z": 16
+        }
+      }
+    },
+    {
+      "id": "ribP",
+      "position": {
+        "x": 260,
+        "y": 750
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "ty": 40,
+          "tz": 3
+        }
+      }
+    },
+    {
+      "id": "ribA",
+      "position": {
+        "x": 520,
+        "y": 450
+      },
+      "data": {
+        "nodeType": "arrayRadial3d",
+        "params": {
+          "count": 4,
+          "angle": 360
+        }
+      }
+    },
+    {
+      "id": "final",
+      "position": {
+        "x": 2080,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "union"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "plate",
+      "sourceHandle": "out",
+      "target": "plateF",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "rimTop",
+      "sourceHandle": "out",
+      "target": "plateF",
+      "targetHandle": "sel",
+      "style": {
+        "stroke": "#d19a66"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "plateF",
+      "sourceHandle": "out",
+      "target": "plateB",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "rimBot",
+      "sourceHandle": "out",
+      "target": "plateB",
+      "targetHandle": "sel",
+      "style": {
+        "stroke": "#d19a66"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "plateB",
+      "sourceHandle": "out",
+      "target": "withHub",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e5",
+      "source": "hub",
+      "sourceHandle": "out",
+      "target": "withHub",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e6",
+      "source": "pilot",
+      "sourceHandle": "out",
+      "target": "pilotP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e7",
+      "source": "withHub",
+      "sourceHandle": "out",
+      "target": "bored",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e8",
+      "source": "pilotP",
+      "sourceHandle": "out",
+      "target": "bored",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e9",
+      "source": "key",
+      "sourceHandle": "out",
+      "target": "keyP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e10",
+      "source": "bored",
+      "sourceHandle": "out",
+      "target": "keyed",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e11",
+      "source": "keyP",
+      "sourceHandle": "out",
+      "target": "keyed",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e12",
+      "source": "bolt",
+      "sourceHandle": "out",
+      "target": "boltP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e13",
+      "source": "boltP",
+      "sourceHandle": "out",
+      "target": "boltA",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e14",
+      "source": "keyed",
+      "sourceHandle": "out",
+      "target": "d1",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e15",
+      "source": "boltA",
+      "sourceHandle": "out",
+      "target": "d1",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e16",
+      "source": "cbore",
+      "sourceHandle": "out",
+      "target": "cboreP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e17",
+      "source": "cboreP",
+      "sourceHandle": "out",
+      "target": "cboreA",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e18",
+      "source": "d1",
+      "sourceHandle": "out",
+      "target": "d2",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e19",
+      "source": "cboreA",
+      "sourceHandle": "out",
+      "target": "d2",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e20",
+      "source": "rib",
+      "sourceHandle": "out",
+      "target": "ribP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e21",
+      "source": "ribP",
+      "sourceHandle": "out",
+      "target": "ribA",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e22",
+      "source": "d2",
+      "sourceHandle": "out",
+      "target": "final",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e23",
+      "source": "ribA",
+      "sourceHandle": "out",
+      "target": "final",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    }
+  ]
+}

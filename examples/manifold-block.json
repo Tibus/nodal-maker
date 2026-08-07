@@ -1,0 +1,698 @@
+{
+  "version": 1,
+  "title": "Junction manifold — 3-axis cross bores, counterbore, 4 mounts, 2 side bosses",
+  "outputId": "final",
+  "nodes": [
+    {
+      "id": "block",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "box",
+        "params": {
+          "x": 80,
+          "y": 50,
+          "z": 40
+        }
+      }
+    },
+    {
+      "id": "vE",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "edgeSelect",
+        "params": {
+          "where": "vertical"
+        }
+      }
+    },
+    {
+      "id": "blockF",
+      "position": {
+        "x": 260,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "fillet",
+        "params": {
+          "radius": 8
+        }
+      }
+    },
+    {
+      "id": "zc",
+      "position": {
+        "x": 0,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 7,
+          "height": 60
+        }
+      }
+    },
+    {
+      "id": "zcC",
+      "position": {
+        "x": 260,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tz": -30
+        }
+      }
+    },
+    {
+      "id": "b1",
+      "position": {
+        "x": 520,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "xc",
+      "position": {
+        "x": 0,
+        "y": 450
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 5,
+          "height": 100
+        }
+      }
+    },
+    {
+      "id": "xcC",
+      "position": {
+        "x": 260,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tz": -50
+        }
+      }
+    },
+    {
+      "id": "xcR",
+      "position": {
+        "x": 520,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "rotate3d",
+        "params": {
+          "axis": "Y",
+          "angle": 90
+        }
+      }
+    },
+    {
+      "id": "b2",
+      "position": {
+        "x": 780,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "yc",
+      "position": {
+        "x": 0,
+        "y": 600
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 5,
+          "height": 100
+        }
+      }
+    },
+    {
+      "id": "ycC",
+      "position": {
+        "x": 260,
+        "y": 450
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tz": -50
+        }
+      }
+    },
+    {
+      "id": "ycR",
+      "position": {
+        "x": 520,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "rotate3d",
+        "params": {
+          "axis": "X",
+          "angle": 90
+        }
+      }
+    },
+    {
+      "id": "b3",
+      "position": {
+        "x": 1040,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "cb",
+      "position": {
+        "x": 0,
+        "y": 750
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 11,
+          "height": 10
+        }
+      }
+    },
+    {
+      "id": "cbC",
+      "position": {
+        "x": 260,
+        "y": 600
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tz": 13
+        }
+      }
+    },
+    {
+      "id": "b4",
+      "position": {
+        "x": 1300,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "mh",
+      "position": {
+        "x": 0,
+        "y": 900
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 3,
+          "height": 60
+        }
+      }
+    },
+    {
+      "id": "mhC",
+      "position": {
+        "x": 260,
+        "y": 750
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": -34,
+          "ty": -19,
+          "tz": -30
+        }
+      }
+    },
+    {
+      "id": "mhRow",
+      "position": {
+        "x": 520,
+        "y": 450
+      },
+      "data": {
+        "nodeType": "arrayLinear3d",
+        "params": {
+          "count": 2,
+          "dx": 68,
+          "dy": 0,
+          "dz": 0
+        }
+      }
+    },
+    {
+      "id": "mhGrid",
+      "position": {
+        "x": 780,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "arrayLinear3d",
+        "params": {
+          "count": 2,
+          "dx": 0,
+          "dy": 38,
+          "dz": 0
+        }
+      }
+    },
+    {
+      "id": "b5",
+      "position": {
+        "x": 1560,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "boss",
+      "position": {
+        "x": 0,
+        "y": 1050
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 9,
+          "height": 6
+        }
+      }
+    },
+    {
+      "id": "bossC",
+      "position": {
+        "x": 260,
+        "y": 900
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tz": -3
+        }
+      }
+    },
+    {
+      "id": "bossR",
+      "position": {
+        "x": 520,
+        "y": 600
+      },
+      "data": {
+        "nodeType": "rotate3d",
+        "params": {
+          "axis": "X",
+          "angle": 90
+        }
+      }
+    },
+    {
+      "id": "bossP",
+      "position": {
+        "x": 780,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "ty": 25
+        }
+      }
+    },
+    {
+      "id": "bosses",
+      "position": {
+        "x": 1040,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "arrayLinear3d",
+        "params": {
+          "count": 2,
+          "dx": 0,
+          "dy": -50,
+          "dz": 0
+        }
+      }
+    },
+    {
+      "id": "b6",
+      "position": {
+        "x": 1820,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "union"
+        }
+      }
+    },
+    {
+      "id": "final",
+      "position": {
+        "x": 2080,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "block",
+      "sourceHandle": "out",
+      "target": "blockF",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "vE",
+      "sourceHandle": "out",
+      "target": "blockF",
+      "targetHandle": "sel",
+      "style": {
+        "stroke": "#d19a66"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "zc",
+      "sourceHandle": "out",
+      "target": "zcC",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "blockF",
+      "sourceHandle": "out",
+      "target": "b1",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "zcC",
+      "sourceHandle": "out",
+      "target": "b1",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e5",
+      "source": "xc",
+      "sourceHandle": "out",
+      "target": "xcC",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e6",
+      "source": "xcC",
+      "sourceHandle": "out",
+      "target": "xcR",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e7",
+      "source": "b1",
+      "sourceHandle": "out",
+      "target": "b2",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e8",
+      "source": "xcR",
+      "sourceHandle": "out",
+      "target": "b2",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e9",
+      "source": "yc",
+      "sourceHandle": "out",
+      "target": "ycC",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e10",
+      "source": "ycC",
+      "sourceHandle": "out",
+      "target": "ycR",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e11",
+      "source": "b2",
+      "sourceHandle": "out",
+      "target": "b3",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e12",
+      "source": "ycR",
+      "sourceHandle": "out",
+      "target": "b3",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e13",
+      "source": "cb",
+      "sourceHandle": "out",
+      "target": "cbC",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e14",
+      "source": "b3",
+      "sourceHandle": "out",
+      "target": "b4",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e15",
+      "source": "cbC",
+      "sourceHandle": "out",
+      "target": "b4",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e16",
+      "source": "mh",
+      "sourceHandle": "out",
+      "target": "mhC",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e17",
+      "source": "mhC",
+      "sourceHandle": "out",
+      "target": "mhRow",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e18",
+      "source": "mhRow",
+      "sourceHandle": "out",
+      "target": "mhGrid",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e19",
+      "source": "b4",
+      "sourceHandle": "out",
+      "target": "b5",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e20",
+      "source": "mhGrid",
+      "sourceHandle": "out",
+      "target": "b5",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e21",
+      "source": "boss",
+      "sourceHandle": "out",
+      "target": "bossC",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e22",
+      "source": "bossC",
+      "sourceHandle": "out",
+      "target": "bossR",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e23",
+      "source": "bossR",
+      "sourceHandle": "out",
+      "target": "bossP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e24",
+      "source": "bossP",
+      "sourceHandle": "out",
+      "target": "bosses",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e25",
+      "source": "b5",
+      "sourceHandle": "out",
+      "target": "b6",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e26",
+      "source": "bosses",
+      "sourceHandle": "out",
+      "target": "b6",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e27",
+      "source": "b6",
+      "sourceHandle": "out",
+      "target": "final",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e28",
+      "source": "ycR",
+      "sourceHandle": "out",
+      "target": "final",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    }
+  ]
+}
