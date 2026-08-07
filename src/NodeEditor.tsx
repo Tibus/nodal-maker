@@ -1129,6 +1129,111 @@ export default function NodeEditor({
     if (copySelection()) pasteClipboard();
   }, [copySelection, pasteClipboard]);
 
+  // Auto-arrange: layered (Sugiyama-style) left→right layout. Layers are set by
+  // longest-path from the sources; within a layer, order is refined by the
+  // median heuristic to cut edge crossings. Loose nodes (notes, unconnected)
+  // are left where they are. Undoable.
+  const autoArrange = useCallback(() => {
+    const all = (rf.current?.getNodes() ?? nodes) as GeoNode[];
+    const es = (rf.current?.getEdges() ?? edges) as Edge[];
+    if (!all.length) return;
+    const byId = new Map(all.map((n) => [n.id, n]));
+    const dimOf = (n: GeoNode) => ({
+      w: n.measured?.width ?? (typeof n.width === "number" ? n.width : 190),
+      h: n.measured?.height ?? (typeof n.height === "number" ? n.height : 130),
+    });
+
+    // only connected, non-note nodes take part in the flow layout
+    const touched = new Set<string>();
+    for (const e of es) if (byId.has(e.source) && byId.has(e.target)) { touched.add(e.source); touched.add(e.target); }
+    const flow = all.filter((n) => touched.has(n.id) && !isNote(n));
+    if (!flow.length) return;
+    const flowSet = new Set(flow.map((n) => n.id));
+    const es2 = es.filter((e) => flowSet.has(e.source) && flowSet.has(e.target));
+
+    const outAdj = new Map<string, string[]>(flow.map((n) => [n.id, []]));
+    const inAdj = new Map<string, string[]>(flow.map((n) => [n.id, []]));
+    for (const e of es2) { outAdj.get(e.source)!.push(e.target); inAdj.get(e.target)!.push(e.source); }
+
+    // longest-path layering via Kahn topological order
+    const indeg = new Map(flow.map((n) => [n.id, inAdj.get(n.id)!.length]));
+    const layer = new Map(flow.map((n) => [n.id, 0]));
+    const q = flow.filter((n) => indeg.get(n.id) === 0).map((n) => n.id);
+    while (q.length) {
+      const id = q.shift()!;
+      for (const t of outAdj.get(id)!) {
+        layer.set(t, Math.max(layer.get(t)!, layer.get(id)! + 1));
+        indeg.set(t, indeg.get(t)! - 1);
+        if (indeg.get(t) === 0) q.push(t);
+      }
+    }
+    // a cycle (shouldn't happen in a DAG) leaves some nodes at layer 0 — harmless
+
+    const nLayers = Math.max(...flow.map((n) => layer.get(n.id)!)) + 1;
+    const layers: string[][] = Array.from({ length: nLayers }, () => []);
+    flow.forEach((n) => layers[layer.get(n.id)!].push(n.id));
+
+    // seed within-layer order by current y so the result stays near the user's
+    // mental model, then refine with the median heuristic
+    layers.forEach((col) => col.sort((a, b) => byId.get(a)!.position.y - byId.get(b)!.position.y));
+    const order = new Map<string, number>();
+    const reindex = () => layers.forEach((col) => col.forEach((id, i) => order.set(id, i)));
+    reindex();
+    const median = (xs: number[]) => {
+      if (!xs.length) return -1;
+      const s = [...xs].sort((a, b) => a - b), m = s.length >> 1;
+      return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+    };
+    for (let sweep = 0; sweep < 6; sweep++) {
+      const down = sweep % 2 === 0;
+      const idxs = layers.map((_, i) => i);
+      if (!down) idxs.reverse();
+      for (const l of idxs) {
+        const side = down ? inAdj : outAdj;
+        const key = new Map<string, number>();
+        layers[l].forEach((id) => key.set(id, median(side.get(id)!.map((x) => order.get(x)!).filter((v) => v >= 0))));
+        // nodes with no neighbour on this side keep their slot; the rest sort by median
+        const withIdx = layers[l].map((id, i) => ({ id, i, k: key.get(id)! }));
+        const moving = withIdx.filter((o) => o.k >= 0).sort((a, b) => a.k - b.k);
+        const res = new Array<string | undefined>(layers[l].length);
+        withIdx.filter((o) => o.k < 0).forEach((o) => { res[o.i] = o.id; });
+        let mi = 0;
+        for (let i = 0; i < res.length; i++) if (res[i] === undefined) res[i] = moving[mi++].id;
+        layers[l] = res as string[];
+        reindex();
+      }
+    }
+
+    // fixed x per layer (widest node in it), y stacked by height, columns
+    // vertically centred; anchored at the flow's current top-left corner
+    const COL_GAP = 80, ROW_GAP = 34;
+    const colW = layers.map((col) => Math.max(120, ...col.map((id) => dimOf(byId.get(id)!).w)));
+    const colX: number[] = []; let acc = 0;
+    for (let l = 0; l < nLayers; l++) { colX[l] = acc; acc += colW[l] + COL_GAP; }
+    const colH = layers.map((col) => col.reduce((s, id) => s + dimOf(byId.get(id)!).h + ROW_GAP, 0) - ROW_GAP);
+    const maxH = Math.max(0, ...colH);
+    const baseX = Math.min(...flow.map((n) => n.position.x));
+    const baseY = Math.min(...flow.map((n) => n.position.y));
+
+    const pos = new Map<string, { x: number; y: number }>();
+    for (let l = 0; l < nLayers; l++) {
+      let y = baseY + (maxH - colH[l]) / 2;
+      for (const id of layers[l]) {
+        pos.set(id, { x: baseX + colX[l], y });
+        y += dimOf(byId.get(id)!).h + ROW_GAP;
+      }
+    }
+
+    // manual undo checkpoint (position-only changes don't bump the graph sig)
+    undoStack.current.push(prevSnap.current);
+    if (undoStack.current.length > 100) undoStack.current.shift();
+    redoStack.current = [];
+    setHistLen({ undo: undoStack.current.length, redo: 0 });
+
+    setNodes((prev) => prev.map((n) => { const p = pos.get(n.id); return p ? { ...n, position: p } : n; }));
+    window.setTimeout(() => rf.current?.fitView({ padding: 0.2, duration: 300 }), 30);
+  }, [nodes, edges, setNodes]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // the sketch editor overlay owns the keyboard while it's open
@@ -1154,11 +1259,14 @@ export default function NodeEditor({
       } else if (!mod && (e.key === "0" || e.key === "Home")) {
         e.preventDefault();
         rf.current?.fitView({ padding: 0.2, duration: 200 }); // frame the node graph
+      } else if (!mod && e.key.toLowerCase() === "l") {
+        e.preventDefault();
+        autoArrange(); // tidy the node graph into layered columns
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [undo, redo, copySelection, pasteClipboard, duplicateSelection, editingSketchId, onFit]);
+  }, [undo, redo, copySelection, pasteClipboard, duplicateSelection, editingSketchId, onFit, autoArrange]);
 
   const isValidConnection = useCallback(
     (c: Connection | Edge) => {
@@ -1786,6 +1894,7 @@ export default function NodeEditor({
             <button onClick={redo} disabled={histLen.redo === 0} title="Redo (⇧⌘Z)">↷</button>
             <button onClick={() => onFit?.()} title="Fit view">⊹</button>
             <button onClick={() => onTopView?.()} title="Top view (2D)">▣</button>
+            <button onClick={autoArrange} title="Auto-arrange nodes (L)">▦</button>
             <button onClick={collapseSelection} title="Group selection into a component">⧉</button>
             <button onClick={addNote} title="Add a comment note">📝</button>
             <button
