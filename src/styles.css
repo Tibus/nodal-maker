@@ -380,6 +380,7 @@ button.link {
 .sock-text     { border-radius: 0; clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0 50%); } /* ⬡ hexagon */
 .sock-sketch2d { border-radius: 0; clip-path: polygon(50% 0, 100% 38%, 82% 100%, 18% 100%, 0 38%); } /* ⬠ pentagon */
 .sock-edgeSel  { border-radius: 0; clip-path: polygon(0 28%, 100% 28%, 100% 72%, 0 72%); } /* ▬ bar (an edge) */
+.sock-axis     { border-radius: 0; clip-path: polygon(0 0, 100% 0, 0 100%, 100% 100%); } /* ⋈ bowtie (a rotation axis) */
 .gnode__row .react-flow__handle-left { left: -12px; top: 50%; }
 .gnode__row .react-flow__handle-right { right: -12px; top: 50%; }
 .gnode__row--out { justify-content: flex-end; }

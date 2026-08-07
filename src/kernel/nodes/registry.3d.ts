@@ -143,6 +143,38 @@ export const nodes3d: Record<string, NodeImpl> = {
     const diameter = preset ? preset.diameter : Number(params.diameter ?? 16);
     return { kind: "solid", solid: buildNutBRep(body, diameter, pitch, clearance, lefthand) };
   },
+
+  /**
+   * A rotation/reference axis. Wire a body into `on` and a cylindrical Face
+   * Select into `face` to derive the axis (origin + direction) from that bore/
+   * boss; otherwise fall back to a world X/Y/Z through the `ox/oy/oz` origin.
+   * Feeds Array Radial's `axis` input so a polar pattern can spin about an
+   * arbitrary line.
+   */
+  axis: (inputs, params) => {
+    const ax = String(params.dir ?? "Z");
+    let dir: Vec3 = ax === "X" ? [1, 0, 0] : ax === "Y" ? [0, 1, 0] : [0, 0, 1];
+    let origin: Vec3 = [Number(params.ox ?? 0), Number(params.oy ?? 0), Number(params.oz ?? 0)];
+
+    const sel = inputs.face;
+    const bodyV = inputs.on;
+    if (sel && sel.kind === "selection" && sel.target === "face" && bodyV && bodyV.kind === "solid") {
+      const body = bodyV.solid;
+      const faces: Face[] = [];
+      if (sel.ref?.kind === "face") {
+        const f = rebindFace(body, sel.ref);
+        if (f) faces.push(f);
+      } else {
+        const ff = sel.apply(new FaceFinder()) as FaceFinder;
+        faces.push(...(ff.find(body as Parameters<FaceFinder["find"]>[0]) as Face[]));
+      }
+      const cyl = faces.map(cylinderFromFace).find((c): c is NonNullable<typeof c> => c != null);
+      if (!cyl) throw new Error("[axis] the selected face is not cylindrical — pick a bore or a round boss");
+      origin = cyl.center;
+      dir = cyl.axis;
+    }
+    return { kind: "axis", origin, dir };
+  },
   cone: (_inputs, params) => {
     const r = Number(params.radius ?? 15);
     const h = Number(params.height ?? 30);
@@ -344,12 +376,21 @@ export const nodes3d: Record<string, NodeImpl> = {
     const solid = expectSolid(inputs.in, "arrayRadial3d");
     const count = Math.max(1, Math.round(Number(params.count ?? 6)));
     const total = Number(params.angle ?? 360);
-    const ax = String(params.axis ?? "Z");
-    const dir: Vec3 = ax === "X" ? [1, 0, 0] : ax === "Y" ? [0, 1, 0] : [0, 0, 1];
+    // an Axis node wins over the X/Y/Z param: spin about its arbitrary line
+    let origin: Vec3 = [0, 0, 0];
+    let dir: Vec3;
+    const axV = inputs.axis;
+    if (axV && axV.kind === "axis") {
+      origin = axV.origin;
+      dir = axV.dir;
+    } else {
+      const ax = String(params.axis ?? "Z");
+      dir = ax === "X" ? [1, 0, 0] : ax === "Y" ? [0, 1, 0] : [0, 0, 1];
+    }
     const denom = Math.abs(total) >= 360 ? count : Math.max(1, count - 1);
     const copies: Shape3D[] = [solid];
     for (let i = 1; i < count; i++) {
-      copies.push(solid.clone().rotate((total / denom) * i, [0, 0, 0], dir) as Shape3D);
+      copies.push(solid.clone().rotate((total / denom) * i, origin, dir) as Shape3D);
     }
     // fuse into one body, or keep the copies as a (cheaper) compound
     const merge = params.merge !== "no";

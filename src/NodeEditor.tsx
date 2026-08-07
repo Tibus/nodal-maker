@@ -76,7 +76,7 @@ const NODE_ICON: Record<string, string> = {
   transform: "✥", rotate3d: "⟳", scale3d: "⤢", mirror3d: "⇋", fillet: "◜", bevel: "◹",
   shell: "◫", hollow: "◌", infill: "▦", gyroid: "❈", split: "⊘", autoOrient: "⤾", supports: "⇟",
   boolean3d: "⊖", collision: "✸", color: "◐", arrange3d: "▤", assemble: "⧉", arrayLinear3d: "⋯", arrayRadial3d: "❋", arrayPath: "⌇",
-  edgeSelect: "╱", faceSelect: "▱",
+  edgeSelect: "╱", faceSelect: "▱", axis: "⌱",
   tessellate: "△", meshToSolid: "◆", importSTL: "⇩", repair: "✚", boolean: "⊖", transformMesh: "✥",
   convexHull: "⬡", minkowski: "⊚", decimate: "▽", subdivide: "◈",
 };

@@ -96,6 +96,31 @@ describe("graph evaluation (real geometry)", () => {
     expect(volumeOf(gStd, "t")).toBeGreaterThan(volumeOf(g, "bored"));
   });
 
+  it("an Axis derived from a cylindrical face spins a radial pattern about that line", () => {
+    // a unit box parked off both the Z and X axes
+    const unit = { id: "u", type: "box", params: { x: 6, y: 6, z: 6 }, inputs: {} } as const;
+    const uMove = { id: "um", type: "transform", params: { tx: 20, ty: 15 }, inputs: { in: "u" } } as const;
+    // a cylinder drilled along X (rotate the default Z-cylinder 90° about Y) →
+    // its lateral face gives an X-oriented axis through the origin
+    const cyl = { id: "cyl", type: "cylinder", params: { radius: 6, height: 40 }, inputs: {} } as const;
+    const cylX = { id: "cx", type: "rotate3d", params: { axis: "Y", angle: 90 }, inputs: { in: "cyl" } } as const;
+    const fs = { id: "fs", type: "faceSelect", params: { where: "cylindrical" }, inputs: {} } as const;
+    const axisNode = { id: "ax", type: "axis", params: {}, inputs: { on: "cx", face: "fs" } } as const;
+
+    const gZ: Graph = [unit, uMove, { id: "arr", type: "arrayRadial3d", params: { count: 4, angle: 360, axis: "Z" }, inputs: { in: "um" } }];
+    const gX: Graph = [unit, uMove, cyl, cylX, fs, axisNode, { id: "arr", type: "arrayRadial3d", params: { count: 4, angle: 360 }, inputs: { in: "um", axis: "ax" } }];
+
+    const zExtent = (g: Graph) => {
+      const v = evalToPayload(g, "arr").mesh.vertices;
+      let lo = Infinity, hi = -Infinity;
+      for (let i = 2; i < v.length; i += 3) { lo = Math.min(lo, v[i]); hi = Math.max(hi, v[i]); }
+      return hi - lo;
+    };
+    // Z-pattern keeps the boxes near their z-plane (~6 tall); the X-axis pattern
+    // swings them out through Z → a much larger vertical extent
+    expect(zExtent(gX)).toBeGreaterThan(zExtent(gZ) + 10);
+  });
+
   it("a fillet accepts several selection nodes (union of edges)", () => {
     // box 20³; select the top 4 edges and the bottom 4 edges as TWO edgeSelect
     // nodes wired into one fillet. Filleting rounds convex edges → removes volume,

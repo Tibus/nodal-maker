@@ -25,7 +25,10 @@ export type GraphValue =
   // is a bbox-RELATIVE signature from the original pick: the consumer re-binds to
   // the best-matching element on the current geometry, so the pick tracks the
   // entity as parameters move/scale it (rather than matching a frozen coordinate).
-  | { kind: "selection"; target: "edge" | "face"; apply: (finder: unknown) => unknown; ref?: SelRef };
+  | { kind: "selection"; target: "edge" | "face"; apply: (finder: unknown) => unknown; ref?: SelRef }
+  // a rotation/reference axis: a point on the line (`origin`) plus a unit
+  // `dir`. Derived from a cylindrical face or set by hand; feeds Array Radial.
+  | { kind: "axis"; origin: Vec3; dir: Vec3 };
 
 /* ------------------------------------------------------------------ */
 /* Graph description                                                   */

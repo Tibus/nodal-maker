@@ -209,6 +209,7 @@ export function evalToPayload(
     if (gv.kind === "number") values[id] = Number.isInteger(gv.value) ? String(gv.value) : gv.value.toFixed(3);
     else if (gv.kind === "text") values[id] = gv.value.length > 24 ? gv.value.slice(0, 24) + "…" : gv.value;
     else if (gv.kind === "selection") values[id] = `${gv.target} selection`;
+    else if (gv.kind === "axis") values[id] = "axis";
   }
   // every node that failed this run → the editor flags them all, not just the viewed one
   const nodeErrors: Record<string, string> = {};

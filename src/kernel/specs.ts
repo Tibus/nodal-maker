@@ -7,7 +7,7 @@
  * `GraphValue["kind"]` there.
  */
 
-export type SocketType = "sketch2d" | "solid" | "mesh" | "number" | "text" | "edgeSel" | "faceSel";
+export type SocketType = "sketch2d" | "solid" | "mesh" | "number" | "text" | "edgeSel" | "faceSel" | "axis";
 
 export interface PortSpec {
   name: string;
@@ -44,6 +44,7 @@ export const SOCKET_COLORS: Record<SocketType, string> = {
   text: "#e5c07b", // yellow — strings
   edgeSel: "#d19a66", // amber — EDGE selections (→ fillet / bevel)
   faceSel: "#61afef", // blue  — FACE selections (→ shell / internal thread)
+  axis: "#e06c75", // red    — a rotation/reference axis (→ Array Radial)
 };
 
 /** Human name + one-line meaning per socket type — for the port hover tooltip. */
@@ -55,6 +56,7 @@ export const SOCKET_LABELS: Record<SocketType, { name: string; desc: string }> =
   text: { name: "Text", desc: "A text string (yellow). E.g. for Text → SVG." },
   edgeSel: { name: "Edge selection", desc: "A set of EDGES (amber). Feeds Fillet or Bevel." },
   faceSel: { name: "Face selection", desc: "A set of FACES (blue). Feeds Shell or Internal thread." },
+  axis: { name: "Axis", desc: "A rotation axis (red): a point + direction. Derive it from a cylindrical face, or set it by hand. Feeds Array Radial." },
 };
 
 /**
@@ -142,7 +144,8 @@ export const NODE_DESCRIPTIONS: Record<string, string> = {
   boolean3d: "Combine two solids: union, difference (base − tool) or intersection.",
   assemble: "Assemble up to 4 solids into one compound (no Boolean). Use for a bolt (head + thread) where a real union would hang on the thread.",
   arrayLinear3d: "Repeat a solid in a line.",
-  arrayRadial3d: "Repeat a solid around the X, Y or Z axis (polar pattern); fuse into one body or keep as a compound.",
+  arrayRadial3d: "Repeat a solid around an axis (polar pattern). Wire an Axis node for an arbitrary rotation line, or pick world X/Y/Z; fuse into one body or keep as a compound.",
+  axis: "A rotation axis. Derive it from a cylindrical face (wire the body + a cylindrical Face Select), or set a world X/Y/Z through an origin. Feeds Array Radial's axis input.",
   edgeSelect: "Select edges by criteria (vertical, horizontal, or in a plane) for fillet/bevel.",
   faceSelect: "Select faces by criteria (top, planar, cylindrical, in a plane) for shell/fillet.",
   tessellate: "Convert a B-rep solid to a triangle mesh (auto-inserted when needed).",
@@ -165,7 +168,7 @@ export const NODE_CATEGORIES: { name: string; types: string[] }[] = [
   { name: "3D Primitive", types: ["box", "cylinder", "sphere", "cone", "torus", "thread", "internalThread", "importSTEP"] },
   { name: "Sketch → Solid", types: ["extrude", "pocket", "hole", "revolve", "loft", "loftSections", "sweep", "bossOnCap", "textOnFace"] },
   { name: "3D Op", types: ["transform", "rotate3d", "scale3d", "mirror3d", "fillet", "bevel", "shell", "hollow", "infill", "gyroid", "split", "autoOrient", "supports", "boolean3d", "collision", "color", "arrange3d", "assemble", "arrayLinear3d", "arrayRadial3d", "arrayPath"] },
-  { name: "Selector", types: ["edgeSelect", "faceSelect"] },
+  { name: "Selector", types: ["edgeSelect", "faceSelect", "axis"] },
   { name: "Mesh", types: ["tessellate", "meshToSolid", "importSTL", "repair", "boolean", "transformMesh", "convexHull", "minkowski", "decimate", "subdivide"] },
 ];
 
@@ -659,13 +662,31 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
   arrayRadial3d: {
     type: "arrayRadial3d",
     label: "Array Radial 3D",
-    inputs: [{ name: "in", type: "solid" }],
+    // wire an Axis into `axis` to spin the pattern about an arbitrary line
+    // (e.g. derived from a cylindrical face); otherwise the `axis` param picks
+    // the world X/Y/Z through the origin.
+    inputs: [{ name: "in", type: "solid" }, { name: "axis", type: "axis" }],
     output: "solid",
     params: [
       { name: "count", kind: "number", default: 6, min: 1, max: 100, step: 1 },
       { name: "angle", kind: "number", label: "total°", default: 360, min: -360, max: 360, step: 1 },
       { name: "axis", kind: "select", default: "Z", options: ["X", "Y", "Z"] },
       { name: "merge", kind: "select", label: "fuse", default: "yes", options: ["yes", "no"] },
+    ],
+  },
+  axis: {
+    type: "axis",
+    label: "Axis",
+    // derive a rotation axis from a cylindrical face (wire the body into `on`
+    // and a cylindrical Face Select into `face`), or set it by hand with the
+    // params below. Output feeds Array Radial's `axis` input.
+    inputs: [{ name: "on", type: "solid" }, { name: "face", type: "faceSel" }],
+    output: "axis",
+    params: [
+      { name: "dir", kind: "select", label: "direction", default: "Z", options: ["X", "Y", "Z"] },
+      { name: "ox", kind: "number", label: "origin x", default: 0, min: -1000, max: 1000, step: 0.5 },
+      { name: "oy", kind: "number", label: "origin y", default: 0, min: -1000, max: 1000, step: 0.5 },
+      { name: "oz", kind: "number", label: "origin z", default: 0, min: -1000, max: 1000, step: 0.5 },
     ],
   },
   textToSvg: {
