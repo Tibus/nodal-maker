@@ -639,20 +639,47 @@ export const nodes3d: Record<string, NodeImpl> = {
   },
 
   /**
-   * Auto-orient for printing: try the six axis-aligned "face-down" orientations,
-   * score each by (overhang area + heightWeight·height) and keep the lowest —
-   * fewer supports, shorter print. The winner is dropped onto the plate (z=0).
+   * Auto-orient for printing: consider the six axis-aligned "face-down" directions
+   * PLUS the outward normals of the model's largest FLAT faces (so a tilted part
+   * can rest on its real flat face, not just an axis). Score each candidate by
+   * (overhang area + heightWeight·height) and keep the lowest — fewer supports,
+   * shorter print. The winner is dropped onto the plate (z=0).
    */
   autoOrient: (inputs, params) => {
     const solid = expectSolid(inputs.in, "autoOrient");
     const hw = Number(params.heightWeight ?? 1);
     const cosT = Math.cos((45 * Math.PI) / 180);
-    const cands: [number, number][] = [[0, 0], [180, 0], [90, 0], [-90, 0], [0, 90], [0, -90]];
+
+    // candidate "down" directions = the outward normal that should face the plate
+    const cand: Vec3[] = [[0, 0, 1], [0, 0, -1], [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0]];
+    // add the biggest flat faces' normals (accumulate triangle area per normal)
+    {
+      const m = meshAndTag(solid), V = m.vertices, T = m.indices;
+      const acc = new Map<string, { n: Vec3; area: number }>();
+      for (let i = 0; i < T.length; i += 3) {
+        const a = T[i] * 3, b = T[i + 1] * 3, c = T[i + 2] * 3;
+        const ux = V[b] - V[a], uy = V[b + 1] - V[a + 1], uz = V[b + 2] - V[a + 2];
+        const vx = V[c] - V[a], vy = V[c + 1] - V[a + 1], vz = V[c + 2] - V[a + 2];
+        let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+        const twice = Math.hypot(nx, ny, nz); if (twice < 1e-9) continue;
+        nx /= twice; ny /= twice; nz /= twice;
+        const key = `${Math.round(nx * 12)}_${Math.round(ny * 12)}_${Math.round(nz * 12)}`; // ~5° bins
+        const e = acc.get(key); if (e) e.area += twice / 2; else acc.set(key, { n: [nx, ny, nz], area: twice / 2 });
+      }
+      for (const { n } of [...acc.values()].sort((p, q) => q.area - p.area).slice(0, 8)) {
+        if (!cand.some((d) => d[0] * n[0] + d[1] * n[1] + d[2] * n[2] > 0.996)) cand.push(n);
+      }
+    }
+
     let best: { s: Shape3D; score: number } | null = null;
-    for (const [rx, ry] of cands) {
+    for (const d of cand) {
+      // rotate so `d` points to -Z (that face rests on the plate)
       let s = solid.clone() as Shape3D;
-      if (rx) s = s.rotate(rx, [0, 0, 0], [1, 0, 0]) as Shape3D;
-      if (ry) s = s.rotate(ry, [0, 0, 0], [0, 1, 0]) as Shape3D;
+      const dot = Math.max(-1, Math.min(1, -d[2]));
+      if (dot < 0.9999) {
+        if (dot < -0.9999) s = s.rotate(180, [0, 0, 0], [1, 0, 0]) as Shape3D;
+        else { const al = Math.hypot(d[1], d[0]) || 1; s = s.rotate((Math.acos(dot) * 180) / Math.PI, [0, 0, 0], [-d[1] / al, d[0] / al, 0]) as Shape3D; }
+      }
       const [lo, hi] = s.boundingBox.bounds;
       s = s.translate([0, 0, -lo[2]]) as Shape3D; // rest on the plate
       const m = meshAndTag(s), V = m.vertices, T = m.indices;

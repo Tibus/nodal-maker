@@ -146,6 +146,21 @@ describe("graph evaluation (real geometry)", () => {
     expect(describeFeatureGeometry(g3, "b", "fs").tris.length).toBeGreaterThan(0); // top face triangles
   });
 
+  it("autoOrient rests a tilted part flat on the plate (flat-face candidate)", () => {
+    // a 40×40×10 slab tilted 30° → its raw bbox is ~29 tall; auto-orient must
+    // re-flatten it onto its 40×40 face (height ≈ 10) and drop it to z=0
+    const g: Graph = [
+      { id: "b", type: "box", params: { x: 40, y: 40, z: 10 }, inputs: {} },
+      { id: "r", type: "rotate3d", params: { axis: "X", angle: 30 }, inputs: { in: "b" } },
+      { id: "o", type: "autoOrient", params: { heightWeight: 1 }, inputs: { in: "r" } },
+    ];
+    const v = evalToPayload(g, "o").mesh.vertices;
+    let mn = 1e9, mx = -1e9;
+    for (let i = 2; i < v.length; i += 3) { mn = Math.min(mn, v[i]); mx = Math.max(mx, v[i]); }
+    expect(mn).toBeCloseTo(0, 1); // resting on the plate
+    expect(mx - mn).toBeLessThan(15); // flat (~10), not the tilted ~29 height
+  });
+
   it("a cone exposes named selection ports (fillet its base rim)", () => {
     const g: Graph = [
       { id: "c", type: "cone", params: { radius: 15, height: 30 }, inputs: {} },
