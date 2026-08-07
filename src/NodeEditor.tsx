@@ -166,10 +166,14 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
 
   if (!spec) return <div className="gnode gnode--error">unknown node</div>;
 
+  // only geometry-producing nodes can be VIEWED; clicking a selection/number/text
+  // node just selects it (→ highlight) without blanking the 3D view.
+  const viewable = spec.output === "solid" || spec.output === "mesh" || spec.output === "sketch2d";
+
   return (
     <div
       className={`gnode${isOutput ? " gnode--out" : ""}${isError ? " gnode--error" : ""}`}
-      onClick={() => ctx.setOutput(id)}
+      onClick={() => { if (viewable) ctx.setOutput(id); }}
     >
       <div className="gnode__title">
         {renaming ? (
@@ -600,7 +604,6 @@ export interface NodeEditorProps {
   onReady?: (api: EditorApi) => void;
   /** fires when a single edge/face selection node is highlighted (or null) so the
    *  viewport can show what that selection targets on the live model */
-  onSelectPreview?: (desc: { kind: "edge" | "face"; where: string; offset: number; near?: [number, number, number] } | null) => void;
   /** hover a selection-output port → highlight its geometry on the model */
   onPortHover?: (info: { nodeId: string; port: string } | null) => void;
   /** a modifier node (fillet/bevel/shell/internalThread) got selected → highlight
@@ -849,7 +852,6 @@ export default function NodeEditor({
   initialOutputId,
   onChange,
   onReady,
-  onSelectPreview,
   onPortHover,
   onFeaturePreview,
   errorNodes,
@@ -1042,27 +1044,18 @@ export default function NodeEditor({
 
   // Preview what a selection node targets: when exactly one edge/face selection
   // node is highlighted, hand its descriptor to the parent (→ viewport overlay).
-  const onSelectPreviewRef = useRef(onSelectPreview);
-  onSelectPreviewRef.current = onSelectPreview;
+  // When a single geometry-meaningful node is selected — a Select node (show what
+  // it selects) or a modifier (show what it acts on) — ask the parent to highlight
+  // the corresponding edges/faces on the live model. Both go through the kernel so
+  // ALL selection kinds (planes, cylinders, cones, direction, ref) are covered.
   const onFeaturePreviewRef = useRef(onFeaturePreview);
   onFeaturePreviewRef.current = onFeaturePreview;
-  const lastPreviewSig = useRef<string>("");
   const lastFeatureSig = useRef<string>("");
-  const FEATURE_NODES = useMemo(() => new Set(["fillet", "bevel", "shell", "internalThread"]), []);
+  const FEATURE_NODES = useMemo(() => new Set(["fillet", "bevel", "shell", "internalThread", "edgeSelect", "faceSelect"]), []);
   useEffect(() => {
     const sel = nodes.filter((n) => n.selected && !isNote(n));
     const one = sel.length === 1 ? sel[0] : null;
     const t = one?.data.nodeType;
-    // (a) an Edge/Face Select node → descriptor preview of its own selection
-    let desc: { kind: "edge" | "face"; where: string; offset: number; near?: [number, number, number] } | null = null;
-    if (one && (t === "edgeSelect" || t === "faceSelect")) {
-      const p = one.data.params ?? {};
-      const near = Array.isArray(p.near) && p.near.length === 3 ? (p.near.map(Number) as [number, number, number]) : undefined;
-      desc = { kind: t === "faceSelect" ? "face" : "edge", where: String(p.where ?? "all"), offset: Number(p.offset ?? 0), near };
-    }
-    const sig = JSON.stringify(desc);
-    if (sig !== lastPreviewSig.current) { lastPreviewSig.current = sig; onSelectPreviewRef.current?.(desc); }
-    // (b) a modifier node → highlight the edges/faces it acts on
     const featNode = one && !one.data.component && t && FEATURE_NODES.has(t) ? one.id : null;
     if ((featNode ?? "") !== lastFeatureSig.current) { lastFeatureSig.current = featNode ?? ""; onFeaturePreviewRef.current?.(featNode); }
   }, [nodes, FEATURE_NODES]);

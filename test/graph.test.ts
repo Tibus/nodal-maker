@@ -129,7 +129,7 @@ describe("graph evaluation (real geometry)", () => {
       { id: "s", type: "edgeSelect", params: { where: "atZ", offset: 20 }, inputs: {} },
       { id: "f", type: "fillet", params: { radius: 2 }, inputs: { in: "b", sel: "s" } },
     ];
-    const withSel = describeFeatureGeometry(g, "f");
+    const withSel = describeFeatureGeometry(g, "f", "f"); // viewedId unused for a modifier
     expect(withSel.segs.length).toBeGreaterThan(0); // the top 4 edges as polylines
     expect(withSel.tris.length).toBe(0);
     // no selection → fillet targets every edge (still non-empty)
@@ -137,7 +137,13 @@ describe("graph evaluation (real geometry)", () => {
       { id: "b", type: "box", params: { x: 20, y: 20, z: 20 }, inputs: {} },
       { id: "f", type: "fillet", params: { radius: 2 }, inputs: { in: "b" } },
     ];
-    expect(describeFeatureGeometry(g2, "f").segs.length).toBeGreaterThan(0);
+    expect(describeFeatureGeometry(g2, "f", "f").segs.length).toBeGreaterThan(0);
+    // a Face Select node → its own selection resolved on the viewed solid
+    const g3: Graph = [
+      { id: "b", type: "box", params: { x: 20, y: 20, z: 20 }, inputs: {} },
+      { id: "fs", type: "faceSelect", params: { where: "atZ", offset: 20 }, inputs: {} },
+    ];
+    expect(describeFeatureGeometry(g3, "b", "fs").tris.length).toBeGreaterThan(0); // top face triangles
   });
 
   it("a cone exposes named selection ports (fillet its base rim)", () => {

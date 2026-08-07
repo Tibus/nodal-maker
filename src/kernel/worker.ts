@@ -87,10 +87,10 @@ const api = {
       return { tris: new Float32Array(0), segs: new Float32Array(0) };
     }
   },
-  async describeFeature(graph: Graph, nodeId: string, userParams?: Record<string, number>) {
+  async describeFeature(graph: Graph, viewedId: string, nodeId: string, userParams?: Record<string, number>) {
     await ensureKernels();
     try {
-      return describeFeatureGeometry(graph, nodeId, graphCache, userParams);
+      return describeFeatureGeometry(graph, viewedId, nodeId, graphCache, userParams);
     } catch {
       return { tris: new Float32Array(0), segs: new Float32Array(0) };
     }

@@ -346,15 +346,34 @@ const FEATURE_SEL: Record<string, { port: string; kind: "edge" | "face" }> = {
  * the faces a shell opens, the bore an internal thread cuts). A fillet/bevel with
  * no selection targets every edge.
  */
+/** Resolve a selection against a solid → its edges' polylines or faces' triangles.
+ *  Uses the parametric re-bind when the selection carries a pick signature. */
+function selToGeometry(solid: Shape3D, sel: Extract<GraphValue, { kind: "selection" }>): { tris: Float32Array; segs: Float32Array } {
+  if (sel.target === "edge") {
+    let edges: Edge[];
+    if (sel.ref?.kind === "edge") { const e = rebindEdge(solid, sel.ref as Extract<SelRef, { kind: "edge" }>); edges = e ? [e] : []; }
+    else edges = (sel.apply(new EdgeFinder()) as EdgeFinder).find(solid as Parameters<EdgeFinder["find"]>[0]) as Edge[];
+    return { tris: new Float32Array(0), segs: edgesToSegs(edges) };
+  }
+  meshSolid(solid);
+  let faces: Face[];
+  if (sel.ref?.kind === "face") { const f = rebindFace(solid, sel.ref as Extract<SelRef, { kind: "face" }>); faces = f ? [f] : []; }
+  else faces = (sel.apply(new FaceFinder()) as FaceFinder).find(solid as Parameters<FaceFinder["find"]>[0]) as Face[];
+  return { tris: facesToTris(faces), segs: new Float32Array(0) };
+}
+
 export function describeFeatureGeometry(
   graph: Graph,
+  viewedId: string,
   nodeId: string,
   cache?: EvalCache,
   vars?: Record<string, number>,
 ): { tris: Float32Array; segs: Float32Array } {
   const node = graph.find((n) => n.id === nodeId);
-  const feat = node && FEATURE_SEL[node.type];
-  if (!node || !feat) return EMPTY_HL();
+  if (!node) return EMPTY_HL();
+  const isSelectNode = node.type === "edgeSelect" || node.type === "faceSelect";
+  const feat = FEATURE_SEL[node.type];
+  if (!isSelectNode && !feat) return EMPTY_HL();
   const { outputs } = cache ? evalGraphCached(graph, cache, vars) : evalGraph(graph, vars);
   const byId = new Map(graph.map((n) => [n.id, n]));
   const evalNode = (id: string): GraphValue => {
@@ -362,34 +381,41 @@ export function describeFeatureGeometry(
     if (!o) throw new Error(`unknown node ${id}`);
     return o;
   };
-  const inRef = node.inputs?.in;
-  if (!inRef) return EMPTY_HL();
-  let inSolid: Shape3D;
   try {
+    // (a) an Edge/Face Select node → show its OWN selection. Apply it to the
+    // viewed solid if that IS one, else to the input solid of whatever consumes
+    // this selection (so it works even when the select node itself is "viewed").
+    if (isSelectNode) {
+      const sv = outputs[nodeId];
+      if (!sv || sv.kind !== "selection") return EMPTY_HL();
+      let solid: Shape3D | null = null;
+      const viewed = outputs[viewedId];
+      if (viewed?.kind === "solid") solid = viewed.solid;
+      else {
+        for (const n of graph) {
+          const consumes = Object.values(n.inputs ?? {}).some((ref) =>
+            (Array.isArray(ref) ? ref : [ref]).some((r) => r.split("#")[0] === nodeId));
+          if (!consumes || !n.inputs?.in) continue;
+          const inId = (Array.isArray(n.inputs.in) ? n.inputs.in[0] : n.inputs.in).split("#")[0];
+          const s = outputs[inId];
+          if (s?.kind === "solid") { solid = s.solid; break; }
+        }
+      }
+      return solid ? selToGeometry(solid, sv) : EMPTY_HL();
+    }
+    // (b) a modifier → resolve its selection input against its INPUT solid
+    const inRef = node.inputs?.in;
+    if (!inRef) return EMPTY_HL();
     const inV = resolvePort(inRef, byId, evalNode);
     if (inV.kind !== "solid") return EMPTY_HL();
-    inSolid = inV.solid;
-  } catch { return EMPTY_HL(); }
-
-  const selRef = node.inputs?.[feat.port];
-  let sel: Extract<GraphValue, { kind: "selection" }> | null = null;
-  if (selRef != null) {
-    try { const sv = resolvePort(selRef, byId, evalNode); if (sv.kind === "selection") sel = sv; } catch { /* unresolved → treat as none */ }
-  }
-
-  try {
-    if (feat.kind === "edge") {
-      let edges: Edge[];
-      if (sel?.ref?.kind === "edge") { const e = rebindEdge(inSolid, sel.ref as Extract<SelRef, { kind: "edge" }>); edges = e ? [e] : []; }
-      else if (sel) edges = (sel.apply(new EdgeFinder()) as EdgeFinder).find(inSolid as Parameters<EdgeFinder["find"]>[0]) as Edge[];
-      else edges = (inSolid as unknown as { edges: Edge[] }).edges; // fillet-all
-      return { tris: new Float32Array(0), segs: edgesToSegs(edges) };
+    const inSolid = inV.solid;
+    const selRef = node.inputs?.[feat!.port];
+    let sel: Extract<GraphValue, { kind: "selection" }> | null = null;
+    if (selRef != null) { const sv = resolvePort(selRef, byId, evalNode); if (sv.kind === "selection") sel = sv; }
+    if (feat!.kind === "edge" && !sel) {
+      return { tris: new Float32Array(0), segs: edgesToSegs((inSolid as unknown as { edges: Edge[] }).edges) }; // fillet-all
     }
-    meshSolid(inSolid);
-    let faces: Face[] = [];
-    if (sel?.ref?.kind === "face") { const f = rebindFace(inSolid, sel.ref as Extract<SelRef, { kind: "face" }>); faces = f ? [f] : []; }
-    else if (sel) faces = (sel.apply(new FaceFinder()) as FaceFinder).find(inSolid as Parameters<FaceFinder["find"]>[0]) as Face[];
-    return { tris: facesToTris(faces), segs: new Float32Array(0) };
+    return sel ? selToGeometry(inSolid, sel) : EMPTY_HL();
   } catch { return EMPTY_HL(); }
 }
 

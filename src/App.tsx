@@ -205,7 +205,7 @@ export default function App() {
     const nodeId = activeFeature.current, g = lastGraph.current;
     if (!nodeId || !g) return;
     try {
-      const r = await kernel.describeFeature(g, nodeId, lastVars.current);
+      const r = await kernel.describeFeature(g, lastOutputId.current, nodeId, lastVars.current);
       if (activeFeature.current === nodeId) viewportRef.current?.setFeatureHighlight(r.tris, r.segs);
     } catch { /* ignore */ }
   }, []);
@@ -299,7 +299,6 @@ export default function App() {
         onReady={(api) => {
           editorApi.current = api;
         }}
-        onSelectPreview={(desc) => viewportRef.current?.setSelectionPreview(desc)}
         onPortHover={onPortHover}
         onFeaturePreview={onFeaturePreview}
         onFit={() => viewportRef.current?.fit()}
