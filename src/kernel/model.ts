@@ -91,6 +91,9 @@ export interface BuildResult {
    * so several B-reps can be seen together for assembly. Non-pickable.
    */
   extras?: { id: string; mesh: MeshPayload }[];
+  /** every node that failed to build this run (id → message), so the editor can
+   *  flag ALL broken nodes, not just the one being viewed. */
+  nodeErrors?: Record<string, string>;
 }
 
 export function build(p: Params): BuildResult {
@@ -207,6 +210,9 @@ export function evalToPayload(
     else if (gv.kind === "text") values[id] = gv.value.length > 24 ? gv.value.slice(0, 24) + "…" : gv.value;
     else if (gv.kind === "selection") values[id] = `${gv.target} selection`;
   }
+  // every node that failed this run → the editor flags them all, not just the viewed one
+  const nodeErrors: Record<string, string> = {};
+  for (const [id, e] of Object.entries(errors)) nodeErrors[id] = e.message;
 
   // extra pinned bodies to show alongside the main output (skip the main id)
   let extras: { id: string; mesh: MeshPayload }[] | undefined;
@@ -244,15 +250,15 @@ export function evalToPayload(
     } catch {
       /* not every solid has a resolvable top cap — fine */
     }
-    return { mesh: { ...meshAndTag(v.solid), tint: v.color }, topCapFaceId, topCapZ, outputKind: "solid", values, extras };
+    return { mesh: { ...meshAndTag(v.solid), tint: v.color }, topCapFaceId, topCapZ, outputKind: "solid", values, extras, nodeErrors };
   }
   if (v.kind === "mesh") {
-    return { mesh: meshToPayload(v.mesh), topCapFaceId: null, topCapZ: 0, outputKind: "mesh", values, extras };
+    return { mesh: meshToPayload(v.mesh), topCapFaceId: null, topCapZ: 0, outputKind: "mesh", values, extras, nodeErrors };
   }
   if (v.kind === "sketch2d") {
     // preview a 2D profile as a FLAT filled face (zero thickness) on its base
     // plane — no extruded-plate thickness. Real geometry → exportSVG.
-    return { mesh: { ...meshAndTag(sketchToFace(v)), isSketch: true }, topCapFaceId: null, topCapZ: 0, outputKind: "sketch2d", values, extras };
+    return { mesh: { ...meshAndTag(sketchToFace(v)), isSketch: true }, topCapFaceId: null, topCapZ: 0, outputKind: "sketch2d", values, extras, nodeErrors };
   }
   throw new Error(`output node "${outputId}" is a ${v.kind}; connect it to geometry to preview`);
 }

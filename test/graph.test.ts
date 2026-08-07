@@ -168,6 +168,16 @@ describe("graph evaluation (real geometry)", () => {
     expect(volumeOf(mk(40), "f")).toBeLessThan(box(40));
   });
 
+  it("reports every broken node in nodeErrors (not just the viewed one)", () => {
+    const g: Graph = [
+      { id: "b", type: "box", params: { x: 20, y: 20, z: 20 }, inputs: {} },
+      { id: "f", type: "fillet", params: { radius: 50 }, inputs: { in: "b" } }, // radius too big → fails
+    ];
+    const res = evalToPayload(g, "b"); // viewing the box succeeds…
+    expect(res.nodeErrors?.f).toBeTruthy(); // …but the broken fillet is still reported
+    expect(res.nodeErrors?.b).toBeUndefined();
+  });
+
   it("a broken node does not blank the rest of the history", () => {
     // repro: a fillet whose edge selection was deleted rounds EVERY edge with a
     // radius too large for the geometry → it fails. Viewing the fillet must show

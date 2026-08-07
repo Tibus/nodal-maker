@@ -101,8 +101,7 @@ interface EditorCtx {
   isLinked: (nodeId: string, port: string) => boolean;
   /** is a source handle (e.g. a selection output) currently wired to something? */
   isSourceLinked: (nodeId: string, handle: string) => boolean;
-  errorNodeId: string | null;
-  errorMessage: string | null;
+  errorNodes: Record<string, string>;
   valueOf: (nodeId: string) => string | undefined;
   componentDef: (defId: string) => ComponentDef | undefined;
   /** effective selection outputs of a node (own, or forwarded from its input) */
@@ -161,7 +160,8 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
       }
     : NODE_SPECS[data.nodeType];
   const isOutput = ctx.outputId === id;
-  const isError = ctx.errorNodeId === id;
+  const errMsg = ctx.errorNodes[id];
+  const isError = !!errMsg;
   const value = ctx.valueOf(id);
 
   if (!spec) return <div className="gnode gnode--error">unknown node</div>;
@@ -208,7 +208,7 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
         </button>
       </div>
       {value !== undefined && <div className="gnode__value">= {value}</div>}
-      {isError && <div className="gnode__err">⚠ {ctx.errorMessage}</div>}
+      {isError && <div className="gnode__err">⚠ {errMsg}</div>}
 
       <div className="gnode__body" onClick={(e) => e.stopPropagation()}>
         {/* structural inputs — required, filled ports */}
@@ -606,8 +606,8 @@ export interface NodeEditorProps {
   /** a modifier node (fillet/bevel/shell/internalThread) got selected → highlight
    *  the edges/faces it acts on (null clears) */
   onFeaturePreview?: (nodeId: string | null) => void;
-  errorNodeId?: string | null;
-  errorMessage?: string | null;
+  /** every node that failed to build (id → message) → each is flagged in the editor */
+  errorNodes?: Record<string, string>;
   values?: Record<string, string>;
   onExportSTL?: (graph: Graph, outputId: string) => void;
   onExport3MF?: () => void;
@@ -852,8 +852,7 @@ export default function NodeEditor({
   onSelectPreview,
   onPortHover,
   onFeaturePreview,
-  errorNodeId,
-  errorMessage,
+  errorNodes,
   values,
   onExportSTL,
   onExport3MF,
@@ -1674,8 +1673,7 @@ export default function NodeEditor({
       setOutput,
       setParam,
       isLinked: (nodeId, port) => linkedSet.has(`${nodeId} ${port}`),
-      errorNodeId: errorNodeId ?? null,
-      errorMessage: errorMessage ?? null,
+      errorNodes: errorNodes ?? {},
       valueOf: (nodeId) => values?.[nodeId],
       componentDef: (defId) => components[defId],
       selOutputs: (nodeId) => selOutputsMap.get(nodeId) ?? [],
@@ -1690,7 +1688,7 @@ export default function NodeEditor({
       hoverPort,
       clearHoverPort,
     }),
-    [outputId, setOutput, setParam, linkedSet, sourceLinkedSet, errorNodeId, errorMessage, values, components, selOutputsMap, hidden, toggleVisible, editSketch, isExposed, toggleExpose, setAlias, hoverPort, clearHoverPort],
+    [outputId, setOutput, setParam, linkedSet, sourceLinkedSet, errorNodes, values, components, selOutputsMap, hidden, toggleVisible, editSketch, isExposed, toggleExpose, setAlias, hoverPort, clearHoverPort],
   );
 
   const outType = NODE_SPECS[nodes.find((n) => n.id === outputId)?.data.nodeType ?? ""]?.output;

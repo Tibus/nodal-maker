@@ -70,7 +70,7 @@ export default function App() {
   }, []);
   const editorApi = useRef<EditorApi | null>(null);
   const [status, setStatus] = useState("initialising kernels…");
-  const [graphError, setGraphError] = useState<{ nodeId?: string; message: string } | null>(null);
+  const [errorNodes, setErrorNodes] = useState<Record<string, string>>({});
   const [graphValues, setGraphValues] = useState<Record<string, string>>({});
   const [pickMode, setPickMode] = useState<"face" | "edge" | "border" | "sketchFace" | "measure" | null>(null);
   const measureA = useRef<[number, number, number] | null>(null);
@@ -233,16 +233,17 @@ export default function App() {
     lastGraph.current = graph;
     lastOutputId.current = outputId;
     lastVars.current = userVars;
+    setStatus("⟳ recalcul…"); // instant feedback while the debounced eval runs
     window.clearTimeout(graphTimer.current);
     graphTimer.current = window.setTimeout(async () => {
       try {
         const res = await kernel.evalGraph(graph, outputId, pinnedIds, userVars);
         if (!res.ok) {
-          setGraphError(res.error);
+          setErrorNodes(res.error.nodeId ? { [res.error.nodeId]: res.error.message } : {});
           setStatus("⚠ " + res.error.message);
           return;
         }
-        setGraphError(null);
+        setErrorNodes(res.nodeErrors ?? {}); // flag every broken node, not just the viewed one
         setGraphValues(res.values ?? {});
         // re-frame the camera ONLY when the viewed node changes — tweaking a
         // parameter must leave the view exactly where the user put it.
@@ -312,8 +313,7 @@ export default function App() {
             a.click();
           }
         }}
-        errorNodeId={graphError?.nodeId ?? null}
-        errorMessage={graphError?.message ?? null}
+        errorNodes={errorNodes}
         values={graphValues}
         onExportSTL={async (graph, outputId) => {
           try {
