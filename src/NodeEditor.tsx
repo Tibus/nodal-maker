@@ -222,7 +222,7 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
                 id={p.name}
                 type="target"
                 position={Position.Left}
-                className={`rf-port rf-port--req${multi ? " rf-port--multi" : ""}`}
+                className={`rf-port rf-port--req sock-${p.type}${multi ? " rf-port--multi" : ""}`}
                 style={{ background: SOCKET_COLORS[p.type] }}
                 title={multi ? `${p.name}: ${p.type} — accepts several selections` : `${p.name}: ${p.type} (required)`}
                 {...tipH(p.type)}
@@ -258,7 +258,7 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
                         id={dm.name}
                         type="target"
                         position={Position.Left}
-                        className="rf-port rf-port--opt"
+                        className="rf-port rf-port--opt sock-number"
                         style={{ borderColor: SOCKET_COLORS.number }}
                         title={`${dm.name}: number (optional — drives this dimension)`}
                         {...tipH("number")}
@@ -290,7 +290,7 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
                   id={ps.name}
                   type="target"
                   position={Position.Left}
-                  className="rf-port rf-port--opt"
+                  className={`rf-port rf-port--opt sock-${pt}`}
                   style={{ borderColor: SOCKET_COLORS[pt] }}
                   title={`${ps.name}: ${pt} (optional — has a default)`}
                   {...tipH(pt)}
@@ -353,7 +353,7 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
                     id={so.name}
                     type="source"
                     position={Position.Right}
-                    className="rf-port rf-port--req"
+                    className={`rf-port rf-port--req sock-${t}`}
                     style={{ background: SOCKET_COLORS[t] }}
                     title={`${so.name}: ${so.target} selection`}
                     {...tipH(t)}
@@ -370,7 +370,7 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
         id="out"
         type="source"
         position={Position.Right}
-        className="rf-port rf-port--req"
+        className={`rf-port rf-port--req sock-${spec.output}`}
         style={{ background: SOCKET_COLORS[spec.output], top: 22 }}
         title={`out: ${spec.output}`}
         {...tipH(spec.output)}
@@ -1871,10 +1871,10 @@ export default function NodeEditor({
 
         {/* colour legend: each node's dot is its OUTPUT type — match it to an
             input port of the same colour to know what can feed it. */}
-        <div className="palette__legend" title="La pastille d'un nœud = son type de sortie. Branche-la sur une entrée de même couleur.">
+        <div className="palette__legend" title="La pastille d'un nœud = son type de sortie (forme + couleur). Branche-la sur une entrée de même forme.">
           {(Object.keys(SOCKET_COLORS) as (keyof typeof SOCKET_COLORS)[]).map((t) => (
             <span key={t} className="palette__leg">
-              <span className="palette__sw" style={{ background: SOCKET_COLORS[t] }} />
+              <span className={`palette__sw sock-${t}`} style={{ background: SOCKET_COLORS[t] }} />
               {SOCKET_LABELS[t].name}
             </span>
           ))}
@@ -1890,7 +1890,7 @@ export default function NodeEditor({
                 onMouseEnter={(e) => setTip({ type: s.type, y: e.currentTarget.getBoundingClientRect().top })}
                 onMouseLeave={() => setTip(null)}
               >
-                <span className="palette__sw" style={{ background: SOCKET_COLORS[s.output] }} title={`sortie : ${SOCKET_LABELS[s.output].name}`} />
+                <span className={`palette__sw sock-${s.output}`} style={{ background: SOCKET_COLORS[s.output] }} title={`sortie : ${SOCKET_LABELS[s.output].name}`} />
                 <span className="palette__ic">{nodeIcon(s.type, false)}</span>
                 {s.label}
               </button>
@@ -1921,7 +1921,7 @@ export default function NodeEditor({
                         onMouseEnter={(e) => setTip({ type: t, y: e.currentTarget.getBoundingClientRect().top })}
                         onMouseLeave={() => setTip(null)}
                       >
-                        <span className="palette__sw" style={{ background: SOCKET_COLORS[NODE_SPECS[t].output] }} title={`sortie : ${SOCKET_LABELS[NODE_SPECS[t].output].name}`} />
+                        <span className={`palette__sw sock-${NODE_SPECS[t].output}`} style={{ background: SOCKET_COLORS[NODE_SPECS[t].output] }} title={`sortie : ${SOCKET_LABELS[NODE_SPECS[t].output].name}`} />
                         <span className="palette__ic">{nodeIcon(t, false)}</span>
                         {NODE_SPECS[t].label}
                       </button>
