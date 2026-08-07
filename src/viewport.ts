@@ -65,6 +65,14 @@ export class Viewport {
   private onScale: ((factor: number) => void) | null = null;
   /** object centre with the node's translation removed — stable drag reference */
   private gizmoBase = new THREE.Vector3();
+  /** snapshot taken at drag-start so we can preview the move locally (no kernel
+   * recompute) and only commit the final value on release */
+  private gizmoDragSnap: {
+    proxyPos: THREE.Vector3;
+    proxyQuat: THREE.Quaternion;
+    proxyScale: number;
+    meshQuat: THREE.Quaternion;
+  } | null = null;
 
   constructor(container: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
@@ -626,21 +634,70 @@ export class Viewport {
     this.gizmo.attach(this.gizmoProxy);
     this.scene.add(this.gizmo as unknown as THREE.Object3D);
     this.gizmo.addEventListener("dragging-changed", (e) => {
-      this.gizmoDragging = (e as unknown as { value: boolean }).value;
-      this.controls.enabled = !this.gizmoDragging;
-    });
-    this.gizmo.addEventListener("objectChange", () => {
-      const p = this.gizmoProxy!;
-      if (this.gizmoMode === "translate") {
-        this.onTranslate?.([p.position.x - this.gizmoBase.x, p.position.y - this.gizmoBase.y, p.position.z - this.gizmoBase.z]);
-      } else if (this.gizmoMode === "rotate") {
-        const e = p.rotation;
-        const rad = this.gizmoAxis === "X" ? e.x : this.gizmoAxis === "Y" ? e.y : e.z;
-        this.onRotate?.((rad * 180) / Math.PI);
+      const dragging = (e as unknown as { value: boolean }).value;
+      this.gizmoDragging = dragging;
+      this.controls.enabled = !dragging;
+      const p = this.gizmoProxy;
+      if (dragging) {
+        // snapshot proxy + mesh orientation so objectChange previews the move
+        // against a stable reference
+        this.gizmoDragSnap = p && {
+          proxyPos: p.position.clone(),
+          proxyQuat: p.quaternion.clone(),
+          proxyScale: p.scale.x,
+          meshQuat: this.mesh ? this.mesh.quaternion.clone() : new THREE.Quaternion(),
+        };
       } else {
-        this.onScale?.(p.scale.x);
+        // release: commit the final value ONCE → a single kernel recompute. The
+        // mesh keeps its previewed transform until the fresh geometry lands, so
+        // there is no snap-back flicker.
+        this.commitGizmoValue();
+        this.gizmoDragSnap = null;
       }
     });
+
+    // Live, kernel-free preview: dragging just moves/rotates/scales the DISPLAYED
+    // mesh directly so the part follows the gizmo in real time. The heavy B-rep
+    // recompute is deferred to release (see dragging-changed above).
+    this.gizmo.addEventListener("objectChange", () => {
+      const p = this.gizmoProxy;
+      const m = this.mesh;
+      const snap = this.gizmoDragSnap;
+      if (!p || !m || !snap) return;
+      if (this.gizmoMode === "translate") {
+        m.position.set(
+          p.position.x - snap.proxyPos.x,
+          p.position.y - snap.proxyPos.y,
+          p.position.z - snap.proxyPos.z,
+        );
+      } else if (this.gizmoMode === "rotate") {
+        // kernel rotates about the world origin, so preview does too
+        const dq = p.quaternion.clone().multiply(snap.proxyQuat.clone().invert());
+        m.quaternion.copy(dq).multiply(snap.meshQuat);
+        m.position.set(0, 0, 0);
+      } else {
+        // kernel scales about the world origin
+        m.scale.setScalar(p.scale.x / snap.proxyScale);
+        m.position.set(0, 0, 0);
+      }
+      m.updateMatrixWorld();
+    });
+  }
+
+  /** Fire the bound param callback with the gizmo's final value — called once on
+   * drag release so a single kernel recompute produces the real B-rep. */
+  private commitGizmoValue() {
+    const p = this.gizmoProxy;
+    if (!p) return;
+    if (this.gizmoMode === "translate") {
+      this.onTranslate?.([p.position.x - this.gizmoBase.x, p.position.y - this.gizmoBase.y, p.position.z - this.gizmoBase.z]);
+    } else if (this.gizmoMode === "rotate") {
+      const e = p.rotation;
+      const rad = this.gizmoAxis === "X" ? e.x : this.gizmoAxis === "Y" ? e.y : e.z;
+      this.onRotate?.((rad * 180) / Math.PI);
+    } else {
+      this.onScale?.(p.scale.x);
+    }
   }
 
   private modelCenter(): THREE.Vector3 {
