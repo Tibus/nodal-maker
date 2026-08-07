@@ -1138,11 +1138,17 @@ export default function NodeEditor({
       } else if (mod && e.key.toLowerCase() === "d") {
         e.preventDefault();
         duplicateSelection();
+      } else if (!mod && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        onFit?.(); // frame the 3D model
+      } else if (!mod && (e.key === "0" || e.key === "Home")) {
+        e.preventDefault();
+        rf.current?.fitView({ padding: 0.2, duration: 200 }); // frame the node graph
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [undo, redo, copySelection, pasteClipboard, duplicateSelection, editingSketchId]);
+  }, [undo, redo, copySelection, pasteClipboard, duplicateSelection, editingSketchId, onFit]);
 
   const isValidConnection = useCallback(
     (c: Connection | Edge) => {
