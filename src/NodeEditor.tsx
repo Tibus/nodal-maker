@@ -1170,11 +1170,11 @@ export default function NodeEditor({
     // a cycle (shouldn't happen in a DAG) leaves some nodes at layer 0 — harmless
 
     const nLayers = Math.max(...flow.map((n) => layer.get(n.id)!)) + 1;
-    const layers: string[][] = Array.from({ length: nLayers }, () => []);
+    let layers: string[][] = Array.from({ length: nLayers }, () => []);
     flow.forEach((n) => layers[layer.get(n.id)!].push(n.id));
 
     // seed within-layer order by current y so the result stays near the user's
-    // mental model, then refine with the median heuristic
+    // mental model, then refine to minimise edge crossings
     layers.forEach((col) => col.sort((a, b) => byId.get(a)!.position.y - byId.get(b)!.position.y));
     const order = new Map<string, number>();
     const reindex = () => layers.forEach((col) => col.forEach((id, i) => order.set(id, i)));
@@ -1184,8 +1184,23 @@ export default function NodeEditor({
       const s = [...xs].sort((a, b) => a - b), m = s.length >> 1;
       return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
     };
-    for (let sweep = 0; sweep < 6; sweep++) {
-      const down = sweep % 2 === 0;
+    // exact crossing count between two adjacent columns: order the edges by
+    // their upper endpoint, then count inversions of the lower endpoints
+    const crossings = (upper: string[], lower: string[]) => {
+      const pl = new Map(lower.map((id, i) => [id, i]));
+      const ep: Array<[number, number]> = [];
+      upper.forEach((u, iu) => { for (const v of outAdj.get(u)!) if (pl.has(v)) ep.push([iu, pl.get(v)!]); });
+      ep.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      let c = 0;
+      for (let i = 0; i < ep.length; i++) for (let j = i + 1; j < ep.length; j++) if (ep[i][1] > ep[j][1]) c++;
+      return c;
+    };
+    const localCross = (l: number) =>
+      (l > 0 ? crossings(layers[l - 1], layers[l]) : 0) + (l < nLayers - 1 ? crossings(layers[l], layers[l + 1]) : 0);
+    const total = () => { let c = 0; for (let l = 0; l < nLayers - 1; l++) c += crossings(layers[l], layers[l + 1]); return c; };
+    // median/barycenter sweep — reorder a layer by the median position of its
+    // neighbours on the incoming (down) or outgoing (up) side
+    const medianSweep = (down: boolean) => {
       const idxs = layers.map((_, i) => i);
       if (!down) idxs.reverse();
       for (const l of idxs) {
@@ -1202,7 +1217,36 @@ export default function NodeEditor({
         layers[l] = res as string[];
         reindex();
       }
+    };
+    // greedy transposition: swap adjacent nodes in a layer whenever it lowers
+    // the crossing count against the neighbouring layers (Sugiyama refinement)
+    const transpose = () => {
+      let improved = true, guard = 0;
+      while (improved && guard++ < 40) {
+        improved = false;
+        for (let l = 0; l < nLayers; l++) {
+          const col = layers[l];
+          for (let i = 0; i < col.length - 1; i++) {
+            const before = localCross(l);
+            [col[i], col[i + 1]] = [col[i + 1], col[i]];
+            if (localCross(l) < before) improved = true;
+            else [col[i], col[i + 1]] = [col[i + 1], col[i]]; // revert
+          }
+        }
+      }
+      reindex();
+    };
+    // alternate median sweeps and transposition, keeping the best ordering seen
+    let best = layers.map((c) => [...c]);
+    let bestC = total();
+    for (let sweep = 0; sweep < 12 && bestC > 0; sweep++) {
+      medianSweep(sweep % 2 === 0);
+      transpose();
+      const c = total();
+      if (c < bestC) { bestC = c; best = layers.map((col) => [...col]); }
     }
+    layers = best;
+    reindex();
 
     // fixed x per layer (widest node in it), y stacked by height, columns
     // vertically centred; anchored at the flow's current top-left corner
