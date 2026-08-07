@@ -1000,15 +1000,25 @@ export default function NodeEditor({
     // the viewed node's own build chain (its ancestors + descendants). These are
     // stages of the *same* body, so we don't draw them on top of the output —
     // only independent bodies show translucent alongside it.
-    const lineage = new Set<string>([validOut]);
-    let grew = true;
-    while (grew) {
-      grew = false;
-      for (const e of edges) {
-        if (lineage.has(e.target) && !lineage.has(e.source)) { lineage.add(e.source); grew = true; }
-        if (lineage.has(e.source) && !lineage.has(e.target)) { lineage.add(e.target); grew = true; }
+    // Walk strictly in one direction from the viewed node. A *bidirectional*
+    // flood would leak across shared ancestors: e.g. viewing a boolean(cylA,cylB)
+    // would climb to cylA then descend cylA's *other* branch and wrongly swallow
+    // a sibling body (a transform of cylA that isn't merged back). Ancestors are
+    // consumed into the output; descendants are built from it — both are the same
+    // body's stages. A sibling branch is neither, so it stays visible.
+    const walk = (dir: "up" | "down") => {
+      const set = new Set<string>([validOut]);
+      let grew = true;
+      while (grew) {
+        grew = false;
+        for (const e of edges) {
+          if (dir === "up" && set.has(e.target) && !set.has(e.source)) { set.add(e.source); grew = true; }
+          if (dir === "down" && set.has(e.source) && !set.has(e.target)) { set.add(e.target); grew = true; }
+        }
       }
-    }
+      return set;
+    };
+    const lineage = new Set<string>([...walk("up"), ...walk("down")]);
     // extra bodies: only *terminal* nodes (no outgoing edge) render as separate
     // bodies — an intermediate stage is already represented by its downstream
     // result, so drawing it too would stack duplicates. Also drop the output,
