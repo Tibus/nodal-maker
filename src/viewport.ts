@@ -29,6 +29,8 @@ export class Viewport {
   private selPreviewObj: THREE.Object3D | null = null;
   // transient highlight when hovering a node's selection OUTPUT port
   private portHl: THREE.Object3D | null = null;
+  // persistent highlight of the feature a selected modifier acts on
+  private featureHl: THREE.Object3D | null = null;
   private measures: THREE.Object3D[] = [];
   private edgesObj: THREE.LineSegments | null = null;
   private modelDiag = 100;
@@ -1132,10 +1134,9 @@ export class Viewport {
     this.buildSelectionPreview();
   }
 
-  /** Flash the faces (triangles) / edges (segments) a selection-output port
-   *  targets, computed on the B-rep by the kernel. Pass empty arrays to clear. */
-  showPortHighlight(tris: Float32Array, segs: Float32Array) {
-    this.clearPortHighlight();
+  /** Build a green overlay group from face triangles + edge segments (kernel B-rep).
+   *  Edges → thick tubes (readable), lines only for pathologically large sets. */
+  private buildHighlightGroup(tris: Float32Array, segs: Float32Array): THREE.Group | null {
     const group = new THREE.Group();
     if (tris.length) {
       const g = new THREE.BufferGeometry();
@@ -1145,8 +1146,6 @@ export class Viewport {
       group.add(mesh);
     }
     if (segs.length) {
-      // thick tubes read far better than hairlines; fall back to plain lines only
-      // for pathologically large sets (keeps the transient highlight cheap)
       if (segs.length / 6 <= 600) {
         const r = Math.max(0.4, this.modelDiag * 0.006);
         const mat = new THREE.MeshBasicMaterial({ color: 0x39d98a, depthTest: false });
@@ -1166,18 +1165,38 @@ export class Viewport {
         group.add(lines);
       }
     }
-    if (!group.children.length) return;
-    this.scene.add(group);
-    this.portHl = group;
+    return group.children.length ? group : null;
+  }
+
+  private disposeHl(o: THREE.Object3D | null) {
+    if (!o) return;
+    this.scene.remove(o);
+    o.traverse((c) => { if (c instanceof THREE.Mesh || c instanceof THREE.LineSegments) { c.geometry.dispose(); (c.material as THREE.Material).dispose?.(); } });
+  }
+
+  /** TRANSIENT hover flash for a selection-output port (cleared on re-eval). */
+  showPortHighlight(tris: Float32Array, segs: Float32Array) {
+    this.clearPortHighlight();
+    this.portHl = this.buildHighlightGroup(tris, segs);
+    if (this.portHl) this.scene.add(this.portHl);
   }
 
   clearPortHighlight() {
-    if (!this.portHl) return;
-    this.scene.remove(this.portHl);
-    this.portHl.traverse((o) => {
-      if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) { o.geometry.dispose(); (o.material as THREE.Material).dispose?.(); }
-    });
+    this.disposeHl(this.portHl);
     this.portHl = null;
+  }
+
+  /** PERSISTENT highlight of the feature a selected modifier acts on. The caller
+   *  re-applies it after every eval (fresh geometry), so it survives param edits. */
+  setFeatureHighlight(tris: Float32Array, segs: Float32Array) {
+    this.clearFeatureHighlight();
+    this.featureHl = this.buildHighlightGroup(tris, segs);
+    if (this.featureHl) this.scene.add(this.featureHl);
+  }
+
+  clearFeatureHighlight() {
+    this.disposeHl(this.featureHl);
+    this.featureHl = null;
   }
 
   private clearSelectionPreview() {

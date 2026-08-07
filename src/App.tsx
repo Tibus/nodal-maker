@@ -198,19 +198,22 @@ export default function App() {
     viewportRef.current?.setClip(clipAxis, clipPos, clipFlip);
   }, [clipAxis, clipPos, clipFlip]);
 
-  // highlight the feature a modifier node acts on, when it's selected
-  const onFeaturePreview = useCallback((nodeId: string | null) => {
-    window.clearTimeout(portHoverTimer.current);
-    if (!nodeId) { viewportRef.current?.clearPortHighlight(); return; }
-    portHoverTimer.current = window.setTimeout(async () => {
-      const g = lastGraph.current;
-      if (!g) return;
-      try {
-        const r = await kernel.describeFeature(g, nodeId, lastVars.current);
-        viewportRef.current?.showPortHighlight(r.tris, r.segs);
-      } catch { /* ignore */ }
-    }, 40);
+  // highlight the feature a modifier node acts on, while it's selected. Persistent:
+  // we remember the node and re-apply after every eval so it survives param edits.
+  const activeFeature = useRef<string | null>(null);
+  const refreshFeature = useCallback(async () => {
+    const nodeId = activeFeature.current, g = lastGraph.current;
+    if (!nodeId || !g) return;
+    try {
+      const r = await kernel.describeFeature(g, nodeId, lastVars.current);
+      if (activeFeature.current === nodeId) viewportRef.current?.setFeatureHighlight(r.tris, r.segs);
+    } catch { /* ignore */ }
   }, []);
+  const onFeaturePreview = useCallback((nodeId: string | null) => {
+    activeFeature.current = nodeId;
+    if (!nodeId) { viewportRef.current?.clearFeatureHighlight(); return; }
+    void refreshFeature();
+  }, [refreshFeature]);
 
   // highlight the geometry a node's selection-output port targets, on hover
   const onPortHover = useCallback((info: { nodeId: string; port: string } | null) => {
@@ -247,6 +250,7 @@ export default function App() {
         prevOutputId.current = outputId;
         viewportRef.current?.setGeometry(res.mesh, reframe);
         viewportRef.current?.setExtraBodies(res.extras ?? []);
+        void refreshFeature(); // re-apply the selected modifier's feature highlight on the new geometry
         setStatus(`${res.mesh.stats.faceCount} regions · ${res.mesh.stats.triangleCount} triangles`);
         const solidLike = res.outputKind === "solid" || res.outputKind === "mesh";
         setProps(solidLike ? meshMassProps(res.mesh.vertices, res.mesh.indices) : null);
