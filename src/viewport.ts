@@ -53,8 +53,8 @@ export class Viewport {
   // index buffer — no CPU line-expansion, so it stays fast even on a dense STL
   private meshWire: THREE.Mesh | null = null;
   private wireMat: THREE.MeshBasicMaterial | null = null;
-  // a dense mesh (imported STL): its all-edges wireframe is heavy + unreadable, so
-  // it only shows in the explicit wireframe mode, not the default edges overlay
+  // a dense mesh (imported STL): skip the O(tris) dihedral EdgesGeometry build
+  // (edge-picking raycast target) that would freeze the main thread on import
   private heavyMesh = false;
   private grid: THREE.GridHelper | null = null;
   // section-cap: fills the cut surface via the stencil buffer (a solid section,
@@ -281,9 +281,9 @@ export class Viewport {
       (this.brepEdges.material as THREE.LineBasicMaterial).color.setHex(edgeHex);
     }
     if (this.meshWire && this.wireMat) {
-      // dense mesh: all-edges wireframe only in the explicit wireframe mode (it is
-      // heavy + unreadable overlaid on faces); a light mesh shows it in edges too
-      this.meshWire.visible = this.heavyMesh ? this.viewMode === "wireframe" : this.viewMode !== "shaded";
+      // show the triangle wireframe over the faces in edges mode, and alone in
+      // wireframe mode — the cheap GPU overlay keeps this fine even on a dense STL
+      this.meshWire.visible = this.viewMode !== "shaded";
       this.wireMat.color.setHex(edgeHex);
     }
     if (this.extraGroup) {
