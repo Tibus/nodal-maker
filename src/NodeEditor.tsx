@@ -398,19 +398,43 @@ function ParamField({
     // a number field also accepts an expression ("width/2 + 4"); a plain number
     // is stored as a number, anything else as a string the kernel evaluates
     const isExpr = typeof value === "string" && value.trim() !== "" && Number.isNaN(Number(value));
+    // stays a TEXT input so expressions are still typable, but a plain number
+    // gets number-input ergonomics: wheel + ↑/↓ step it (Shift = ×10), clamped
+    // to the spec's range. Wheel only bites while focused, like a real spinner.
+    const step = Number(spec.step ?? 1) || 1;
+    const bump = (dir: number, mult = 1) => {
+      if (isExpr) return;
+      const cur = Number(value);
+      let next = (Number.isNaN(cur) ? 0 : cur) + dir * step * mult;
+      if (typeof spec.min === "number") next = Math.max(spec.min, next);
+      if (typeof spec.max === "number") next = Math.min(spec.max, next);
+      onChange(Number(next.toFixed(4)));
+    };
     return (
       <label className="pf">
         <span>{label}</span>
         <input
           type="text"
           inputMode="decimal"
-          className={isExpr ? "pf__expr" : undefined}
-          title={isExpr ? "expression" : "number or expression (e.g. width/2)"}
+          // `nowheel` stops React Flow from swallowing the wheel event (its zoom
+          // handler) so our own step-on-scroll below can fire
+          className={`nowheel${isExpr ? " pf__expr" : ""}`}
+          title={isExpr ? "expression" : "number or expression — scroll / ↑↓ to step (⇧ ×10)"}
           value={value == null ? "" : String(value)}
           onChange={(e) => {
             const raw = e.target.value;
             const n = Number(raw);
             onChange(raw.trim() !== "" && !Number.isNaN(n) ? n : raw);
+          }}
+          onWheel={(e) => {
+            if (isExpr || document.activeElement !== e.currentTarget) return;
+            e.preventDefault();
+            bump(e.deltaY < 0 ? 1 : -1, e.shiftKey ? 10 : 1);
+          }}
+          onKeyDown={(e) => {
+            if (isExpr) return;
+            if (e.key === "ArrowUp") { e.preventDefault(); bump(1, e.shiftKey ? 10 : 1); }
+            else if (e.key === "ArrowDown") { e.preventDefault(); bump(-1, e.shiftKey ? 10 : 1); }
           }}
         />
       </label>
