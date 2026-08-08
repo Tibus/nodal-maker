@@ -15,6 +15,7 @@ import {
   ReactFlow,
   Background,
   Controls,
+  ControlButton,
   MiniMap,
   Handle,
   Position,
@@ -1946,7 +1947,6 @@ export default function NodeEditor({
             <button onClick={redo} disabled={histLen.redo === 0} title="Redo (⇧⌘Z)">↷</button>
             <button onClick={() => onFit?.()} title="Fit view">⊹</button>
             <button onClick={() => onTopView?.()} title="Top view (2D)">▣</button>
-            <button onClick={autoArrange} title="Auto-arrange nodes (L)">▦</button>
             <button onClick={collapseSelection} title="Group selection into a component">⧉</button>
             <button onClick={addNote} title="Add a comment note">📝</button>
             <button
@@ -2147,7 +2147,10 @@ export default function NodeEditor({
             proOptions={{ hideAttribution: true }}
           >
             <Background color="#2a2e36" gap={18} />
-            <Controls position="top-left" />
+            <Controls position="top-left">
+              {/* auto-arrange, tucked under the built-in zoom/fit/lock buttons */}
+              <ControlButton onClick={autoArrange} title="Auto-arrange nodes (L)">▦</ControlButton>
+            </Controls>
             <MiniMap pannable zoomable className="editor__minimap" position="top-right" />
           </ReactFlow>
         </Ctx.Provider>
