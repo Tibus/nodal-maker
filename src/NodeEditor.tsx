@@ -34,6 +34,7 @@ import {
   NODE_CATEGORIES,
   NODE_DESCRIPTIONS,
   NODE_THUMBS,
+  PARAMS_OVERRIDDEN_BY_INPUT,
   SOCKET_COLORS,
   SOCKET_LABELS,
   paramPortType,
@@ -241,6 +242,11 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
 
         {/* params — those that are portable get an OPTIONAL, hollow port */}
         {spec.params.map((ps) => {
+          // hide params that a connected optional input now drives (e.g. the
+          // axis picker once an Axis node is wired, or the manual origin/dir of
+          // an Axis node once a cylindrical face feeds it)
+          const ovr = PARAMS_OVERRIDDEN_BY_INPUT[data.nodeType];
+          if (ovr && Object.entries(ovr).some(([port, ps2]) => (ps2 as string[]).includes(ps.name) && ctx.isLinked(id, port))) return null;
           // the sketch doc renders as an "Edit" button plus one field per
           // driving dimension (those mirror into node params and re-solve)
           if (ps.kind === "sketch") {

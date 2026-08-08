@@ -35,6 +35,18 @@ export interface NodeSpec {
   selectionOutputs?: { name: string; target: "face" | "edge" }[];
 }
 
+/**
+ * When an optional INPUT port is wired, it drives these params, so they no
+ * longer have any effect — the editor hides them to avoid confusion. Keyed by
+ * node type, then by the port name that overrides them.
+ */
+export const PARAMS_OVERRIDDEN_BY_INPUT: Record<string, Record<string, string[]>> = {
+  // an Axis derived from a cylindrical face supplies both origin and direction
+  axis: { face: ["dir", "ox", "oy", "oz"] },
+  // a wired Axis replaces the X/Y/Z axis picker on the radial pattern
+  arrayRadial3d: { axis: ["axis"] },
+};
+
 /** Colour per socket type — shared by the editor handles and edge styling. */
 export const SOCKET_COLORS: Record<SocketType, string> = {
   sketch2d: "#c678dd", // purple — 2D profiles
