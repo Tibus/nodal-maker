@@ -10,11 +10,20 @@ import { dirname, join } from "node:path";
 import { initKernel } from "../test/kernel";
 import { evalToPayload } from "../src/kernel/model";
 import { NODE_SPECS, SOCKET_COLORS } from "../src/kernel/specs";
+import { evalExpr } from "../src/kernel/expr";
 import type { Graph } from "../src/kernel/nodes";
 
 type In = Record<string, string | string[]>;
 interface N { id: string; type: string; params?: Record<string, unknown>; inputs?: In }
-interface Ex { name: string; title: string; outputId: string; nodes: N[] }
+interface UP { name: string; expr: string }
+interface Ex { name: string; title: string; outputId: string; nodes: N[]; userParams?: UP[] }
+
+/** resolve named user parameters (later ones may reference earlier) to numbers */
+function resolveVars(ups: UP[] = []): Record<string, number> {
+  const vars: Record<string, number> = {};
+  for (const p of ups) { try { vars[p.name] = evalExpr(p.expr || "0", vars); } catch { vars[p.name] = 0; } }
+  return vars;
+}
 
 /* ------------------------------------------------------------------ */
 /* Example definitions                                                 */
@@ -234,6 +243,42 @@ EXAMPLES.push({
   ],
 });
 
+// 8) Parametric project box — EVERY dimension is driven by a named variable in
+//    the ƒ Parameters panel. Edit W/D/H/wall… and the whole box + its bosses and
+//    screw holes update together. Number fields hold expressions, not constants.
+EXAMPLES.push({
+  name: "parametric-box",
+  title: "Parametric project box — driven by ƒ Parameters variables (W, D, H, wall…)",
+  outputId: "final",
+  userParams: [
+    { name: "W", expr: "90" },      // outer width
+    { name: "D", expr: "60" },      // outer depth
+    { name: "H", expr: "30" },      // outer height
+    { name: "wall", expr: "2.5" },  // wall / floor thickness
+    { name: "rad", expr: "6" },     // corner fillet
+    { name: "inset", expr: "9" },   // boss inset from the corners
+    { name: "bossR", expr: "4" },   // screw-boss radius
+    { name: "screwR", expr: "1.6" },// screw clearance radius
+  ],
+  nodes: [
+    { id: "box", type: "box", params: { x: "W", y: "D", z: "H" } },
+    { id: "vE", type: "edgeSelect", params: { where: "vertical" } },
+    { id: "boxF", type: "fillet", params: { radius: "rad" }, inputs: { in: "box", sel: "vE" } },
+    { id: "topSel", type: "faceSelect", params: { where: "top" } },
+    { id: "shell", type: "shell", params: { thickness: "wall" }, inputs: { in: "boxF", faces: "topSel" } },
+    { id: "boss", type: "cylinder", params: { radius: "bossR", height: "H-wall" } },
+    { id: "bossP", type: "transform", params: { tx: "-(W/2-inset)", ty: "-(D/2-inset)" }, inputs: { in: "boss" } },
+    { id: "bossRow", type: "arrayLinear3d", params: { count: 2, dx: "W-2*inset", dy: 0, dz: 0 }, inputs: { in: "bossP" } },
+    { id: "bossGrid", type: "arrayLinear3d", params: { count: 2, dx: 0, dy: "D-2*inset", dz: 0 }, inputs: { in: "bossRow" } },
+    { id: "withBosses", type: "boolean3d", params: { op: "union" }, inputs: { base: "shell", tool: "bossGrid" } },
+    { id: "screw", type: "cylinder", params: { radius: "screwR", height: "H+4" } },
+    { id: "screwP", type: "transform", params: { tx: "-(W/2-inset)", ty: "-(D/2-inset)", tz: -2 }, inputs: { in: "screw" } },
+    { id: "screwRow", type: "arrayLinear3d", params: { count: 2, dx: "W-2*inset", dy: 0, dz: 0 }, inputs: { in: "screwP" } },
+    { id: "screwGrid", type: "arrayLinear3d", params: { count: 2, dx: 0, dy: "D-2*inset", dz: 0 }, inputs: { in: "screwRow" } },
+    { id: "final", type: "boolean3d", params: { op: "difference" }, inputs: { base: "withBosses", tool: "screwGrid" } },
+  ],
+});
+
 /* ------------------------------------------------------------------ */
 /* Build → validate → layout → emit                                    */
 /* ------------------------------------------------------------------ */
@@ -279,14 +324,17 @@ function toDoc(ex: Ex) {
         const stroke = SOCKET_COLORS[NODE_SPECS[srcType].output];
         edges.push({ id: `e${e++}`, source: src, sourceHandle: "out", target: n.id, targetHandle: port, style: { stroke } });
       }
-  return { version: 1, title: ex.title, outputId: ex.outputId, nodes, edges };
+  const userParams = (ex.userParams ?? []).map((p, i) => ({ id: `up${i}`, name: p.name, expr: p.expr }));
+  const doc: Record<string, unknown> = { version: 1, title: ex.title, outputId: ex.outputId, nodes, edges };
+  if (userParams.length) doc.userParams = userParams;
+  return doc;
 }
 
 async function main() {
   await initKernel();
   const outDir = join(dirname(fileURLToPath(import.meta.url)), "..", "examples");
   for (const ex of EXAMPLES) {
-    const res = evalToPayload(toGraph(ex.nodes), ex.outputId);
+    const res = evalToPayload(toGraph(ex.nodes), ex.outputId, undefined, undefined, resolveVars(ex.userParams));
     const errs = res.nodeErrors ?? {};
     const nErr = Object.keys(errs).length;
     const tris = res.mesh ? res.mesh.indices.length / 3 : 0;

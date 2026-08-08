@@ -1,0 +1,405 @@
+{
+  "version": 1,
+  "title": "Parametric project box — driven by ƒ Parameters variables (W, D, H, wall…)",
+  "outputId": "final",
+  "nodes": [
+    {
+      "id": "box",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "box",
+        "params": {
+          "x": "W",
+          "y": "D",
+          "z": "H"
+        }
+      }
+    },
+    {
+      "id": "vE",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "edgeSelect",
+        "params": {
+          "where": "vertical"
+        }
+      }
+    },
+    {
+      "id": "boxF",
+      "position": {
+        "x": 260,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "fillet",
+        "params": {
+          "radius": "rad"
+        }
+      }
+    },
+    {
+      "id": "topSel",
+      "position": {
+        "x": 0,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "faceSelect",
+        "params": {
+          "where": "top"
+        }
+      }
+    },
+    {
+      "id": "shell",
+      "position": {
+        "x": 520,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "shell",
+        "params": {
+          "thickness": "wall"
+        }
+      }
+    },
+    {
+      "id": "boss",
+      "position": {
+        "x": 0,
+        "y": 450
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": "bossR",
+          "height": "H-wall"
+        }
+      }
+    },
+    {
+      "id": "bossP",
+      "position": {
+        "x": 260,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": "-(W/2-inset)",
+          "ty": "-(D/2-inset)"
+        }
+      }
+    },
+    {
+      "id": "bossRow",
+      "position": {
+        "x": 520,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "arrayLinear3d",
+        "params": {
+          "count": 2,
+          "dx": "W-2*inset",
+          "dy": 0,
+          "dz": 0
+        }
+      }
+    },
+    {
+      "id": "bossGrid",
+      "position": {
+        "x": 780,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "arrayLinear3d",
+        "params": {
+          "count": 2,
+          "dx": 0,
+          "dy": "D-2*inset",
+          "dz": 0
+        }
+      }
+    },
+    {
+      "id": "withBosses",
+      "position": {
+        "x": 1040,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "union"
+        }
+      }
+    },
+    {
+      "id": "screw",
+      "position": {
+        "x": 0,
+        "y": 600
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": "screwR",
+          "height": "H+4"
+        }
+      }
+    },
+    {
+      "id": "screwP",
+      "position": {
+        "x": 260,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": "-(W/2-inset)",
+          "ty": "-(D/2-inset)",
+          "tz": -2
+        }
+      }
+    },
+    {
+      "id": "screwRow",
+      "position": {
+        "x": 520,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "arrayLinear3d",
+        "params": {
+          "count": 2,
+          "dx": "W-2*inset",
+          "dy": 0,
+          "dz": 0
+        }
+      }
+    },
+    {
+      "id": "screwGrid",
+      "position": {
+        "x": 780,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "arrayLinear3d",
+        "params": {
+          "count": 2,
+          "dx": 0,
+          "dy": "D-2*inset",
+          "dz": 0
+        }
+      }
+    },
+    {
+      "id": "final",
+      "position": {
+        "x": 1300,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "box",
+      "sourceHandle": "out",
+      "target": "boxF",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "vE",
+      "sourceHandle": "out",
+      "target": "boxF",
+      "targetHandle": "sel",
+      "style": {
+        "stroke": "#d19a66"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "boxF",
+      "sourceHandle": "out",
+      "target": "shell",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "topSel",
+      "sourceHandle": "out",
+      "target": "shell",
+      "targetHandle": "faces",
+      "style": {
+        "stroke": "#61afef"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "boss",
+      "sourceHandle": "out",
+      "target": "bossP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e5",
+      "source": "bossP",
+      "sourceHandle": "out",
+      "target": "bossRow",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e6",
+      "source": "bossRow",
+      "sourceHandle": "out",
+      "target": "bossGrid",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e7",
+      "source": "shell",
+      "sourceHandle": "out",
+      "target": "withBosses",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e8",
+      "source": "bossGrid",
+      "sourceHandle": "out",
+      "target": "withBosses",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e9",
+      "source": "screw",
+      "sourceHandle": "out",
+      "target": "screwP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e10",
+      "source": "screwP",
+      "sourceHandle": "out",
+      "target": "screwRow",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e11",
+      "source": "screwRow",
+      "sourceHandle": "out",
+      "target": "screwGrid",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e12",
+      "source": "withBosses",
+      "sourceHandle": "out",
+      "target": "final",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e13",
+      "source": "screwGrid",
+      "sourceHandle": "out",
+      "target": "final",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    }
+  ],
+  "userParams": [
+    {
+      "id": "up0",
+      "name": "W",
+      "expr": "90"
+    },
+    {
+      "id": "up1",
+      "name": "D",
+      "expr": "60"
+    },
+    {
+      "id": "up2",
+      "name": "H",
+      "expr": "30"
+    },
+    {
+      "id": "up3",
+      "name": "wall",
+      "expr": "2.5"
+    },
+    {
+      "id": "up4",
+      "name": "rad",
+      "expr": "6"
+    },
+    {
+      "id": "up5",
+      "name": "inset",
+      "expr": "9"
+    },
+    {
+      "id": "up6",
+      "name": "bossR",
+      "expr": "4"
+    },
+    {
+      "id": "up7",
+      "name": "screwR",
+      "expr": "1.6"
+    }
+  ]
+}
