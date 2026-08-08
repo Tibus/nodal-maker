@@ -67,8 +67,42 @@ export function meshAndTag(solid: Shape3D): MeshPayload {
  * by its normal — mirroring `meshAndTag` for solids.
  */
 export function meshToPayload(md: MeshData): MeshPayload {
-  const regions = segmentMesh(md);
   const triTotal = md.indices.length / 3;
+
+  // A LARGE mesh (an imported STL) must NOT be segmented: on a smooth mesh no two
+  // triangles are coplanar, so segmentMesh yields one region PER TRIANGLE — a
+  // pathological payload (hundreds of thousands of groups + a de-indexed buffer)
+  // that stalls the transfer, the geometry build and the mass-props on the main
+  // thread. Instead keep the raw INDEXED geometry with a single group; the
+  // viewport flat-shades it, so the facets come from screen-space derivatives and
+  // we only need cheap per-vertex normals (ignored under flat shading anyway).
+  if (triTotal > 40_000) {
+    const nv = md.vertices.length / 3;
+    const normals = new Float32Array(md.vertices.length);
+    for (let t = 0; t < triTotal; t++) {
+      const a = md.indices[t * 3], b = md.indices[t * 3 + 1], c = md.indices[t * 3 + 2];
+      const ax = md.vertices[a * 3], ay = md.vertices[a * 3 + 1], az = md.vertices[a * 3 + 2];
+      const ux = md.vertices[b * 3] - ax, uy = md.vertices[b * 3 + 1] - ay, uz = md.vertices[b * 3 + 2] - az;
+      const vx = md.vertices[c * 3] - ax, vy = md.vertices[c * 3 + 1] - ay, vz = md.vertices[c * 3 + 2] - az;
+      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; // area-weighted
+      for (const vi of [a, b, c]) { normals[vi * 3] += nx; normals[vi * 3 + 1] += ny; normals[vi * 3 + 2] += nz; }
+    }
+    for (let i = 0; i < nv; i++) {
+      const x = normals[i * 3], y = normals[i * 3 + 1], z = normals[i * 3 + 2];
+      const l = Math.hypot(x, y, z) || 1;
+      normals[i * 3] = x / l; normals[i * 3 + 1] = y / l; normals[i * 3 + 2] = z / l;
+    }
+    return {
+      vertices: md.vertices,
+      indices: md.indices,
+      normals,
+      groups: [{ start: 0, count: md.indices.length, faceId: 0, tag: "side" }],
+      faceted: true,
+      stats: { faceCount: 1, triangleCount: triTotal, tagCounts: { top: 0, bottom: 0, side: triTotal } },
+    };
+  }
+
+  const regions = segmentMesh(md);
   const vertices = new Float32Array(triTotal * 9);
   const normals = new Float32Array(triTotal * 9);
   const indices = new Uint32Array(triTotal * 3);

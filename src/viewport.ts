@@ -53,6 +53,9 @@ export class Viewport {
   // index buffer — no CPU line-expansion, so it stays fast even on a dense STL
   private meshWire: THREE.Mesh | null = null;
   private wireMat: THREE.MeshBasicMaterial | null = null;
+  // a dense mesh (imported STL): its all-edges wireframe is heavy + unreadable, so
+  // it only shows in the explicit wireframe mode, not the default edges overlay
+  private heavyMesh = false;
   private grid: THREE.GridHelper | null = null;
   // section-cap: fills the cut surface via the stencil buffer (a solid section,
   // not a hollow hole). Holds two stencil passes + the cap plane.
@@ -179,12 +182,24 @@ export class Viewport {
     this.scene.add(mesh);
     this.mesh = mesh;
 
+    // EdgesGeometry (dihedral) and a per-triangle wireframe are O(triangles) with
+    // a heavy constant — on a dense imported STL (100k+ tris) they freeze the main
+    // thread on build and render an unreadable, slow line mush. Above this limit we
+    // skip both: the flat-shaded facets alone already read as "a mesh".
+    const nTris = payload.indices.length / 3;
+    this.heavyMesh = !!payload.faceted && nTris > 60_000;
+
     // a feature-edge line set kept off-scene purely as a raycast target for
-    // edge picking (built from the mesh by dihedral angle threshold)
-    if (this.edgesObj) this.edgesObj.geometry.dispose();
-    const eg = new THREE.EdgesGeometry(geom, 18);
-    this.edgesObj = new THREE.LineSegments(eg, new THREE.LineBasicMaterial());
-    this.edgesObj.updateMatrixWorld();
+    // edge picking (built by dihedral angle threshold). EdgesGeometry is O(tris)
+    // with a heavy constant — skip it on a dense mesh where it would freeze the
+    // main thread on build (and mesh edge-picking is marginal anyway).
+    if (this.edgesObj) { this.edgesObj.geometry.dispose(); this.edgesObj = null; }
+    let eg: THREE.EdgesGeometry | null = null;
+    if (!this.heavyMesh) {
+      eg = new THREE.EdgesGeometry(geom, 18);
+      this.edgesObj = new THREE.LineSegments(eg, new THREE.LineBasicMaterial());
+      this.edgesObj.updateMatrixWorld();
+    }
 
     // Fusion-style construction wireframe: prefer the real B-rep edges shipped
     // in the payload; for mesh-domain payloads (no B-rep) fall back to the
@@ -196,22 +211,25 @@ export class Viewport {
     }
     if (payload.faceted) {
       // a mesh → GPU wireframe overlay: draws every triangle edge from the index
-      // buffer (no giant CPU-expanded line buffer → fast even on a dense STL)
+      // buffer (no CPU line-expansion). Building it is free (shares geometry); on
+      // a dense mesh applyViewMode only shows it in the explicit wireframe mode.
       this.meshWire = new THREE.Mesh(geom, this.wireMat!);
       this.meshWire.renderOrder = 1;
       this.scene.add(this.meshWire);
     } else {
       // a B-rep → its real construction edges (or dihedral fallback) as segments
-      let lineGeom: THREE.BufferGeometry;
+      let lineGeom: THREE.BufferGeometry | null = null;
       if (payload.edges && payload.edges.length) {
         lineGeom = new THREE.BufferGeometry();
         lineGeom.setAttribute("position", new THREE.BufferAttribute(payload.edges, 3));
-      } else {
+      } else if (eg) {
         lineGeom = eg.clone();
       }
-      this.brepEdges = new THREE.LineSegments(lineGeom, new THREE.LineBasicMaterial({ color: 0x101418 }));
-      this.brepEdges.renderOrder = 1;
-      this.scene.add(this.brepEdges);
+      if (lineGeom) {
+        this.brepEdges = new THREE.LineSegments(lineGeom, new THREE.LineBasicMaterial({ color: 0x101418 }));
+        this.brepEdges.renderOrder = 1;
+        this.scene.add(this.brepEdges);
+      }
     }
     this.applyViewMode();
     this.applyClip(); // keep any active section plane on the new geometry
@@ -263,7 +281,9 @@ export class Viewport {
       (this.brepEdges.material as THREE.LineBasicMaterial).color.setHex(edgeHex);
     }
     if (this.meshWire && this.wireMat) {
-      this.meshWire.visible = this.viewMode !== "shaded";
+      // dense mesh: all-edges wireframe only in the explicit wireframe mode (it is
+      // heavy + unreadable overlaid on faces); a light mesh shows it in edges too
+      this.meshWire.visible = this.heavyMesh ? this.viewMode === "wireframe" : this.viewMode !== "shaded";
       this.wireMat.color.setHex(edgeHex);
     }
     if (this.extraGroup) {
