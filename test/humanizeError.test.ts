@@ -20,4 +20,12 @@ describe("humanizeError", () => {
   it("surfaces the raw message when nothing matches", () => {
     expect(humanizeError("box", "something weird 12345")).toBe("[box] something weird 12345");
   });
+
+  it("turns a bare OCCT abort pointer (a number, no text) into an actionable hint", () => {
+    // emscripten aborts throw a raw heap pointer with no message text
+    const msg = humanizeError("hole", "10522088");
+    expect(msg).toMatch(/^\[hole\]/);
+    expect(msg).not.toMatch(/10522088/);
+    expect(msg).toMatch(/degenerate or self-intersecting|could not complete/i);
+  });
 });

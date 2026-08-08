@@ -43,6 +43,9 @@ export function humanizeError(nodeType: string, raw: string): string {
   else if (/loft|sweep|revolve|extrude/.test(n) || /loft|sweep|revolve|extrude/.test(r)) hint = "could not build the solid — check the profile is a single closed loop";
   else if (/null|empty|no geometry|no result|nothing to/.test(r)) hint = "produced no geometry — check the inputs are connected";
   else if (/notdone|not done|stdfail|standard_|brep_api|abort|failed/.test(r)) hint = "the kernel could not complete this operation on the given geometry";
+  // OCCT/emscripten aborts throw a bare pointer NUMBER (e.g. "10522088") with no
+  // text — surfacing that raw is useless, so give a generic-but-actionable hint.
+  else if (!/[a-z]/i.test(raw)) hint = "the CAD kernel could not complete this operation — the geometry is likely degenerate or self-intersecting. Try adjusting the parameters or the upstream shape";
   else hint = raw; // unknown — surface the raw message rather than hide it
   return `[${nodeType}] ${hint}`;
 }

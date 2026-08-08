@@ -10,6 +10,7 @@ import {
   meshToPayload,
   resolveTopCap,
   placeSketchValue,
+  humanizeError,
   type EvalCache,
   type Graph,
   type GraphValue,
@@ -241,25 +242,35 @@ export function evalToPayload(
     if (errors[outputId]) throw errors[outputId];
     throw new Error(`unknown output node "${outputId}"`);
   }
-  if (v.kind === "solid") {
-    let topCapFaceId: number | null = null;
-    let topCapZ = 0;
-    try {
-      const cap = resolveTopCap(v.solid);
-      topCapFaceId = cap.faceId;
-      topCapZ = cap.z;
-    } catch {
-      /* not every solid has a resolvable top cap — fine */
+  // Meshing the viewed solid can itself abort deep in OCCT (a valid-looking
+  // B-rep that won't triangulate throws a bare pointer number). That happens
+  // OUTSIDE the per-node eval try/catch, so humanize it here and tag the viewed
+  // node — otherwise the user just sees a cryptic number and no red node.
+  try {
+    if (v.kind === "solid") {
+      let topCapFaceId: number | null = null;
+      let topCapZ = 0;
+      try {
+        const cap = resolveTopCap(v.solid);
+        topCapFaceId = cap.faceId;
+        topCapZ = cap.z;
+      } catch {
+        /* not every solid has a resolvable top cap — fine */
+      }
+      return { mesh: { ...meshAndTag(v.solid), tint: v.color }, topCapFaceId, topCapZ, outputKind: "solid", values, extras, nodeErrors };
     }
-    return { mesh: { ...meshAndTag(v.solid), tint: v.color }, topCapFaceId, topCapZ, outputKind: "solid", values, extras, nodeErrors };
-  }
-  if (v.kind === "mesh") {
-    return { mesh: meshToPayload(v.mesh), topCapFaceId: null, topCapZ: 0, outputKind: "mesh", values, extras, nodeErrors };
-  }
-  if (v.kind === "sketch2d") {
-    // preview a 2D profile as a FLAT filled face (zero thickness) on its base
-    // plane — no extruded-plate thickness. Real geometry → exportSVG.
-    return { mesh: { ...meshAndTag(sketchToFace(v)), isSketch: true }, topCapFaceId: null, topCapZ: 0, outputKind: "sketch2d", values, extras, nodeErrors };
+    if (v.kind === "mesh") {
+      return { mesh: meshToPayload(v.mesh), topCapFaceId: null, topCapZ: 0, outputKind: "mesh", values, extras, nodeErrors };
+    }
+    if (v.kind === "sketch2d") {
+      // preview a 2D profile as a FLAT filled face (zero thickness) on its base
+      // plane — no extruded-plate thickness. Real geometry → exportSVG.
+      return { mesh: { ...meshAndTag(sketchToFace(v)), isSketch: true }, topCapFaceId: null, topCapZ: 0, outputKind: "sketch2d", values, extras, nodeErrors };
+    }
+  } catch (e) {
+    const raw = e instanceof Error ? e.message : String(e);
+    const nodeType = graph.find((n) => n.id === outputId)?.type ?? outputId;
+    throw Object.assign(new Error(humanizeError(nodeType, raw)), { nodeId: outputId, raw });
   }
   throw new Error(`output node "${outputId}" is a ${v.kind}; connect it to geometry to preview`);
 }
