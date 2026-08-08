@@ -103,6 +103,7 @@ export function meshToPayload(md: MeshData): MeshPayload {
     indices,
     normals,
     groups,
+    faceted: true, // mesh-domain body → flat-shaded + full-triangle wireframe
     stats: { faceCount: regions.length, triangleCount: triTotal, tagCounts },
   };
 }

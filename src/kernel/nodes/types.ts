@@ -137,6 +137,10 @@ export interface MeshPayload {
   edges?: Float32Array;
   /** this payload is a 2D sketch preview → render as line-work on its plane */
   isSketch?: boolean;
+  /** a mesh-domain body (no B-rep): render FLAT-shaded so its triangle facets
+   *  show, and wireframe mode draws every triangle edge — the visual cue that
+   *  distinguishes a discrete mesh from a smooth B-rep solid. */
+  faceted?: boolean;
   /** optional whole-body tint (hex) set by a Color node — overrides tag shading */
   tint?: string;
   stats: {

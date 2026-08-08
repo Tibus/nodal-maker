@@ -47,6 +47,8 @@ export class Viewport {
   private analysis: { mode: "overhang" | "thickness"; angle: number; minWall: number } | null = null;
   private analysisMat: THREE.MeshStandardMaterial | null = null;
   private tintMat: THREE.MeshStandardMaterial | null = null;
+  // flat-shaded gray material for mesh-domain bodies (shows the triangle facets)
+  private facetMat: THREE.MeshStandardMaterial | null = null;
   private grid: THREE.GridHelper | null = null;
   // section-cap: fills the cut surface via the stencil buffer (a solid section,
   // not a hollow hole). Holds two stencil passes + the cap plane.
@@ -117,6 +119,7 @@ export class Viewport {
     // same neutral gray (Fusion look); the tag grouping still serves picking.
     const bodyMat = () => new THREE.MeshStandardMaterial({ color: BODY_GRAY, roughness: 0.5, metalness: 0.12 });
     this.materials = [bodyMat(), bodyMat(), bodyMat()];
+    this.facetMat = new THREE.MeshStandardMaterial({ color: BODY_GRAY, roughness: 0.5, metalness: 0.12, flatShading: true });
 
     window.addEventListener("resize", () => this.onResize(container));
     // also track the container itself so the split-pane resizer (which doesn't
@@ -156,11 +159,15 @@ export class Viewport {
       geom.addGroup(g.start, g.count, this.matIndexFor(g.tag));
     }
 
-    // whole-body tint from a Color node overrides the per-tag materials
+    // whole-body tint from a Color node overrides the per-tag materials; a mesh
+    // body is FLAT-shaded so its facets read (B-rep solids stay smooth)
     if (this.tintMat) { this.tintMat.dispose(); this.tintMat = null; }
-    if (payload.tint) this.tintMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(payload.tint), roughness: 0.55, metalness: 0.1 });
+    if (payload.tint) this.tintMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(payload.tint), roughness: 0.55, metalness: 0.1, flatShading: !!payload.faceted });
     // 2D profiles render as a flat filled region; solids use the gray body mats
-    const mesh = new THREE.Mesh(geom, payload.isSketch ? this.sketchMat : (this.tintMat ?? this.materials));
+    const mesh = new THREE.Mesh(
+      geom,
+      payload.isSketch ? this.sketchMat : this.tintMat ?? (payload.faceted ? this.facetMat! : this.materials),
+    );
     this.scene.add(mesh);
     this.mesh = mesh;
 
@@ -180,7 +187,10 @@ export class Viewport {
       this.brepEdges = null;
     }
     let lineGeom: THREE.BufferGeometry;
-    if (payload.edges && payload.edges.length) {
+    if (payload.faceted) {
+      // a mesh has no B-rep edges — show EVERY triangle edge (full wireframe)
+      lineGeom = new THREE.WireframeGeometry(geom);
+    } else if (payload.edges && payload.edges.length) {
       lineGeom = new THREE.BufferGeometry();
       lineGeom.setAttribute("position", new THREE.BufferAttribute(payload.edges, 3));
     } else {
@@ -399,6 +409,7 @@ export class Viewport {
     for (const m of this.materials) (m as THREE.Material).clippingPlanes = planes;
     if (this.analysisMat) this.analysisMat.clippingPlanes = planes.length ? planes : null;
     if (this.tintMat) this.tintMat.clippingPlanes = planes.length ? planes : null;
+    if (this.facetMat) this.facetMat.clippingPlanes = planes;
     if (this.brepEdges) (this.brepEdges.material as THREE.Material).clippingPlanes = planes;
     if (this.extraGroup) this.extraGroup.traverse((o) => {
       if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) (o.material as THREE.Material).clippingPlanes = planes;
