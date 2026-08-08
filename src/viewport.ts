@@ -49,6 +49,10 @@ export class Viewport {
   private tintMat: THREE.MeshStandardMaterial | null = null;
   // flat-shaded gray material for mesh-domain bodies (shows the triangle facets)
   private facetMat: THREE.MeshStandardMaterial | null = null;
+  // GPU wireframe overlay for meshes: draws every triangle edge straight from the
+  // index buffer — no CPU line-expansion, so it stays fast even on a dense STL
+  private meshWire: THREE.Mesh | null = null;
+  private wireMat: THREE.MeshBasicMaterial | null = null;
   private grid: THREE.GridHelper | null = null;
   // section-cap: fills the cut surface via the stencil buffer (a solid section,
   // not a hollow hole). Holds two stencil passes + the cap plane.
@@ -120,6 +124,7 @@ export class Viewport {
     const bodyMat = () => new THREE.MeshStandardMaterial({ color: BODY_GRAY, roughness: 0.5, metalness: 0.12 });
     this.materials = [bodyMat(), bodyMat(), bodyMat()];
     this.facetMat = new THREE.MeshStandardMaterial({ color: BODY_GRAY, roughness: 0.5, metalness: 0.12, flatShading: true });
+    this.wireMat = new THREE.MeshBasicMaterial({ color: 0x101418, wireframe: true });
 
     window.addEventListener("resize", () => this.onResize(container));
     // also track the container itself so the split-pane resizer (which doesn't
@@ -139,6 +144,9 @@ export class Viewport {
    * view stable during live param/gizmo editing.
    */
   setGeometry(payload: MeshPayload, reframe = false) {
+    // the wire overlay shares the main geometry — drop it first, then dispose the
+    // geometry once with the main mesh (never double-free the shared buffer)
+    if (this.meshWire) { this.scene.remove(this.meshWire); this.meshWire = null; }
     if (this.mesh) {
       this.scene.remove(this.mesh);
       this.mesh.geometry.dispose();
@@ -186,22 +194,25 @@ export class Viewport {
       this.brepEdges.geometry.dispose();
       this.brepEdges = null;
     }
-    let lineGeom: THREE.BufferGeometry;
     if (payload.faceted) {
-      // a mesh has no B-rep edges — show EVERY triangle edge (full wireframe)
-      lineGeom = new THREE.WireframeGeometry(geom);
-    } else if (payload.edges && payload.edges.length) {
-      lineGeom = new THREE.BufferGeometry();
-      lineGeom.setAttribute("position", new THREE.BufferAttribute(payload.edges, 3));
+      // a mesh → GPU wireframe overlay: draws every triangle edge from the index
+      // buffer (no giant CPU-expanded line buffer → fast even on a dense STL)
+      this.meshWire = new THREE.Mesh(geom, this.wireMat!);
+      this.meshWire.renderOrder = 1;
+      this.scene.add(this.meshWire);
     } else {
-      lineGeom = eg.clone();
+      // a B-rep → its real construction edges (or dihedral fallback) as segments
+      let lineGeom: THREE.BufferGeometry;
+      if (payload.edges && payload.edges.length) {
+        lineGeom = new THREE.BufferGeometry();
+        lineGeom.setAttribute("position", new THREE.BufferAttribute(payload.edges, 3));
+      } else {
+        lineGeom = eg.clone();
+      }
+      this.brepEdges = new THREE.LineSegments(lineGeom, new THREE.LineBasicMaterial({ color: 0x101418 }));
+      this.brepEdges.renderOrder = 1;
+      this.scene.add(this.brepEdges);
     }
-    this.brepEdges = new THREE.LineSegments(
-      lineGeom,
-      new THREE.LineBasicMaterial({ color: 0x101418 }),
-    );
-    this.brepEdges.renderOrder = 1;
-    this.scene.add(this.brepEdges);
     this.applyViewMode();
     this.applyClip(); // keep any active section plane on the new geometry
     this.applyAnalysis(); // re-apply any overhang/thickness overlay after re-eval
@@ -244,13 +255,16 @@ export class Viewport {
       return;
     }
     if (this.mesh) this.mesh.visible = this.viewMode !== "wireframe";
+    // dark edges read well over the shaded solid; over the dark empty background
+    // (wireframe mode) they need to be light instead
+    const edgeHex = this.viewMode === "wireframe" ? 0xcfd6de : 0x101418;
     if (this.brepEdges) {
       this.brepEdges.visible = this.viewMode !== "shaded";
-      // dark edges read well over the shaded solid; over the dark empty
-      // background (wireframe) they need to be light instead
-      (this.brepEdges.material as THREE.LineBasicMaterial).color.setHex(
-        this.viewMode === "wireframe" ? 0xcfd6de : 0x101418,
-      );
+      (this.brepEdges.material as THREE.LineBasicMaterial).color.setHex(edgeHex);
+    }
+    if (this.meshWire && this.wireMat) {
+      this.meshWire.visible = this.viewMode !== "shaded";
+      this.wireMat.color.setHex(edgeHex);
     }
     if (this.extraGroup) {
       for (const o of this.extraGroup.children) {
@@ -410,6 +424,7 @@ export class Viewport {
     if (this.analysisMat) this.analysisMat.clippingPlanes = planes.length ? planes : null;
     if (this.tintMat) this.tintMat.clippingPlanes = planes.length ? planes : null;
     if (this.facetMat) this.facetMat.clippingPlanes = planes;
+    if (this.wireMat) this.wireMat.clippingPlanes = planes;
     if (this.brepEdges) (this.brepEdges.material as THREE.Material).clippingPlanes = planes;
     if (this.extraGroup) this.extraGroup.traverse((o) => {
       if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) (o.material as THREE.Material).clippingPlanes = planes;
