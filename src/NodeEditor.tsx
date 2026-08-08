@@ -1129,9 +1129,10 @@ export default function NodeEditor({
     if (copySelection()) pasteClipboard();
   }, [copySelection, pasteClipboard]);
 
-  // Auto-arrange: layered (Sugiyama-style) left→right layout. Layers are set by
-  // longest-path from the sources; within a layer, order is refined by the
-  // median heuristic to cut edge crossings. Loose nodes (notes, unconnected)
+  // Auto-arrange: layered (Sugiyama-style) left→right layout. Columns are set by
+  // longest-path TO the output (ALAP), so each node sits next to its consumer
+  // and edges stay short; within a column, order is refined by the median
+  // heuristic + transposition to cut crossings. Loose nodes (notes, unconnected)
   // are left where they are. Undoable.
   const autoArrange = useCallback(() => {
     const all = (rf.current?.getNodes() ?? nodes) as GeoNode[];
@@ -1155,23 +1156,30 @@ export default function NodeEditor({
     const inAdj = new Map<string, string[]>(flow.map((n) => [n.id, []]));
     for (const e of es2) { outAdj.get(e.source)!.push(e.target); inAdj.get(e.target)!.push(e.source); }
 
-    // longest-path layering via Kahn topological order
-    const indeg = new Map(flow.map((n) => [n.id, inAdj.get(n.id)!.length]));
-    const layer = new Map(flow.map((n) => [n.id, 0]));
-    const q = flow.filter((n) => indeg.get(n.id) === 0).map((n) => n.id);
+    // ALAP layering, anchored on the OUTPUT (sinks), not the sources: a node's
+    // depth is its longest path TO a sink, so every node sits as close to its
+    // consumer as the graph allows. This keeps edges SHORT (a primitive used
+    // only by the final node lands right next to it instead of stretching across
+    // every column) and packs the graph tightly toward the output on the right.
+    const outdeg = new Map(flow.map((n) => [n.id, outAdj.get(n.id)!.length]));
+    const depth = new Map(flow.map((n) => [n.id, 0])); // longest path to a sink
+    const q = flow.filter((n) => outdeg.get(n.id) === 0).map((n) => n.id); // sinks (the output)
     while (q.length) {
       const id = q.shift()!;
-      for (const t of outAdj.get(id)!) {
-        layer.set(t, Math.max(layer.get(t)!, layer.get(id)! + 1));
-        indeg.set(t, indeg.get(t)! - 1);
-        if (indeg.get(t) === 0) q.push(t);
+      for (const s of inAdj.get(id)!) {
+        depth.set(s, Math.max(depth.get(s)!, depth.get(id)! + 1));
+        outdeg.set(s, outdeg.get(s)! - 1);
+        if (outdeg.get(s) === 0) q.push(s);
       }
     }
-    // a cycle (shouldn't happen in a DAG) leaves some nodes at layer 0 — harmless
+    // a cycle (shouldn't happen in a DAG) leaves some nodes at depth 0 — harmless
 
-    const nLayers = Math.max(...flow.map((n) => layer.get(n.id)!)) + 1;
+    const nLayers = Math.max(...flow.map((n) => depth.get(n.id)!)) + 1;
+    // column index grows left→right; deepest sources on the left, output on the
+    // right (col = maxDepth − depth), so the flow still reads left-to-right.
+    const col = (id: string) => nLayers - 1 - depth.get(id)!;
     let layers: string[][] = Array.from({ length: nLayers }, () => []);
-    flow.forEach((n) => layers[layer.get(n.id)!].push(n.id));
+    flow.forEach((n) => layers[col(n.id)].push(n.id));
 
     // seed within-layer order by current y so the result stays near the user's
     // mental model, then refine to minimise edge crossings
