@@ -83,6 +83,10 @@ export default function App() {
   const [clipAxis, setClipAxis] = useState<"X" | "Y" | "Z" | null>(null);
   const [clipPos, setClipPos] = useState(0);
   const [clipFlip, setClipFlip] = useState(false);
+  // slice preview: scrub build layers along Z (reuses the section clip machinery)
+  const [sliceOn, setSliceOn] = useState(false);
+  const [layerH, setLayerH] = useState(0.1);
+  const [sliceIdx, setSliceIdx] = useState(1e6); // starts clamped to the top layer
   const hoverRAF = useRef<number | undefined>(undefined);
   const lastHover = useRef<{ x: number; y: number } | null>(null);
 
@@ -193,10 +197,20 @@ export default function App() {
     }
   }, []);
 
-  // apply the section-view clipping plane whenever it changes
+  // total build layers for the current model at the chosen layer height
+  const layerCount = props ? Math.max(1, Math.ceil((props.bbox.max[2] - props.bbox.min[2]) / layerH)) : 1;
+  // apply the clip plane: slice mode scrubs Z layers (keep everything below the
+  // current layer), otherwise the manual section plane along the chosen axis
   useEffect(() => {
-    viewportRef.current?.setClip(clipAxis, clipPos, clipFlip);
-  }, [clipAxis, clipPos, clipFlip]);
+    const vp = viewportRef.current;
+    if (sliceOn && props) {
+      const zmin = props.bbox.min[2], zmax = props.bbox.max[2];
+      const z = Math.min(zmax, zmin + (Math.min(sliceIdx, layerCount - 1) + 1) * layerH);
+      vp?.setClip("Z", z, true); // flip=true keeps z ≤ plane → the built-so-far part
+    } else {
+      vp?.setClip(clipAxis, clipPos, clipFlip);
+    }
+  }, [sliceOn, sliceIdx, layerH, layerCount, props, clipAxis, clipPos, clipFlip]);
 
   // highlight the feature a modifier node acts on, while it's selected. Persistent:
   // we remember the node and re-apply after every eval so it survives param edits.
@@ -440,6 +454,7 @@ export default function App() {
               e.stopPropagation();
               const next = clipAxis === null ? "X" : clipAxis === "X" ? "Y" : clipAxis === "Y" ? "Z" : null;
               setClipAxis(next);
+              if (next) setSliceOn(false); // section and slice share the clip plane
               if (next && props) {
                 const ax = next === "X" ? 0 : next === "Y" ? 1 : 2;
                 setClipPos((props.bbox.min[ax] + props.bbox.max[ax]) / 2);
@@ -448,6 +463,21 @@ export default function App() {
             title="Section view — clip the model along an axis to see inside"
           >
             ✂ {clipAxis ? `Section ${clipAxis}` : "Section"}
+          </button>
+          <button
+            className={`vp-pick${sliceOn ? " vp-pick--on" : ""}`}
+            disabled={!props}
+            onClick={(e) => {
+              e.stopPropagation();
+              setSliceOn((on) => {
+                const next = !on;
+                if (next) { setClipAxis(null); setSliceIdx(1e6); } // start at the top layer
+                return next;
+              });
+            }}
+            title="Slice preview — scrub the build layers along Z"
+          >
+            🍰 {sliceOn ? `Slices ${Math.min(sliceIdx, layerCount - 1) + 1}/${layerCount}` : "Slices"}
           </button>
           <button
             className={`vp-pick${recording ? " vp-pick--on" : ""}`}
@@ -480,6 +510,24 @@ export default function App() {
               <input type="range" min={lo} max={hi} step={(hi - lo) / 200 || 1} value={clipPos}
                 onChange={(e) => setClipPos(Number(e.target.value))} />
               <button className="clipbar__flip" onClick={() => setClipFlip((f) => !f)} title="Flip which half is kept">⇄</button>
+            </div>
+          );
+        })()}
+        {sliceOn && props && (() => {
+          const zmin = props.bbox.min[2], zmax = props.bbox.max[2];
+          const idx = Math.min(sliceIdx, layerCount - 1);
+          const z = Math.min(zmax, zmin + (idx + 1) * layerH);
+          return (
+            <div className="clipbar slicebar" onClick={(e) => e.stopPropagation()}>
+              <label className="slicebar__lh" title="Layer height (mm)">
+                layer
+                <input type="number" min={0.01} max={5} step={0.01} value={layerH}
+                  onChange={(e) => setLayerH(Math.min(5, Math.max(0.01, Number(e.target.value) || 0.1)))} />
+                mm
+              </label>
+              <input type="range" min={0} max={layerCount - 1} step={1} value={idx}
+                onChange={(e) => setSliceIdx(Number(e.target.value))} />
+              <span className="slicebar__n">{idx + 1}/{layerCount} · z {z.toFixed(2)}</span>
             </div>
           );
         })()}
