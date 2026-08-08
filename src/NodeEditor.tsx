@@ -1092,7 +1092,7 @@ export default function NodeEditor({
   const onFeaturePreviewRef = useRef(onFeaturePreview);
   onFeaturePreviewRef.current = onFeaturePreview;
   const lastFeatureSig = useRef<string>("");
-  const FEATURE_NODES = useMemo(() => new Set(["fillet", "bevel", "shell", "internalThread", "edgeSelect", "faceSelect"]), []);
+  const FEATURE_NODES = useMemo(() => new Set(["fillet", "bevel", "shell", "internalThread", "edgeSelect", "faceSelect", "axis"]), []);
   useEffect(() => {
     const sel = nodes.filter((n) => n.selected && !isNote(n));
     const one = sel.length === 1 ? sel[0] : null;

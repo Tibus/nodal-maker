@@ -384,8 +384,9 @@ export function describeFeatureGeometry(
   const node = graph.find((n) => n.id === nodeId);
   if (!node) return EMPTY_HL();
   const isSelectNode = node.type === "edgeSelect" || node.type === "faceSelect";
+  const isAxisNode = node.type === "axis";
   const feat = FEATURE_SEL[node.type];
-  if (!isSelectNode && !feat) return EMPTY_HL();
+  if (!isSelectNode && !feat && !isAxisNode) return EMPTY_HL();
   const { outputs } = cache ? evalGraphCached(graph, cache, vars) : evalGraph(graph, vars);
   const byId = new Map(graph.map((n) => [n.id, n]));
   const evalNode = (id: string): GraphValue => {
@@ -394,6 +395,23 @@ export function describeFeatureGeometry(
     return o;
   };
   try {
+    // (0) an Axis node → draw a long line through its origin along its direction,
+    // sized to overshoot the viewed model so it reads as an infinite axis.
+    if (isAxisNode) {
+      const av = outputs[nodeId];
+      if (!av || av.kind !== "axis") return EMPTY_HL();
+      const [ox, oy, oz] = av.origin, [dx, dy, dz] = av.dir;
+      let L = 400;
+      const viewed = outputs[viewedId];
+      if (viewed?.kind === "solid") {
+        try {
+          const [lo, hi] = viewed.solid.boundingBox.bounds;
+          L = Math.max(400, Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) * 2);
+        } catch { /* keep default */ }
+      }
+      const segs = new Float32Array([ox - dx * L, oy - dy * L, oz - dz * L, ox + dx * L, oy + dy * L, oz + dz * L]);
+      return { tris: new Float32Array(0), segs };
+    }
     // (a) an Edge/Face Select node → show its OWN selection. Apply it to the
     // viewed solid if that IS one, else to the input solid of whatever consumes
     // this selection (so it works even when the select node itself is "viewed").
