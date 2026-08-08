@@ -247,6 +247,13 @@ function GeoNodeView({ id, data }: NodeProps<GeoNode>) {
           // an Axis node once a cylindrical face feeds it)
           const ovr = PARAMS_OVERRIDDEN_BY_INPUT[data.nodeType];
           if (ovr && Object.entries(ovr).some(([port, ps2]) => (ps2 as string[]).includes(ps.name) && ctx.isLinked(id, port))) return null;
+          // hide params gated by another param's value (e.g. a plane offset that
+          // only matters for atZ/atX/atY) — show only what can change the result
+          if (ps.showIf) {
+            const ctrl = spec.params.find((p) => p.name === ps.showIf!.param);
+            const cur = data.params[ps.showIf.param] ?? ctrl?.default;
+            if (!ps.showIf.in.includes(cur as string | number)) return null;
+          }
           // the sketch doc renders as an "Edit" button plus one field per
           // driving dimension (those mirror into node params and re-solve)
           if (ps.kind === "sketch") {

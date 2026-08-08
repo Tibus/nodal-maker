@@ -23,6 +23,10 @@ export interface ParamSpec {
   max?: number;
   step?: number;
   options?: string[];
+  /** editor-only: show this param only when another param currently holds one
+   *  of these values (e.g. a face-select offset only matters for atZ/atX/atY).
+   *  Keeps the node showing just the params that can actually change the result. */
+  showIf?: { param: string; in: (string | number)[] };
 }
 
 export interface NodeSpec {
@@ -527,8 +531,8 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     output: "solid",
     params: [
       { name: "standard", kind: "select", default: "M16", options: ["custom", "M2", "M2.5", "M3", "M4", "M5", "M6", "M8", "M10", "M12", "M14", "M16", "M20", "M24"] },
-      { name: "diameter", kind: "number", label: "Ø nominal (custom)", default: 16, min: 2, max: 120, step: 0.5 },
-      { name: "pitch", kind: "number", label: "pitch (custom)", default: 2, min: 0.3, max: 10, step: 0.05 },
+      { name: "diameter", kind: "number", label: "Ø nominal (custom)", default: 16, min: 2, max: 120, step: 0.5, showIf: { param: "standard", in: ["custom"] } },
+      { name: "pitch", kind: "number", label: "pitch (custom)", default: 2, min: 0.3, max: 10, step: 0.05, showIf: { param: "standard", in: ["custom"] } },
       { name: "clearance", kind: "number", label: "clearance", default: 0.4, min: 0, max: 2, step: 0.05 },
       { name: "hand", kind: "select", default: "right", options: ["right", "left"] },
     ],
@@ -826,12 +830,12 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
       { name: "x", kind: "number", default: 0, min: -300, max: 300, step: 1 },
       { name: "y", kind: "number", default: 0, min: -300, max: 300, step: 1 },
       { name: "diameter", kind: "number", default: 6, min: 0.5, max: 200, step: 0.5 },
-      { name: "depth", kind: "number", default: 20, min: 0.5, max: 300, step: 1 },
+      { name: "depth", kind: "number", default: 20, min: 0.5, max: 300, step: 1, showIf: { param: "mode", in: ["blind"] } },
       { name: "mode", kind: "select", default: "through", options: ["through", "blind"] },
       { name: "type", kind: "select", default: "simple", options: ["simple", "counterbore", "countersink"] },
-      { name: "headDia", kind: "number", label: "head Ø", default: 12, min: 0.5, max: 200, step: 0.5 },
-      { name: "headDepth", kind: "number", label: "cbore depth", default: 4, min: 0.1, max: 100, step: 0.5 },
-      { name: "headAngle", kind: "number", label: "csink °", default: 90, min: 30, max: 179, step: 1 },
+      { name: "headDia", kind: "number", label: "head Ø", default: 12, min: 0.5, max: 200, step: 0.5, showIf: { param: "type", in: ["counterbore", "countersink"] } },
+      { name: "headDepth", kind: "number", label: "cbore depth", default: 4, min: 0.1, max: 100, step: 0.5, showIf: { param: "type", in: ["counterbore"] } },
+      { name: "headAngle", kind: "number", label: "csink °", default: 90, min: 30, max: 179, step: 1, showIf: { param: "type", in: ["countersink"] } },
     ],
   },
   edgeSelect: {
@@ -841,7 +845,7 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     output: "edgeSel",
     params: [
       { name: "where", kind: "select", default: "vertical", options: ["all", "vertical", "horizontal-x", "horizontal-y", "atZ", "atX", "atY"] },
-      { name: "offset", kind: "number", label: "plane offset", default: 0, min: -300, max: 300, step: 0.5 },
+      { name: "offset", kind: "number", label: "plane offset", default: 0, min: -300, max: 300, step: 0.5, showIf: { param: "where", in: ["atZ", "atX", "atY"] } },
     ],
   },
   faceSelect: {
@@ -851,7 +855,7 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
     output: "faceSel",
     params: [
       { name: "where", kind: "select", default: "top", options: ["all", "top", "bottom", "atZ", "atX", "atY", "horizontal", "vertical-x", "vertical-y", "planar", "cylindrical"] },
-      { name: "offset", kind: "number", label: "plane offset", default: 0, min: -300, max: 300, step: 0.5 },
+      { name: "offset", kind: "number", label: "plane offset", default: 0, min: -300, max: 300, step: 0.5, showIf: { param: "where", in: ["atZ", "atX", "atY"] } },
     ],
   },
   fillet: {
