@@ -113,38 +113,124 @@ EXAMPLES.push({
     { id: "block", type: "box", params: { x: 80, y: 50, z: 40 } },
     { id: "vE", type: "edgeSelect", params: { where: "vertical" } },
     { id: "blockF", type: "fillet", params: { radius: 8 }, inputs: { in: "block", sel: "vE" } },
-    // Z through bore
+    // Z through bore (block spans z 0..40, centre at z=20)
     { id: "zc", type: "cylinder", params: { radius: 7, height: 60 } },
-    { id: "zcC", type: "transform", params: { tz: -30 }, inputs: { in: "zc" } },
-    { id: "b1", type: "boolean3d", params: { op: "difference" }, inputs: { base: "blockF", tool: "zcC" } },
-    // X cross bore (centre the cylinder, then lay it along X)
+    { id: "zcP", type: "transform", params: { tz: -10 }, inputs: { in: "zc" } },
+    { id: "b1", type: "boolean3d", params: { op: "difference" }, inputs: { base: "blockF", tool: "zcP" } },
+    // X cross bore: centre the cylinder, lay it along X, raise it to mid-height
     { id: "xc", type: "cylinder", params: { radius: 5, height: 100 } },
     { id: "xcC", type: "transform", params: { tz: -50 }, inputs: { in: "xc" } },
     { id: "xcR", type: "rotate3d", params: { axis: "Y", angle: 90 }, inputs: { in: "xcC" } },
-    { id: "b2", type: "boolean3d", params: { op: "difference" }, inputs: { base: "b1", tool: "xcR" } },
+    { id: "xcP", type: "transform", params: { tz: 20 }, inputs: { in: "xcR" } },
+    { id: "b2", type: "boolean3d", params: { op: "difference" }, inputs: { base: "b1", tool: "xcP" } },
     // Y cross bore
     { id: "yc", type: "cylinder", params: { radius: 5, height: 100 } },
     { id: "ycC", type: "transform", params: { tz: -50 }, inputs: { in: "yc" } },
     { id: "ycR", type: "rotate3d", params: { axis: "X", angle: 90 }, inputs: { in: "ycC" } },
-    { id: "b3", type: "boolean3d", params: { op: "difference" }, inputs: { base: "b2", tool: "ycR" } },
-    // top counterbore for the Z port
-    { id: "cb", type: "cylinder", params: { radius: 11, height: 10 } },
-    { id: "cbC", type: "transform", params: { tz: 13 }, inputs: { in: "cb" } },
-    { id: "b4", type: "boolean3d", params: { op: "difference" }, inputs: { base: "b3", tool: "cbC" } },
+    { id: "ycP", type: "transform", params: { tz: 20 }, inputs: { in: "ycR" } },
+    { id: "b3", type: "boolean3d", params: { op: "difference" }, inputs: { base: "b2", tool: "ycP" } },
+    // top counterbore for the Z port (opens the top face at z=40)
+    { id: "cb", type: "cylinder", params: { radius: 11, height: 12 } },
+    { id: "cbP", type: "transform", params: { tz: 30 }, inputs: { in: "cb" } },
+    { id: "b4", type: "boolean3d", params: { op: "difference" }, inputs: { base: "b3", tool: "cbP" } },
     // 4 corner mounting holes (two crossed linear arrays)
     { id: "mh", type: "cylinder", params: { radius: 3, height: 60 } },
-    { id: "mhC", type: "transform", params: { tx: -34, ty: -19, tz: -30 }, inputs: { in: "mh" } },
-    { id: "mhRow", type: "arrayLinear3d", params: { count: 2, dx: 68, dy: 0, dz: 0 }, inputs: { in: "mhC" } },
+    { id: "mhP", type: "transform", params: { tx: -34, ty: -19, tz: -10 }, inputs: { in: "mh" } },
+    { id: "mhRow", type: "arrayLinear3d", params: { count: 2, dx: 68, dy: 0, dz: 0 }, inputs: { in: "mhP" } },
     { id: "mhGrid", type: "arrayLinear3d", params: { count: 2, dx: 0, dy: 38, dz: 0 }, inputs: { in: "mhRow" } },
     { id: "b5", type: "boolean3d", params: { op: "difference" }, inputs: { base: "b4", tool: "mhGrid" } },
-    // two bosses around the Y port (one per Y face), then re-open the port
+    // two bosses around the Y port (one per Y face) at mid-height, then re-open it
     { id: "boss", type: "cylinder", params: { radius: 9, height: 6 } },
     { id: "bossC", type: "transform", params: { tz: -3 }, inputs: { in: "boss" } },
     { id: "bossR", type: "rotate3d", params: { axis: "X", angle: 90 }, inputs: { in: "bossC" } },
-    { id: "bossP", type: "transform", params: { ty: 25 }, inputs: { in: "bossR" } },
+    { id: "bossP", type: "transform", params: { ty: 25, tz: 20 }, inputs: { in: "bossR" } },
     { id: "bosses", type: "arrayLinear3d", params: { count: 2, dx: 0, dy: -50, dz: 0 }, inputs: { in: "bossP" } },
     { id: "b6", type: "boolean3d", params: { op: "union" }, inputs: { base: "b5", tool: "bosses" } },
-    { id: "final", type: "boolean3d", params: { op: "difference" }, inputs: { base: "b6", tool: "ycR" } },
+    { id: "final", type: "boolean3d", params: { op: "difference" }, inputs: { base: "b6", tool: "ycP" } },
+  ],
+});
+
+// 5) Electronics enclosure — a rounded shell box (open top), four bored corner
+//    bosses, a connector cut-out on one wall, and a row of vent slots on another.
+EXAMPLES.push({
+  name: "enclosure",
+  title: "Electronics enclosure — shelled box, 4 bored bosses, connector cut-out, vents",
+  outputId: "final",
+  nodes: [
+    { id: "box", type: "box", params: { x: 100, y: 70, z: 36 } },
+    { id: "vE", type: "edgeSelect", params: { where: "vertical" } },
+    { id: "boxF", type: "fillet", params: { radius: 5 }, inputs: { in: "box", sel: "vE" } },
+    { id: "topSel", type: "faceSelect", params: { where: "top" } },
+    { id: "shell", type: "shell", params: { thickness: 2.5 }, inputs: { in: "boxF", faces: "topSel" } },
+    { id: "boss", type: "cylinder", params: { radius: 4.5, height: 31 } },
+    { id: "bossP", type: "transform", params: { tx: -40, ty: -25, tz: 2 }, inputs: { in: "boss" } },
+    { id: "bossRow", type: "arrayLinear3d", params: { count: 2, dx: 80, dy: 0, dz: 0 }, inputs: { in: "bossP" } },
+    { id: "bossGrid", type: "arrayLinear3d", params: { count: 2, dx: 0, dy: 50, dz: 0 }, inputs: { in: "bossRow" } },
+    { id: "withBosses", type: "boolean3d", params: { op: "union" }, inputs: { base: "shell", tool: "bossGrid" } },
+    { id: "bore", type: "cylinder", params: { radius: 1.6, height: 42 } },
+    { id: "boreP", type: "transform", params: { tx: -40, ty: -25, tz: -2 }, inputs: { in: "bore" } },
+    { id: "boreRow", type: "arrayLinear3d", params: { count: 2, dx: 80, dy: 0, dz: 0 }, inputs: { in: "boreP" } },
+    { id: "boreGrid", type: "arrayLinear3d", params: { count: 2, dx: 0, dy: 50, dz: 0 }, inputs: { in: "boreRow" } },
+    { id: "bored", type: "boolean3d", params: { op: "difference" }, inputs: { base: "withBosses", tool: "boreGrid" } },
+    { id: "usb", type: "box", params: { x: 18, y: 22, z: 9 } },
+    { id: "usbP", type: "transform", params: { tx: 50, tz: 14 }, inputs: { in: "usb" } },
+    { id: "usbCut", type: "boolean3d", params: { op: "difference" }, inputs: { base: "bored", tool: "usbP" } },
+    { id: "vent", type: "box", params: { x: 8, y: 3, z: 14 } },
+    { id: "ventP", type: "transform", params: { tx: -50, ty: -20, tz: 9 }, inputs: { in: "vent" } },
+    { id: "vents", type: "arrayLinear3d", params: { count: 5, dx: 0, dy: 10, dz: 0 }, inputs: { in: "ventP" } },
+    { id: "final", type: "boolean3d", params: { op: "difference" }, inputs: { base: "usbCut", tool: "vents" } },
+  ],
+});
+
+// 6) Planet carrier — a sun gear on a round carrier ringed by 3 posted planet
+//    gears (each a real involute gear extruded), with a central bore.
+EXAMPLES.push({
+  name: "planet-carrier",
+  title: "Planet carrier — sun gear + 3 posted planet gears on a round carrier",
+  outputId: "final",
+  nodes: [
+    { id: "carrier", type: "cylinder", params: { radius: 40, height: 6 } },
+    { id: "sunG", type: "gear", params: { teeth: 18, radius: 15, depth: 5 } },
+    { id: "sun", type: "extrude", params: { height: 18 }, inputs: { in: "sunG" } },
+    { id: "withSun", type: "boolean3d", params: { op: "union" }, inputs: { base: "carrier", tool: "sun" } },
+    { id: "post", type: "cylinder", params: { radius: 3, height: 8 } },
+    { id: "postP", type: "transform", params: { tx: 25, tz: 4 }, inputs: { in: "post" } },
+    { id: "posts", type: "arrayRadial3d", params: { count: 3, angle: 360 }, inputs: { in: "postP" } },
+    { id: "withPosts", type: "boolean3d", params: { op: "union" }, inputs: { base: "withSun", tool: "posts" } },
+    { id: "planetG", type: "gear", params: { teeth: 10, radius: 8, depth: 4 } },
+    { id: "planet", type: "extrude", params: { height: 9 }, inputs: { in: "planetG" } },
+    { id: "planetP", type: "transform", params: { tx: 25, tz: 8 }, inputs: { in: "planet" } },
+    { id: "planets", type: "arrayRadial3d", params: { count: 3, angle: 360 }, inputs: { in: "planetP" } },
+    { id: "asm", type: "boolean3d", params: { op: "union" }, inputs: { base: "withPosts", tool: "planets" } },
+    { id: "coreBore", type: "cylinder", params: { radius: 5, height: 40 } },
+    { id: "coreP", type: "transform", params: { tz: -6 }, inputs: { in: "coreBore" } },
+    { id: "final", type: "boolean3d", params: { op: "difference" }, inputs: { base: "asm", tool: "coreP" } },
+  ],
+});
+
+// 7) Knurled knob — a rounded knob fluted all round (polar array cut), a dished
+//    top (sphere subtraction), and a counterbored centre bore via the Hole node.
+EXAMPLES.push({
+  name: "knurled-knob",
+  title: "Knurled knob — 24 grip flutes, dished top, counterbored bore",
+  outputId: "final",
+  nodes: [
+    { id: "knob", type: "cylinder", params: { radius: 20, height: 18 } },
+    { id: "topRim", type: "edgeSelect", params: { where: "atZ", offset: 18 } },
+    { id: "knobF", type: "fillet", params: { radius: 4 }, inputs: { in: "knob", sel: "topRim" } },
+    { id: "flute", type: "cylinder", params: { radius: 2.2, height: 26 } },
+    { id: "fluteP", type: "transform", params: { tx: 20, tz: -3 }, inputs: { in: "flute" } },
+    { id: "flutes", type: "arrayRadial3d", params: { count: 24, angle: 360 }, inputs: { in: "fluteP" } },
+    { id: "knurled", type: "boolean3d", params: { op: "difference" }, inputs: { base: "knobF", tool: "flutes" } },
+    { id: "dish", type: "sphere", params: { radius: 40 } },
+    { id: "dishP", type: "transform", params: { tz: 54 }, inputs: { in: "dish" } },
+    { id: "dished", type: "boolean3d", params: { op: "difference" }, inputs: { base: "knurled", tool: "dishP" } },
+    { id: "bore", type: "cylinder", params: { radius: 3, height: 34 } },
+    { id: "boreP", type: "transform", params: { tz: -6 }, inputs: { in: "bore" } },
+    { id: "bored", type: "boolean3d", params: { op: "difference" }, inputs: { base: "dished", tool: "boreP" } },
+    { id: "cbore", type: "cylinder", params: { radius: 6, height: 8 } },
+    { id: "cboreP", type: "transform", params: { tz: 12 }, inputs: { in: "cbore" } },
+    { id: "final", type: "boolean3d", params: { op: "difference" }, inputs: { base: "bored", tool: "cboreP" } },
   ],
 });
 

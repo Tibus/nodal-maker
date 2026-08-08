@@ -1,0 +1,535 @@
+{
+  "version": 1,
+  "title": "Electronics enclosure — shelled box, 4 bored bosses, connector cut-out, vents",
+  "outputId": "final",
+  "nodes": [
+    {
+      "id": "box",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "box",
+        "params": {
+          "x": 100,
+          "y": 70,
+          "z": 36
+        }
+      }
+    },
+    {
+      "id": "vE",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "edgeSelect",
+        "params": {
+          "where": "vertical"
+        }
+      }
+    },
+    {
+      "id": "boxF",
+      "position": {
+        "x": 260,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "fillet",
+        "params": {
+          "radius": 5
+        }
+      }
+    },
+    {
+      "id": "topSel",
+      "position": {
+        "x": 0,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "faceSelect",
+        "params": {
+          "where": "top"
+        }
+      }
+    },
+    {
+      "id": "shell",
+      "position": {
+        "x": 520,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "shell",
+        "params": {
+          "thickness": 2.5
+        }
+      }
+    },
+    {
+      "id": "boss",
+      "position": {
+        "x": 0,
+        "y": 450
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 4.5,
+          "height": 31
+        }
+      }
+    },
+    {
+      "id": "bossP",
+      "position": {
+        "x": 260,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": -40,
+          "ty": -25,
+          "tz": 2
+        }
+      }
+    },
+    {
+      "id": "bossRow",
+      "position": {
+        "x": 520,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "arrayLinear3d",
+        "params": {
+          "count": 2,
+          "dx": 80,
+          "dy": 0,
+          "dz": 0
+        }
+      }
+    },
+    {
+      "id": "bossGrid",
+      "position": {
+        "x": 780,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "arrayLinear3d",
+        "params": {
+          "count": 2,
+          "dx": 0,
+          "dy": 50,
+          "dz": 0
+        }
+      }
+    },
+    {
+      "id": "withBosses",
+      "position": {
+        "x": 1040,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "union"
+        }
+      }
+    },
+    {
+      "id": "bore",
+      "position": {
+        "x": 0,
+        "y": 600
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 1.6,
+          "height": 42
+        }
+      }
+    },
+    {
+      "id": "boreP",
+      "position": {
+        "x": 260,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": -40,
+          "ty": -25,
+          "tz": -2
+        }
+      }
+    },
+    {
+      "id": "boreRow",
+      "position": {
+        "x": 520,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "arrayLinear3d",
+        "params": {
+          "count": 2,
+          "dx": 80,
+          "dy": 0,
+          "dz": 0
+        }
+      }
+    },
+    {
+      "id": "boreGrid",
+      "position": {
+        "x": 780,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "arrayLinear3d",
+        "params": {
+          "count": 2,
+          "dx": 0,
+          "dy": 50,
+          "dz": 0
+        }
+      }
+    },
+    {
+      "id": "bored",
+      "position": {
+        "x": 1300,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "usb",
+      "position": {
+        "x": 0,
+        "y": 750
+      },
+      "data": {
+        "nodeType": "box",
+        "params": {
+          "x": 18,
+          "y": 22,
+          "z": 9
+        }
+      }
+    },
+    {
+      "id": "usbP",
+      "position": {
+        "x": 260,
+        "y": 450
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 50,
+          "tz": 14
+        }
+      }
+    },
+    {
+      "id": "usbCut",
+      "position": {
+        "x": 1560,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "vent",
+      "position": {
+        "x": 0,
+        "y": 900
+      },
+      "data": {
+        "nodeType": "box",
+        "params": {
+          "x": 8,
+          "y": 3,
+          "z": 14
+        }
+      }
+    },
+    {
+      "id": "ventP",
+      "position": {
+        "x": 260,
+        "y": 600
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": -50,
+          "ty": -20,
+          "tz": 9
+        }
+      }
+    },
+    {
+      "id": "vents",
+      "position": {
+        "x": 520,
+        "y": 450
+      },
+      "data": {
+        "nodeType": "arrayLinear3d",
+        "params": {
+          "count": 5,
+          "dx": 0,
+          "dy": 10,
+          "dz": 0
+        }
+      }
+    },
+    {
+      "id": "final",
+      "position": {
+        "x": 1820,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "box",
+      "sourceHandle": "out",
+      "target": "boxF",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "vE",
+      "sourceHandle": "out",
+      "target": "boxF",
+      "targetHandle": "sel",
+      "style": {
+        "stroke": "#d19a66"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "boxF",
+      "sourceHandle": "out",
+      "target": "shell",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "topSel",
+      "sourceHandle": "out",
+      "target": "shell",
+      "targetHandle": "faces",
+      "style": {
+        "stroke": "#61afef"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "boss",
+      "sourceHandle": "out",
+      "target": "bossP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e5",
+      "source": "bossP",
+      "sourceHandle": "out",
+      "target": "bossRow",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e6",
+      "source": "bossRow",
+      "sourceHandle": "out",
+      "target": "bossGrid",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e7",
+      "source": "shell",
+      "sourceHandle": "out",
+      "target": "withBosses",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e8",
+      "source": "bossGrid",
+      "sourceHandle": "out",
+      "target": "withBosses",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e9",
+      "source": "bore",
+      "sourceHandle": "out",
+      "target": "boreP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e10",
+      "source": "boreP",
+      "sourceHandle": "out",
+      "target": "boreRow",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e11",
+      "source": "boreRow",
+      "sourceHandle": "out",
+      "target": "boreGrid",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e12",
+      "source": "withBosses",
+      "sourceHandle": "out",
+      "target": "bored",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e13",
+      "source": "boreGrid",
+      "sourceHandle": "out",
+      "target": "bored",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e14",
+      "source": "usb",
+      "sourceHandle": "out",
+      "target": "usbP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e15",
+      "source": "bored",
+      "sourceHandle": "out",
+      "target": "usbCut",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e16",
+      "source": "usbP",
+      "sourceHandle": "out",
+      "target": "usbCut",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e17",
+      "source": "vent",
+      "sourceHandle": "out",
+      "target": "ventP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e18",
+      "source": "ventP",
+      "sourceHandle": "out",
+      "target": "vents",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e19",
+      "source": "usbCut",
+      "sourceHandle": "out",
+      "target": "final",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e20",
+      "source": "vents",
+      "sourceHandle": "out",
+      "target": "final",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    }
+  ]
+}

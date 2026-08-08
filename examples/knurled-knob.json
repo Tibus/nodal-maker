@@ -1,0 +1,374 @@
+{
+  "version": 1,
+  "title": "Knurled knob — 24 grip flutes, dished top, counterbored bore",
+  "outputId": "final",
+  "nodes": [
+    {
+      "id": "knob",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 20,
+          "height": 18
+        }
+      }
+    },
+    {
+      "id": "topRim",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "edgeSelect",
+        "params": {
+          "where": "atZ",
+          "offset": 18
+        }
+      }
+    },
+    {
+      "id": "knobF",
+      "position": {
+        "x": 260,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "fillet",
+        "params": {
+          "radius": 4
+        }
+      }
+    },
+    {
+      "id": "flute",
+      "position": {
+        "x": 0,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 2.2,
+          "height": 26
+        }
+      }
+    },
+    {
+      "id": "fluteP",
+      "position": {
+        "x": 260,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 20,
+          "tz": -3
+        }
+      }
+    },
+    {
+      "id": "flutes",
+      "position": {
+        "x": 520,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "arrayRadial3d",
+        "params": {
+          "count": 24,
+          "angle": 360
+        }
+      }
+    },
+    {
+      "id": "knurled",
+      "position": {
+        "x": 780,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "dish",
+      "position": {
+        "x": 0,
+        "y": 450
+      },
+      "data": {
+        "nodeType": "sphere",
+        "params": {
+          "radius": 40
+        }
+      }
+    },
+    {
+      "id": "dishP",
+      "position": {
+        "x": 260,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tz": 54
+        }
+      }
+    },
+    {
+      "id": "dished",
+      "position": {
+        "x": 1040,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "bore",
+      "position": {
+        "x": 0,
+        "y": 600
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 3,
+          "height": 34
+        }
+      }
+    },
+    {
+      "id": "boreP",
+      "position": {
+        "x": 260,
+        "y": 450
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tz": -6
+        }
+      }
+    },
+    {
+      "id": "bored",
+      "position": {
+        "x": 1300,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    },
+    {
+      "id": "cbore",
+      "position": {
+        "x": 0,
+        "y": 750
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 6,
+          "height": 8
+        }
+      }
+    },
+    {
+      "id": "cboreP",
+      "position": {
+        "x": 260,
+        "y": 600
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tz": 12
+        }
+      }
+    },
+    {
+      "id": "final",
+      "position": {
+        "x": 1560,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "knob",
+      "sourceHandle": "out",
+      "target": "knobF",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "topRim",
+      "sourceHandle": "out",
+      "target": "knobF",
+      "targetHandle": "sel",
+      "style": {
+        "stroke": "#d19a66"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "flute",
+      "sourceHandle": "out",
+      "target": "fluteP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "fluteP",
+      "sourceHandle": "out",
+      "target": "flutes",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "knobF",
+      "sourceHandle": "out",
+      "target": "knurled",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e5",
+      "source": "flutes",
+      "sourceHandle": "out",
+      "target": "knurled",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e6",
+      "source": "dish",
+      "sourceHandle": "out",
+      "target": "dishP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e7",
+      "source": "knurled",
+      "sourceHandle": "out",
+      "target": "dished",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e8",
+      "source": "dishP",
+      "sourceHandle": "out",
+      "target": "dished",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e9",
+      "source": "bore",
+      "sourceHandle": "out",
+      "target": "boreP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e10",
+      "source": "dished",
+      "sourceHandle": "out",
+      "target": "bored",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e11",
+      "source": "boreP",
+      "sourceHandle": "out",
+      "target": "bored",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e12",
+      "source": "cbore",
+      "sourceHandle": "out",
+      "target": "cboreP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e13",
+      "source": "bored",
+      "sourceHandle": "out",
+      "target": "final",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e14",
+      "source": "cboreP",
+      "sourceHandle": "out",
+      "target": "final",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    }
+  ]
+}

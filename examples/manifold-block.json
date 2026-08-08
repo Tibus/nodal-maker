@@ -59,7 +59,7 @@
       }
     },
     {
-      "id": "zcC",
+      "id": "zcP",
       "position": {
         "x": 260,
         "y": 150
@@ -67,7 +67,7 @@
       "data": {
         "nodeType": "transform",
         "params": {
-          "tz": -30
+          "tz": -10
         }
       }
     },
@@ -126,9 +126,22 @@
       }
     },
     {
-      "id": "b2",
+      "id": "xcP",
       "position": {
         "x": 780,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tz": 20
+        }
+      }
+    },
+    {
+      "id": "b2",
+      "position": {
+        "x": 1040,
         "y": 0
       },
       "data": {
@@ -180,9 +193,22 @@
       }
     },
     {
+      "id": "ycP",
+      "position": {
+        "x": 780,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tz": 20
+        }
+      }
+    },
+    {
       "id": "b3",
       "position": {
-        "x": 1040,
+        "x": 1300,
         "y": 0
       },
       "data": {
@@ -202,12 +228,12 @@
         "nodeType": "cylinder",
         "params": {
           "radius": 11,
-          "height": 10
+          "height": 12
         }
       }
     },
     {
-      "id": "cbC",
+      "id": "cbP",
       "position": {
         "x": 260,
         "y": 600
@@ -215,14 +241,14 @@
       "data": {
         "nodeType": "transform",
         "params": {
-          "tz": 13
+          "tz": 30
         }
       }
     },
     {
       "id": "b4",
       "position": {
-        "x": 1300,
+        "x": 1560,
         "y": 0
       },
       "data": {
@@ -247,7 +273,7 @@
       }
     },
     {
-      "id": "mhC",
+      "id": "mhP",
       "position": {
         "x": 260,
         "y": 750
@@ -257,7 +283,7 @@
         "params": {
           "tx": -34,
           "ty": -19,
-          "tz": -30
+          "tz": -10
         }
       }
     },
@@ -281,7 +307,7 @@
       "id": "mhGrid",
       "position": {
         "x": 780,
-        "y": 150
+        "y": 300
       },
       "data": {
         "nodeType": "arrayLinear3d",
@@ -296,7 +322,7 @@
     {
       "id": "b5",
       "position": {
-        "x": 1560,
+        "x": 1820,
         "y": 0
       },
       "data": {
@@ -351,12 +377,13 @@
       "id": "bossP",
       "position": {
         "x": 780,
-        "y": 300
+        "y": 450
       },
       "data": {
         "nodeType": "transform",
         "params": {
-          "ty": 25
+          "ty": 25,
+          "tz": 20
         }
       }
     },
@@ -379,7 +406,7 @@
     {
       "id": "b6",
       "position": {
-        "x": 1820,
+        "x": 2080,
         "y": 0
       },
       "data": {
@@ -392,7 +419,7 @@
     {
       "id": "final",
       "position": {
-        "x": 2080,
+        "x": 2340,
         "y": 0
       },
       "data": {
@@ -428,7 +455,7 @@
       "id": "e2",
       "source": "zc",
       "sourceHandle": "out",
-      "target": "zcC",
+      "target": "zcP",
       "targetHandle": "in",
       "style": {
         "stroke": "#ff8c42"
@@ -446,7 +473,7 @@
     },
     {
       "id": "e4",
-      "source": "zcC",
+      "source": "zcP",
       "sourceHandle": "out",
       "target": "b1",
       "targetHandle": "tool",
@@ -476,6 +503,16 @@
     },
     {
       "id": "e7",
+      "source": "xcR",
+      "sourceHandle": "out",
+      "target": "xcP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e8",
       "source": "b1",
       "sourceHandle": "out",
       "target": "b2",
@@ -485,8 +522,8 @@
       }
     },
     {
-      "id": "e8",
-      "source": "xcR",
+      "id": "e9",
+      "source": "xcP",
       "sourceHandle": "out",
       "target": "b2",
       "targetHandle": "tool",
@@ -495,7 +532,7 @@
       }
     },
     {
-      "id": "e9",
+      "id": "e10",
       "source": "yc",
       "sourceHandle": "out",
       "target": "ycC",
@@ -505,7 +542,7 @@
       }
     },
     {
-      "id": "e10",
+      "id": "e11",
       "source": "ycC",
       "sourceHandle": "out",
       "target": "ycR",
@@ -515,7 +552,17 @@
       }
     },
     {
-      "id": "e11",
+      "id": "e12",
+      "source": "ycR",
+      "sourceHandle": "out",
+      "target": "ycP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e13",
       "source": "b2",
       "sourceHandle": "out",
       "target": "b3",
@@ -525,8 +572,8 @@
       }
     },
     {
-      "id": "e12",
-      "source": "ycR",
+      "id": "e14",
+      "source": "ycP",
       "sourceHandle": "out",
       "target": "b3",
       "targetHandle": "tool",
@@ -535,17 +582,17 @@
       }
     },
     {
-      "id": "e13",
+      "id": "e15",
       "source": "cb",
       "sourceHandle": "out",
-      "target": "cbC",
+      "target": "cbP",
       "targetHandle": "in",
       "style": {
         "stroke": "#ff8c42"
       }
     },
     {
-      "id": "e14",
+      "id": "e16",
       "source": "b3",
       "sourceHandle": "out",
       "target": "b4",
@@ -555,8 +602,8 @@
       }
     },
     {
-      "id": "e15",
-      "source": "cbC",
+      "id": "e17",
+      "source": "cbP",
       "sourceHandle": "out",
       "target": "b4",
       "targetHandle": "tool",
@@ -565,18 +612,18 @@
       }
     },
     {
-      "id": "e16",
+      "id": "e18",
       "source": "mh",
       "sourceHandle": "out",
-      "target": "mhC",
+      "target": "mhP",
       "targetHandle": "in",
       "style": {
         "stroke": "#ff8c42"
       }
     },
     {
-      "id": "e17",
-      "source": "mhC",
+      "id": "e19",
+      "source": "mhP",
       "sourceHandle": "out",
       "target": "mhRow",
       "targetHandle": "in",
@@ -585,7 +632,7 @@
       }
     },
     {
-      "id": "e18",
+      "id": "e20",
       "source": "mhRow",
       "sourceHandle": "out",
       "target": "mhGrid",
@@ -595,7 +642,7 @@
       }
     },
     {
-      "id": "e19",
+      "id": "e21",
       "source": "b4",
       "sourceHandle": "out",
       "target": "b5",
@@ -605,7 +652,7 @@
       }
     },
     {
-      "id": "e20",
+      "id": "e22",
       "source": "mhGrid",
       "sourceHandle": "out",
       "target": "b5",
@@ -615,7 +662,7 @@
       }
     },
     {
-      "id": "e21",
+      "id": "e23",
       "source": "boss",
       "sourceHandle": "out",
       "target": "bossC",
@@ -625,7 +672,7 @@
       }
     },
     {
-      "id": "e22",
+      "id": "e24",
       "source": "bossC",
       "sourceHandle": "out",
       "target": "bossR",
@@ -635,7 +682,7 @@
       }
     },
     {
-      "id": "e23",
+      "id": "e25",
       "source": "bossR",
       "sourceHandle": "out",
       "target": "bossP",
@@ -645,7 +692,7 @@
       }
     },
     {
-      "id": "e24",
+      "id": "e26",
       "source": "bossP",
       "sourceHandle": "out",
       "target": "bosses",
@@ -655,7 +702,7 @@
       }
     },
     {
-      "id": "e25",
+      "id": "e27",
       "source": "b5",
       "sourceHandle": "out",
       "target": "b6",
@@ -665,7 +712,7 @@
       }
     },
     {
-      "id": "e26",
+      "id": "e28",
       "source": "bosses",
       "sourceHandle": "out",
       "target": "b6",
@@ -675,7 +722,7 @@
       }
     },
     {
-      "id": "e27",
+      "id": "e29",
       "source": "b6",
       "sourceHandle": "out",
       "target": "final",
@@ -685,8 +732,8 @@
       }
     },
     {
-      "id": "e28",
-      "source": "ycR",
+      "id": "e30",
+      "source": "ycP",
       "sourceHandle": "out",
       "target": "final",
       "targetHandle": "tool",

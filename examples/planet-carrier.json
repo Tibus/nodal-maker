@@ -1,0 +1,378 @@
+{
+  "version": 1,
+  "title": "Planet carrier — sun gear + 3 posted planet gears on a round carrier",
+  "outputId": "final",
+  "nodes": [
+    {
+      "id": "carrier",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 40,
+          "height": 6
+        }
+      }
+    },
+    {
+      "id": "sunG",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "gear",
+        "params": {
+          "teeth": 18,
+          "radius": 15,
+          "depth": 5
+        }
+      }
+    },
+    {
+      "id": "sun",
+      "position": {
+        "x": 260,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "extrude",
+        "params": {
+          "height": 18
+        }
+      }
+    },
+    {
+      "id": "withSun",
+      "position": {
+        "x": 520,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "union"
+        }
+      }
+    },
+    {
+      "id": "post",
+      "position": {
+        "x": 0,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 3,
+          "height": 8
+        }
+      }
+    },
+    {
+      "id": "postP",
+      "position": {
+        "x": 260,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 25,
+          "tz": 4
+        }
+      }
+    },
+    {
+      "id": "posts",
+      "position": {
+        "x": 520,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "arrayRadial3d",
+        "params": {
+          "count": 3,
+          "angle": 360
+        }
+      }
+    },
+    {
+      "id": "withPosts",
+      "position": {
+        "x": 780,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "union"
+        }
+      }
+    },
+    {
+      "id": "planetG",
+      "position": {
+        "x": 0,
+        "y": 450
+      },
+      "data": {
+        "nodeType": "gear",
+        "params": {
+          "teeth": 10,
+          "radius": 8,
+          "depth": 4
+        }
+      }
+    },
+    {
+      "id": "planet",
+      "position": {
+        "x": 260,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "extrude",
+        "params": {
+          "height": 9
+        }
+      }
+    },
+    {
+      "id": "planetP",
+      "position": {
+        "x": 520,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tx": 25,
+          "tz": 8
+        }
+      }
+    },
+    {
+      "id": "planets",
+      "position": {
+        "x": 780,
+        "y": 150
+      },
+      "data": {
+        "nodeType": "arrayRadial3d",
+        "params": {
+          "count": 3,
+          "angle": 360
+        }
+      }
+    },
+    {
+      "id": "asm",
+      "position": {
+        "x": 1040,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "union"
+        }
+      }
+    },
+    {
+      "id": "coreBore",
+      "position": {
+        "x": 0,
+        "y": 600
+      },
+      "data": {
+        "nodeType": "cylinder",
+        "params": {
+          "radius": 5,
+          "height": 40
+        }
+      }
+    },
+    {
+      "id": "coreP",
+      "position": {
+        "x": 260,
+        "y": 450
+      },
+      "data": {
+        "nodeType": "transform",
+        "params": {
+          "tz": -6
+        }
+      }
+    },
+    {
+      "id": "final",
+      "position": {
+        "x": 1300,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "boolean3d",
+        "params": {
+          "op": "difference"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "sunG",
+      "sourceHandle": "out",
+      "target": "sun",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "carrier",
+      "sourceHandle": "out",
+      "target": "withSun",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "sun",
+      "sourceHandle": "out",
+      "target": "withSun",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "post",
+      "sourceHandle": "out",
+      "target": "postP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "postP",
+      "sourceHandle": "out",
+      "target": "posts",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e5",
+      "source": "withSun",
+      "sourceHandle": "out",
+      "target": "withPosts",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e6",
+      "source": "posts",
+      "sourceHandle": "out",
+      "target": "withPosts",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e7",
+      "source": "planetG",
+      "sourceHandle": "out",
+      "target": "planet",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#c678dd"
+      }
+    },
+    {
+      "id": "e8",
+      "source": "planet",
+      "sourceHandle": "out",
+      "target": "planetP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e9",
+      "source": "planetP",
+      "sourceHandle": "out",
+      "target": "planets",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e10",
+      "source": "withPosts",
+      "sourceHandle": "out",
+      "target": "asm",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e11",
+      "source": "planets",
+      "sourceHandle": "out",
+      "target": "asm",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e12",
+      "source": "coreBore",
+      "sourceHandle": "out",
+      "target": "coreP",
+      "targetHandle": "in",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e13",
+      "source": "asm",
+      "sourceHandle": "out",
+      "target": "final",
+      "targetHandle": "base",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    },
+    {
+      "id": "e14",
+      "source": "coreP",
+      "sourceHandle": "out",
+      "target": "final",
+      "targetHandle": "tool",
+      "style": {
+        "stroke": "#ff8c42"
+      }
+    }
+  ]
+}
